@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import 'login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'leaderboard_screen.dart';
+import 'test_develop_area.dart';
 
 class MainMenuScreen extends StatefulWidget {
   final String token;
@@ -282,7 +283,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                             fontSize: 14,
                             color: Colors.grey[600],
                           ),
-                        ),*/ // хз херня какая-то с позициями (position - место в списке ? Или роль ?)
+                        ),*/ // хз херня какая-то с позициями (position - место в списке ? Или роль ?) TODO: уточнить
 
                        Text(
                          userData.fullName,
@@ -473,6 +474,21 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         ),
                       ),
                       const SizedBox(height: 15),
+                      SizedBox(
+                        width: 250,
+                        child: FloatingActionButton(
+                          backgroundColor: Colors.red,
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AreaDevelopScreen(
+                                ),
+                              ),
+                            );
+                          },
+                          child: Icon(Icons.bug_report, color: Colors.white),
+                        ),
+                      ),
                     ],
                   ),
                 ),

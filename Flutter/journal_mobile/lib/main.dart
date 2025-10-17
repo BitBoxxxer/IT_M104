@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/menu_screen.dart';
 import 'screens/login_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'services/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,9 +15,17 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  Future<String?> _getToken() async {
+  Future<Map<String, dynamic>> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
+    final token = prefs.getString('token');
+    
+    if (token == null || token.isEmpty) {
+      return {'isValid': false, 'token': null};
+    }
+    
+    final apiService = ApiService();
+    final isValid = await apiService.validateToken(token);
+    return {'isValid': isValid, 'token': isValid ? token : null};
   }
 
   @override
@@ -27,7 +36,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: FutureBuilder<String?>(
+      home: FutureBuilder<Map<String, dynamic>>(
         future: _getToken(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -35,8 +44,10 @@ class MyApp extends StatelessWidget {
               body: Center(child: CircularProgressIndicator()),
             );
           }
-          if (snapshot.hasData && snapshot.data != null) {
-            return MainMenuScreen(token: snapshot.data!);
+          if (snapshot.hasData && 
+              snapshot.data!['isValid'] == true && 
+              snapshot.data!['token'] != null) {
+            return MainMenuScreen(token: snapshot.data!['token']!);
           }
           return const LoginScreen();
         },

@@ -7,7 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/leaderboard_user.dart';
 import '../models/leader_position_model.dart';
 
-// не трогать КОД - НИКОМУ кроме КЕЙСИ (Дианы) !!! НИЗАЧТО (сломаю пальцы и в жопу засуну)
+/// не трогать КОД - НИКОМУ кроме КЕЙСИ (Дианы) !!! НИЗАЧТО (сломаю пальцы и в жопу засуну). 
+/// Исключение, если КЕЙСИ попросит помочь с доработкой этого кода и ВЫ точно знаете что делаете. 
+/// Подумайте дважды прежде чем что-то менять здесь. Иначе - ломайте себе пальцы по одному.
 class ApiService {
   final String _baseUrl = "https://msapi.top-academy.ru/api/v2"; 
 
@@ -53,6 +55,7 @@ class ApiService {
     }
   }
 
+  /// получение оценок студента [api]
   Future<List<Mark>> getMarks(String token) async {
     var response = await http.get(
       Uri.parse('$_baseUrl/progress/operations/student-visits'),
@@ -118,6 +121,7 @@ class ApiService {
     }
   }
 
+  /// получение расписания за указанный период [api]
   Future <List<ScheduleElement>> getSchedule(String token, String dateFrom, String dateTo) async { 
     final String _baseUrl = "https://msapi.top-academy.ru/api/v2";
     
@@ -158,6 +162,7 @@ class ApiService {
     }
   }
 
+  /// получение лидеров группы [api]
   Future<List<LeaderboardUser>> getGroupLeaders(String token) async {
   var response = await http.get(
     Uri.parse('$_baseUrl/dashboard/progress/leader-group'),
@@ -203,6 +208,7 @@ class ApiService {
   }
 }
 
+/// получение лидеров потока [api]
 Future<List<LeaderboardUser>> getStreamLeaders(String token) async {
   var response = await http.get(
     Uri.parse('$_baseUrl/dashboard/progress/leader-stream'),
@@ -247,4 +253,37 @@ Future<List<LeaderboardUser>> getStreamLeaders(String token) async {
     throw Exception('Failed to load stream leaders: ${response.statusCode}');
   }
 }
+
+Future<bool> validateToken(String token) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/settings/user-info'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+        'Referer': 'https://journal.top-academy.ru',
+      },
+    );
+    
+    return response.statusCode == 200;
+  } catch (e) {
+    return false;
+  }
+}
+
+
+// Для тестов. Запросы чисто для проверок РАЗРАБОТЧИКАМ
+/// замена токена на некорректный для тестирования обработки ошибки [api]
+Future<void> simulateTokenError() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('token', 'invalid_token_12345');
+  print('Искусственная ошибка токена активирована!');
+}
+/// очищение токена [api]
+Future<void> clearTokenForTesting() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('token');
+  print('Токен очищен для тестирования!');
+}
+
 }
