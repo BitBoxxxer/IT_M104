@@ -8,6 +8,7 @@ import 'login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'leaderboard_screen.dart';
 import 'test_develop_area.dart';
+import 'contacts_menu_screen.dart';
 
 class MainMenuScreen extends StatefulWidget {
   final String token;
@@ -468,6 +469,21 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                   token: widget.token,
                                   isGroupLeaderboard: false,
                                 ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        width: 250,
+                        child: ElevatedButton.icon(
+                          icon: Icon(Icons.question_answer),
+                          label: Text('Меню для Связи'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ContactMenuScreen(),
                               ),
                             );
                           },
