@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/user_data.dart';
+import '../models/mark.dart';
+import '../services/secure_storage_service.dart';
+import '../services/api_service.dart';
+
 import 'marks_and_profile_screen.dart';
 import 'schedule_screen.dart';
-import '../models/mark.dart';
-import '../services/api_service.dart';
 import 'login_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'leaderboard_screen.dart';
-import 'test_develop_area.dart';
 import 'feedback_review.dart';
+import 'test_develop_area.dart';
 
 class MainMenuScreen extends StatefulWidget {
   final String token;
@@ -199,8 +202,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
+    final secureStorage = SecureStorageService();
+    await secureStorage.clearAll();
 
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(

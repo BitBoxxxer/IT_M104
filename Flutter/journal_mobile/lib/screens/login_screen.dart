@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/secure_storage_service.dart';
 import 'menu_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,9 +14,77 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
+  final _secureStorage = SecureStorageService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
+  bool _checkingAutoLogin = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAutoLogin();
+  }
+
+  Future<void> _checkAutoLogin() async {
+  final hasCredentials = await _secureStorage.hasSavedCredentials();
+  
+  if (hasCredentials && mounted) {
+    final token = await _secureStorage.getToken();
+    
+    if (token != null) {
+      try {
+        final userData = await _apiService.getUser(token);
+        if (mounted) {
+          final newToken = await _secureStorage.getToken();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => MainMenuScreen(token: newToken!)),
+            (Route<dynamic> route) => false,
+          );
+        }
+        return;
+      } catch (e) {
+        print("Token validation failed, trying relogin: $e");
+      }
+    }
+    
+    final credentials = await _secureStorage.getCredentials();
+    if (credentials['username'] != null && credentials['password'] != null && mounted) {
+      _autoLogin(credentials['username']!, credentials['password']!);
+      return;
+    }
+  }
+  
+  if (mounted) {
+    setState(() {
+      _checkingAutoLogin = false;
+    });
+  }
+}
+
+  Future<void> _autoLogin(String username, String password) async {
+    try {
+      final token = await _apiService.login(username, password);
+      if (token != null && mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => MainMenuScreen(token: token)),
+          (Route<dynamic> route) => false,
+        );
+      } else {
+        if (mounted) {
+          setState(() {
+            _checkingAutoLogin = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _checkingAutoLogin = false;
+        });
+      }
+    }
+  }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
@@ -34,17 +102,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final token = await _apiService.login(username, password);
 
       if (token != null && mounted) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', token);
-        await prefs.setString('username', username); 
-        await prefs.setString('password', password); 
-
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => MainMenuScreen(token: token)),
-            (Route<dynamic> route) => false,
-          );
-        }
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => MainMenuScreen(token: token)),
+          (Route<dynamic> route) => false,
+        );
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -98,6 +159,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingAutoLogin) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'Автоматический вход...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -115,13 +198,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Icon(
                           Icons.school_outlined,
                           size: 40,
-                          color: const Color.fromARGB(255, 0, 0, 0),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -130,6 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -137,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Войдите в свой аккаунт',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                         ),
                       ),
                     ],
@@ -153,22 +237,34 @@ class _LoginScreenState extends State<LoginScreen> {
                         // логин
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
+                            color: Theme.of(context).colorScheme.surfaceVariant,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                            ),
                           ),
                           child: TextFormField(
                             controller: _usernameController,
                             validator: _validateUsername,
                             decoration: InputDecoration(
                               labelText: 'Логин',
-                              labelStyle: TextStyle(color: Colors.grey.shade600),
-                              prefixIcon: Icon(Icons.person_outline, color: Colors.grey.shade500),
+                              labelStyle: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.person_outline, 
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                              errorStyle: TextStyle(color: Colors.red.shade600),
+                              errorStyle: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                             ),
-                            style: TextStyle(fontSize: 16, color: Colors.grey.shade800),
+                            style: TextStyle(
+                              fontSize: 16, 
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -176,9 +272,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         // пароль
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
+                            color: Theme.of(context).colorScheme.surfaceVariant,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade200),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                            ),
                           ),
                           child: TextFormField(
                             controller: _passwordController,
@@ -186,12 +284,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
                               labelText: 'Пароль',
-                              labelStyle: TextStyle(color: Colors.grey.shade600),
-                              prefixIcon: Icon(Icons.lock_outline, color: Colors.grey.shade500),
+                              labelStyle: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.lock_outline, 
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                  color: Colors.grey.shade500,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -201,9 +304,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                              errorStyle: TextStyle(color: Colors.red.shade600),
+                              errorStyle: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                             ),
-                            style: TextStyle(fontSize: 16, color: Colors.grey.shade800),
+                            style: TextStyle(
+                              fontSize: 16, 
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -246,9 +354,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         Text(
                           'Student Journal',
                           style: TextStyle(
-                            color: Colors.grey.shade500,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                             fontSize: 12,
-                          ), // TODO: Перенести версию приложения, зависимостью от кол-ва коммитов в репе Github
+                          ),
                         ),
                       ],
                     ),
@@ -261,6 +369,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  
 }

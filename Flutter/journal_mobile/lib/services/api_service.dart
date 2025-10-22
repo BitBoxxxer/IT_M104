@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/secure_storage_service.dart';
 import '../models/mark.dart';
 import '../models/user_data.dart';
 import '../models/days_element.dart';
@@ -13,11 +15,12 @@ import  '../models/feedback_review.dart';
 /// Подумайте дважды прежде чем что-то менять здесь. Иначе - ломайте себе пальцы по одному.
 class ApiService {
   final String _baseUrl = "https://msapi.top-academy.ru/api/v2"; 
+  final SecureStorageService _secureStorage = SecureStorageService();
 
   Future<String?> _reauthenticate() async {
-    final prefs = await SharedPreferences.getInstance();
-    final username = prefs.getString('username');
-    final password = prefs.getString('password');
+    final credentials = await _secureStorage.getCredentials();
+    final username = credentials['username'];
+    final password = credentials['password'];
 
     if (username == null || password == null) {
       return null; 
@@ -26,7 +29,7 @@ class ApiService {
     final newToken = await login(username, password); 
     
     if (newToken != null) {
-      await prefs.setString('token', newToken); // новый токен
+      await _secureStorage.saveToken(newToken);
     }
     return newToken;
   }
@@ -48,7 +51,12 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return data['access_token']; 
+      final token = data['access_token'];
+      
+      await _secureStorage.saveToken(token);
+      await _secureStorage.saveCredentials(username, password);
+      
+      return token; 
     } else {
       print("Login failed: ${response.statusCode}");
       print("Response body: ${response.body}"); 
@@ -333,15 +341,15 @@ Future<bool> validateToken(String token) async {
 // Для тестов. Запросы чисто для проверок РАЗРАБОТЧИКАМ
 /// замена токена на некорректный для тестирования обработки ошибки [api]
 Future<void> simulateTokenError() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('token', 'invalid_token_12345');
+  final secureStorage = SecureStorageService();
+  await secureStorage.saveToken('invalid_token_12345');
   print('Искусственная ошибка токена активирована!');
 }
-/// очищение токена [api]
+
 Future<void> clearTokenForTesting() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.remove('token');
-  print('Токен очищен для тестирования!');
+  final secureStorage = SecureStorageService();
+  await secureStorage.clearAll();
+  print('Все данные очищены для тестирования!');
 }
 
 }
