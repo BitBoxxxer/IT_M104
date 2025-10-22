@@ -78,7 +78,7 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
       color = Colors.blue.shade700; // В классе
       break;
     default:
-      color = Colors.black;
+      color = Colors.white;
   }
 
   
@@ -189,7 +189,6 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                         alignment: Alignment.centerRight,
                         child: Text(
                           mark.dateVisit,
-                          style: const TextStyle(color: Colors.black54, fontSize: 12),
                         ),
                       ),
                     ],

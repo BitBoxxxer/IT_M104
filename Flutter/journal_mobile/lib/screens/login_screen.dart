@@ -99,7 +99,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
@@ -122,16 +121,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Icon(
                           Icons.school_outlined,
                           size: 40,
-                          color: Colors.blue.shade700,
+                          color: const Color.fromARGB(255, 0, 0, 0),
                         ),
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        'Journal Mobile',
+                        'Journal ITTOP M',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade800,
                         ),
                       ),
                       const SizedBox(height: 8),

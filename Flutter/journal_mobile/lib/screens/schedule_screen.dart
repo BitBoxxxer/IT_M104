@@ -32,6 +32,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   final ApiService _apiService = ApiService();
   DateTime _currentDate = DateTime.now(); 
   late Future<List<ScheduleElement>> _scheduleFuture;
+  final PageController _pageController = PageController();
 
   @override
   void initState() {
@@ -54,22 +55,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     setState(() {
       _currentDate = _currentDate.add(Duration(days: delta * 7));
       _scheduleFuture = _loadSchedule(); 
+      _pageController.jumpToPage(0);
     });
   }
-  Widget _buildScheduleDay(ScheduleElement element) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 2),
-          ),
-        ],
+
+  Widget _buildScheduleCard(ScheduleElement element) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -78,51 +73,142 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.access_time, size: 16, color: Colors.indigo),
-                const SizedBox(width: 5),
+                Icon(Icons.access_time, size: 16, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 6),
                 Text(
                   '${element.startedAt.substring(0, 5)} - ${element.finishedAt.substring(0, 5)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.indigo),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 14, 
+                    color: Theme.of(context).colorScheme.primary
+                  ),
                 ),
                 const Spacer(),
                 Text(
                   'Пара ${element.lesson}',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
-            const Divider(height: 12, thickness: 1),
+            
+            const SizedBox(height: 8),
+            
             Text(
               element.subjectName,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 15, 
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
+            
+            const SizedBox(height: 6),
+            
             Row(
               children: [
-                const Icon(Icons.person_outline, size: 14, color: Colors.grey),
+                Icon(Icons.person_outline, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     element.teacherName,
-                    style: const TextStyle(fontSize: 13, color: Colors.black54),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
+            
             const SizedBox(height: 4),
+            
             Row(
               children: [
-                const Icon(Icons.location_on_outlined, size: 14, color: Colors.grey),
+                Icon(Icons.location_on_outlined, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                 const SizedBox(width: 4),
                 Text(
                   element.roomName,
-                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                  ),
                 ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDayPage(List<ScheduleElement> lessons, String dayKey) {
+    final date = DateTime.parse(dayKey);
+    final dayName = DateFormat('EEEE', 'ru_RU').format(date);
+    final formattedDate = DateFormat('dd.MM.yyyy').format(date);
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  '${dayName[0].toUpperCase()}${dayName.substring(1)}',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  formattedDate,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          if (lessons.isEmpty)
+            Expanded(
+              child: Center(
+                child: Text(
+                  'Пар нет',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: lessons.length,
+                itemBuilder: (context, index) {
+                  return _buildScheduleCard(lessons[index]);
+                },
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -168,13 +254,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
-                  return Center(child: Text('Ошибка загрузки: ${snapshot.error.toString()}'));
+                  return Center(
+                    child: Text(
+                      'Ошибка загрузки: ${snapshot.error.toString()}',
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  );
                 }
                 
                 final schedule = snapshot.data ?? [];
-                if (schedule.isEmpty) {
-                  return const Center(child: Text('На эту неделю занятий нет'));
-                }
+                
                 final groupedSchedule = <String, List<ScheduleElement>>{};
                 for (var element in schedule) {
                   if (!groupedSchedule.containsKey(element.date)) {
@@ -182,33 +271,95 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   }
                   groupedSchedule[element.date]!.add(element);
                 }
-                final sortedDays = groupedSchedule.keys.toList()..sort();
                 
-                return ListView.builder(
-                  itemCount: sortedDays.length,
-                  itemBuilder: (context, index) {
-                    final dayKey = sortedDays[index];
-                    final lessons = groupedSchedule[dayKey]!;
+                final allDays = <String>[];
+                DateTime currentDay = monday;
+                while (currentDay.isBefore(sunday.add(const Duration(days: 1)))) {
+                  final dayKey = formatDate(currentDay);
+                  allDays.add(dayKey);
+                  currentDay = currentDay.add(const Duration(days: 1));
+                }
+
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: 60,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: allDays.length,
+                        itemBuilder: (context, index) {
+                          final dayKey = allDays[index];
+                          final date = DateTime.parse(dayKey);
+                          final dayName = DateFormat('E', 'ru_RU').format(date);
+                          final hasLessons = groupedSchedule.containsKey(dayKey);
+                          
+                          return GestureDetector(
+                            onTap: () => _pageController.animateToPage(
+                              index,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            ),
+                            child: Container(
+                              width: 50,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: hasLessons 
+                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                                    : Theme.of(context).colorScheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _pageController.hasClients && _pageController.page?.round() == index
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    dayName,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: hasLessons
+                                          ? Theme.of(context).colorScheme.primary
+                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  Text(
+                                    DateFormat('dd').format(date),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: hasLessons
+                                          ? Theme.of(context).colorScheme.primary
+                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                     
-                    final date = DateTime.parse(dayKey);
-                    final dayName = DateFormat('EEEE', 'ru_RU').format(date);
-                    final formattedDate = '${dayName[0].toUpperCase()}${dayName.substring(1)}, ${DateFormat('dd.MM').format(date)}';
+                    const SizedBox(height: 8),
                     
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-                          child: Text(
-                            formattedDate,
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87),
-                          ),
-                        ),
-                        ...lessons.map(_buildScheduleDay).toList(),
-                        const SizedBox(height: 16),
-                      ],
-                    );
-                  },
+                    Expanded(
+                      child: PageView.builder(
+                        controller: _pageController,
+                        itemCount: allDays.length,
+                        itemBuilder: (context, index) {
+                          final dayKey = allDays[index];
+                          final lessons = groupedSchedule[dayKey] ?? [];
+                          return _buildDayPage(lessons, dayKey);
+                        },
+                      ),
+                    ),
+                  ],
                 );
               },
             ),

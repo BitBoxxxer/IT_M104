@@ -8,6 +8,7 @@ import 'login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'leaderboard_screen.dart';
 import 'test_develop_area.dart';
+import 'feedback_review.dart';
 
 class MainMenuScreen extends StatefulWidget {
   final String token;
@@ -324,14 +325,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           color: Colors.grey[700],
                         ),
                       ),
-                       const SizedBox(height: 4),
-                       /* Text(
-                         'achieves_count: ${userData.groupName}',
-                         style: TextStyle(
-                           fontSize: 16,
-                           color: Colors.grey[700],
-                         ),
-                       ), */
                      ],
                    ),
                  ),
@@ -392,7 +385,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         width: 250,
                         child: ElevatedButton.icon(
                           icon: const Icon(Icons.school),
-                          label: const Text('Оценки и Профиль'),
+                          label: const Text('Оценки и Пары'),
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -402,7 +395,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 20),
                       SizedBox(
                         width: 250,
                         child: ElevatedButton.icon(
@@ -417,6 +410,76 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         ),
                       ),
             
+                      const SizedBox(height: 20),
+                      
+                      SizedBox(
+                        width: 250,
+                        child: ElevatedButton.icon(
+                          icon: Icon(Icons.leaderboard),
+                          label: Text('Лидеры группы'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => LeaderboardScreen(
+                                  token: widget.token,
+                                  isGroupLeaderboard: true,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: 250,
+                        child: ElevatedButton.icon(
+                          icon: Icon(Icons.leaderboard_outlined),
+                          label: Text('Лидеры потока'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => LeaderboardScreen(
+                                  token: widget.token,
+                                  isGroupLeaderboard: false,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: 250,
+                        child: ElevatedButton.icon(
+                          icon: Icon(Icons.commit),
+                          label: Text('Отзывы Студента'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => FeedbackReviewScreen(token: widget.token),
+                              ),
+                            ); // TODO: Написать окно для отзывов студента.
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: 250,
+                        child: FloatingActionButton(
+                          backgroundColor: Colors.red,
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AreaDevelopScreen(
+                                ),
+                              ),
+                            );
+                          },
+                          child: Icon(Icons.bug_report, color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(height: 20), /*без него выглядит дерьмово*/
+
                       Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: SizedBox(
@@ -436,59 +499,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10), /*без него выглядит дерьмово*/
                       
-                      SizedBox(
-                        width: 250,
-                        child: ElevatedButton.icon(
-                          icon: Icon(Icons.leaderboard),
-                          label: Text('Лидеры группы'),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => LeaderboardScreen(
-                                  token: widget.token,
-                                  isGroupLeaderboard: true,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      SizedBox(
-                        width: 250,
-                        child: ElevatedButton.icon(
-                          icon: Icon(Icons.leaderboard_outlined),
-                          label: Text('Лидеры потока'),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => LeaderboardScreen(
-                                  token: widget.token,
-                                  isGroupLeaderboard: false,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      SizedBox(
-                        width: 250,
-                        child: FloatingActionButton(
-                          backgroundColor: Colors.red,
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => AreaDevelopScreen(
-                                ),
-                              ),
-                            );
-                          },
-                          child: Icon(Icons.bug_report, color: Colors.white),
-                        ),
-                      ),
                     ],
                   ),
                 ),
