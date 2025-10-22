@@ -55,14 +55,14 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
               width: 250,
               child: ElevatedButton.icon(
                 icon: Icon(Icons.delete, color: Colors.purple),
-                label: Text('Очистить токен', style: TextStyle(color: Colors.purple)),
+                label: Text('Очистить все данные Secure_Storage', style: TextStyle(color: Colors.purple)),
                 onPressed: () async {
                   final apiService = ApiService();
                   await apiService.clearTokenForTesting();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Токен очищен! Перезайдите в приложение'),
-                      backgroundColor: Colors.purple,
+                      content: Text('Secure_Storage данные очищены! Перезайдите в приложение'),
+                      backgroundColor: const Color.fromARGB(255, 181, 64, 202),
                     ),
                   );
                 },
