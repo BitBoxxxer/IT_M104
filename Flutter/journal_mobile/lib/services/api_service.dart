@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/mark.dart';
 import '../models/user_data.dart';
 import '../models/days_element.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/leaderboard_user.dart';
 import '../models/leader_position_model.dart';
+import  '../models/feedback_review.dart';
 
 /// не трогать КОД - НИКОМУ кроме КЕЙСИ (Дианы) !!! НИЗАЧТО (сломаю пальцы и в жопу засуну). 
 /// Исключение, если КЕЙСИ попросит помочь с доработкой этого кода и ВЫ точно знаете что делаете. 
@@ -122,6 +123,7 @@ class ApiService {
   }
 
   /// получение расписания за указанный период [api]
+  /// Универсально принимает значения даты от и до
   Future <List<ScheduleElement>> getSchedule(String token, String dateFrom, String dateTo) async { 
     final String _baseUrl = "https://msapi.top-academy.ru/api/v2";
     
@@ -251,6 +253,62 @@ Future<List<LeaderboardUser>> getStreamLeaders(String token) async {
     print("Failed to load stream leaders: ${response.statusCode}");
     print("Response body: ${response.body}");
     throw Exception('Failed to load stream leaders: ${response.statusCode}');
+  }
+}
+
+/// получение отзывов о студенте [api]
+Future<List<FeedbackReview>> getFeedbackReview(String token) async {
+  var response = await http.get(
+    Uri.parse('$_baseUrl/reviews/index/list'),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'Referer': 'https://journal.top-academy.ru',
+    },
+  );
+
+  if (response.statusCode == 401) {
+    final newToken = await _reauthenticate();
+    if (newToken != null) {
+      response = await http.get(
+        Uri.parse('$_baseUrl/reviews/index/list'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $newToken',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+      );
+    }
+  }
+
+  if (response.statusCode == 200) {
+    try {
+      print("Raw feedback response: ${response.body}");
+      
+      final responseData = jsonDecode(response.body);
+      List<dynamic> feedbackData = [];
+      
+      if (responseData is List) {
+        feedbackData = responseData;
+      } else if (responseData['data'] is List) {
+        feedbackData = responseData['data'];
+      } else if (responseData['reviews'] is List) {
+        feedbackData = responseData['reviews'];
+      } else if (responseData['items'] is List) {
+        feedbackData = responseData['items'];
+      }
+      
+      print("Parsed feedback data: $feedbackData");
+      
+      return feedbackData.map((json) => FeedbackReview.fromJson(json)).toList();
+    } catch (e) {
+      print("Error parsing feedback: $e");
+      throw Exception('Failed to parse feedback data: $e');
+    }
+  } else {
+    print("Failed to load feedback: ${response.statusCode}");
+    print("Response body: ${response.body}");
+    throw Exception('Failed to load feedback: ${response.statusCode}');
   }
 }
 

@@ -36,6 +36,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+      ), // TODO: пока так, настройка темы будет в будущих настройках.
       home: FutureBuilder<Map<String, dynamic>>(
         future: _getToken(),
         builder: (context, snapshot) {
