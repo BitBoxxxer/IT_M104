@@ -27,49 +27,25 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _checkAutoLogin() async {
-  final hasCredentials = await _secureStorage.hasSavedCredentials();
-  
-  if (hasCredentials && mounted) {
-    final token = await _secureStorage.getToken();
-    
-    if (token != null) {
-      try {
-        final userData = await _apiService.getUser(token);
+    try {
+      // Даем небольшую задержку для лучшего UX
+      await Future.delayed(Duration(milliseconds: 500));
+      
+      final hasCredentials = await _secureStorage.hasSavedCredentials();
+      
+      if (!hasCredentials) {
         if (mounted) {
-          final newToken = await _secureStorage.getToken();
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => MainMenuScreen(token: newToken!)),
-            (Route<dynamic> route) => false,
-          );
+          setState(() {
+            _checkingAutoLogin = false;
+          });
         }
         return;
-      } catch (e) {
-        print("Token validation failed, trying relogin: $e");
       }
-    }
-    
-    final credentials = await _secureStorage.getCredentials();
-    if (credentials['username'] != null && credentials['password'] != null && mounted) {
-      _autoLogin(credentials['username']!, credentials['password']!);
-      return;
-    }
-  }
-  
-  if (mounted) {
-    setState(() {
-      _checkingAutoLogin = false;
-    });
-  }
-}
 
-  Future<void> _autoLogin(String username, String password) async {
-    try {
-      final token = await _apiService.login(username, password);
-      if (token != null && mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => MainMenuScreen(token: token)),
-          (Route<dynamic> route) => false,
-        );
+      // ПРОСТО ПЫТАЕМСЯ АВТОМАТИЧЕСКИ ВОЙТИ БЕЗ ПРОВЕРОК
+      final credentials = await _secureStorage.getCredentials();
+      if (credentials['username'] != null && credentials['password'] != null) {
+        await _autoLogin(credentials['username']!, credentials['password']!);
       } else {
         if (mounted) {
           setState(() {
@@ -78,10 +54,52 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
+      print("Auto-login error: $e");
       if (mounted) {
         setState(() {
           _checkingAutoLogin = false;
         });
+      }
+    }
+  }
+
+  Future<void> _autoLogin(String username, String password) async {
+    try {
+      print("Attempting auto-login for user: $username");
+      
+      final token = await _apiService.login(username, password);
+      
+      if (token != null && mounted) {
+        print("Auto-login successful!");
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => MainMenuScreen(token: token)),
+          (Route<dynamic> route) => false,
+        );
+      } else {
+        print("Auto-login failed: token is null");
+        if (mounted) {
+          setState(() {
+            _checkingAutoLogin = false;
+          });
+        }
+      }
+    } catch (e) {
+      print("Auto-login exception: $e");
+      if (mounted) {
+        setState(() {
+          _checkingAutoLogin = false;
+        });
+        
+        // Показываем ошибку только если это не сетевые проблемы
+        if (!e.toString().contains('Network') && !e.toString().contains('Socket')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Автовход не удался: $e'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }
@@ -118,6 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
+      print("Manual login error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -173,6 +192,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Проверка сохраненных данных',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ],
