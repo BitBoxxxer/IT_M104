@@ -164,7 +164,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 _buildThemeOption(
                   'Синяя',
-                  'Темная тема с синими акцентами [ЕЩЕ В ПРОЦЕССЕ - Ди. Пока что это прост dark тема]',
+                  'Темная тема с синими акцентами',
                   Icons.color_lens,
                   ThemeService.blue,
                 ),

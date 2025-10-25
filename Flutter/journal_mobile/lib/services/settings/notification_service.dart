@@ -59,7 +59,7 @@ class NotificationService {
     }
   }
 
-  Future<void> _saveNotificationToHistory(NotificationItem notification) async {
+  Future<void> saveNotificationToHistory(NotificationItem notification) async {
     await _secureStorage.addNotificationToHistory(notification);
   }
 
@@ -209,6 +209,17 @@ class NotificationService {
     return _isInitialized;
   }
 
+  Future<void> deleteNotification(int notificationId) async {
+    try {
+      final List<NotificationItem> notifications = await getNotificationsHistory();
+      final updatedNotifications = notifications.where((n) => n.id != notificationId).toList();
+      await _secureStorage.saveNotificationsHistory(updatedNotifications);
+      print('🗑️ Уведомление $notificationId удалено');
+    } catch (e) {
+      print('❌ Ошибка удаления уведомления: $e');
+    }
+  }
+
   Future<void> _showTestNotification() async {
     try {
       const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -286,6 +297,7 @@ class NotificationService {
     });
   }
 
+  // TODO: пересмотреть при необходимости время системы обновлений - Ди.
   Duration _getPollingInterval() {
     final hour = DateTime.now().hour;
     
@@ -408,7 +420,7 @@ class NotificationService {
       payload: {'newMarksCount': newMarksCount},
     );
     
-    await _saveNotificationToHistory(notification);
+    await saveNotificationToHistory(notification);
     
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'new_marks_channel',
@@ -465,7 +477,7 @@ class NotificationService {
       payload: {'absences': absences, 'lates': lates},
     );
     
-    await _saveNotificationToHistory(notification);
+    await saveNotificationToHistory(notification);
 
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'attendance_channel',
@@ -509,7 +521,7 @@ class NotificationService {
         type: NotificationType.system,
       );
       
-      await _saveNotificationToHistory(notification);
+      await saveNotificationToHistory(notification);
       await _checkForUpdates(token);
     }
   }

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/user_data.dart';
 import '../models/mark.dart';
+import '../models/notification_item.dart';
 import '../services/secure_storage_service.dart';
 import '../services/api_service.dart';
+import '../services/settings/notification_service.dart';
 
 import 'marks_and_profile_screen.dart';
 import 'schedule_screen.dart';
@@ -243,22 +245,64 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Главное меню'),
-        actions: [
-          SizedBox(
-            width: 165,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.notification_important),
-              label: const Text('Уведомления'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => UserNotificationScreen()
-                  )
-                );
-              },
+        leading: FutureBuilder<List<NotificationItem>>(
+    future: NotificationService().getNotificationsHistory(),
+    builder: (context, snapshot) {
+      final unreadCount = snapshot.hasData 
+          ? snapshot.data!.where((n) => !n.isRead).length 
+          : 0;
+      
+      return Stack(
+        children: [
+          IconButton(
+            icon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: unreadCount > 0
+                  ? const Icon(Icons.notifications_active, key: ValueKey('active'))
+                  : const Icon(Icons.notifications, key: ValueKey('normal')),
             ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => UserNotificationScreen()
+                )
+              );
+            },
           ),
-          SizedBox(width: 50,),
+          if (unreadCount > 0)
+            Positioned(
+              right: 8,
+              top: 8,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : unreadCount.toString(),
+                    key: ValueKey(unreadCount), // Анимация при изменении числа
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  ),
+        actions: [
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -272,7 +316,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               );
             },
           ),
-
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(

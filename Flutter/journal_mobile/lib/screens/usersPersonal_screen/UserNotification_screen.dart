@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:journal_mobile/services/settings/notification_service.dart';
 import 'package:journal_mobile/services/secure_storage_service.dart';
 import 'package:journal_mobile/models/notification_item.dart';
@@ -15,17 +16,68 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
   final NotificationService _notificationService = NotificationService();
   late Future<List<NotificationItem>> _notificationsFuture;
   bool _isLoading = false;
+  bool _hasUnreadNotifications = false;
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _notificationsFuture = _notificationService.getNotificationsHistory();
+    _markAllAsRead();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    Future.delayed(Duration(seconds: 1), () {
+      _refreshNotifications();
+    });
+
+    _scheduleNextRefresh();
+  }
+
+  void _scheduleNextRefresh() {
+    _autoRefreshTimer?.cancel();
+    
+    final interval = _getCurrentPollingInterval();
+    
+    _autoRefreshTimer = Timer(interval, () {
+      _refreshNotifications();
+      _scheduleNextRefresh();
+    });
+  }
+
+  Duration _getCurrentPollingInterval() {
+    final hour = DateTime.now().hour;
+    
+    if (hour >= 23 || hour <= 6) {
+      return Duration(minutes: 60);
+    } else if (hour >= 8 && hour <= 18) {
+      return Duration(minutes: 10);
+    } else {
+      return Duration(minutes: 30);
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    final notifications = await _notificationService.getNotificationsHistory();
+    for (final notification in notifications.where((n) => !n.isRead)) {
+      await _notificationService.markAsRead(notification.id);
+    }
+    _refreshNotifications();
   }
 
   void _refreshNotifications() {
-    setState(() {
-      _notificationsFuture = _notificationService.getNotificationsHistory();
-    });
+    if (mounted) {
+      setState(() {
+        _notificationsFuture = _notificationService.getNotificationsHistory();
+      });
+    }
   }
 
   Future<void> _manualCheck() async {
@@ -41,10 +93,12 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
       await Future.delayed(const Duration(seconds: 2));
     }
 
-    setState(() {
-      _isLoading = false;
-      _refreshNotifications();
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _refreshNotifications();
+      });
+    }
   }
 
   Future<void> _clearAllNotifications() async {
@@ -74,6 +128,24 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
         const SnackBar(content: Text('История уведомлений очищена')),
       );
     }
+  }
+
+  Future<void> _deleteNotification(NotificationItem notification) async {
+    await _notificationService.deleteNotification(notification.id);
+    _refreshNotifications();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Уведомление удалено'),
+        action: SnackBarAction(
+          label: 'Отмена',
+          onPressed: () async {
+            await _notificationService.saveNotificationToHistory(notification);
+            _refreshNotifications();
+          },
+        ),
+      ),
+    );
   }
 
   Widget _buildNotificationIcon(NotificationType type) {
@@ -185,7 +257,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
                         Text(
                           _isLoading 
                             ? 'Выполняется проверка...' 
-                            : 'Проверить новые оценки и посещаемость',
+                            : 'Автообновление каждые ${_getCurrentPollingInterval().inMinutes} мин.',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -265,7 +337,6 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
                   itemBuilder: (context, index) {
                     final notification = notifications[index];
                     
-                    // TODO: Добавить смахивание уведомлений - удаление (архивация?)
                     return Dismissible(
                       key: Key(notification.id.toString()),
                       direction: DismissDirection.endToStart,
@@ -275,8 +346,28 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
                         padding: const EdgeInsets.only(right: 20),
                         child: const Icon(Icons.delete, color: Colors.white),
                       ),
+                      confirmDismiss: (direction) async {
+                        final shouldDelete = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Удалить уведомление?'),
+                            content: Text('Удалить "${notification.title}"?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Отмена'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+                        return shouldDelete ?? false;
+                      },
                       onDismissed: (direction) async {
-                        _refreshNotifications();
+                        await _deleteNotification(notification);
                       },
                       child: Card(
                         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

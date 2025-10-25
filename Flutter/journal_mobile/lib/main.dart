@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'services/api_service.dart';
 import 'services/theme_service.dart';
 import 'services/settings/notification_service.dart';
+import 'models/system/blue_theme.dart'; // Добавляем импорт синей темы
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,13 +60,20 @@ class _MyAppState extends State<MyApp> {
     return {'isValid': isValid, 'token': isValid ? token : null};
   }
 
+  // Новый метод для получения правильной темы
+  ThemeData _getDarkTheme() {
+    return _currentTheme == ThemeService.blue 
+        ? blueTheme  // Используем синюю тему
+        : ThemeData.dark(); // Стандартная темная тема
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Student App',
       theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
+      darkTheme: _getDarkTheme(), // Используем наш метод
       themeMode: _themeService.getThemeMode(_currentTheme),
       home: FutureBuilder<Map<String, dynamic>>(
         future: _getToken(),
@@ -79,7 +87,7 @@ class _MyAppState extends State<MyApp> {
               snapshot.data!['isValid'] == true && 
               snapshot.data!['token'] != null) {
             
-              WidgetsBinding.instance.addPostFrameCallback((_) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
               NotificationService().startSmartPolling(snapshot.data!['token']!);
             });
             

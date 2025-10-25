@@ -48,7 +48,6 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
 
             // УВЕДОМЛЕНИЯ
             Card(
-              color: Colors.blue.shade50,
               child: Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(

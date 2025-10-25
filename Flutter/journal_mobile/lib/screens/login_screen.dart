@@ -35,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _checkAutoLogin() async {
     try {
-      // Даем небольшую задержку для лучшего UX
+      // Небольшую задержку для лучшего UX - Ди
       await Future.delayed(Duration(milliseconds: 500));
       
       final hasCredentials = await _secureStorage.hasSavedCredentials();
@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // ПРОСТО ПЫТАЕМСЯ АВТОМАТИЧЕСКИ ВОЙТИ БЕЗ ПРОВЕРОК
+      // ПРОСТО ПЫТАЕТСЯ АВТОМАТИЧЕСКИ ВОЙТИ БЕЗ ПРОВЕРОК - Ди
       final credentials = await _secureStorage.getCredentials();
       if (credentials['username'] != null && credentials['password'] != null) {
         await _autoLogin(credentials['username']!, credentials['password']!);
@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _checkingAutoLogin = false;
         });
         
-        // Показываем ошибку только если это не сетевые проблемы
+        // Показывает ошибку только если это не сетевые проблемы - Ди
         if (!e.toString().contains('Network') && !e.toString().contains('Socket')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -27,10 +27,31 @@ class ThemeService {
       case dark:
         return ThemeMode.dark;
       case blue:
-        return ThemeMode.dark; // Синяя тема = кастомизация темной. TODO: ДОПИСАТЬ.
+        return ThemeMode.dark;
       case system:
       default:
         return ThemeMode.system;
     }
+  }
+
+  ThemeData getThemeData(String themeName, BuildContext context) {
+    switch (themeName) {
+      case light:
+        return ThemeData.light();
+      case blue:
+        return blueTheme;
+      case dark:
+      default:
+        return ThemeData.dark();
+    }
+  }
+
+  ThemeData getCurrentThemeData(BuildContext context) {
+    final themeName = getThemeSync();
+    return getThemeData(themeName, context);
+  }
+
+  String getThemeSync() {
+    return dark;
   }
 }
