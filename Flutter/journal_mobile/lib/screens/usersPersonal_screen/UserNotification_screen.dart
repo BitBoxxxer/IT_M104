@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'dart:async';
 import 'package:journal_mobile/services/settings/notification_service.dart';
 import 'package:journal_mobile/services/secure_storage_service.dart';
@@ -16,7 +15,6 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
   final NotificationService _notificationService = NotificationService();
   late Future<List<NotificationItem>> _notificationsFuture;
   bool _isLoading = false;
-  bool _hasUnreadNotifications = false;
   Timer? _autoRefreshTimer;
 
   @override

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/settings/notification_service.dart';
@@ -175,7 +174,6 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                         print('🔄 Проверка системы уведомлений...');
                         
                         try {
-                          // Проверяем инициализацию
                           final isInitialized = await _notificationService.isInitialized();
                           print('📱 Система инициализирована: $isInitialized');
                           
@@ -184,15 +182,12 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                             await _notificationService.initialize();
                           }
 
-                          // Получаем полный статус системы
                           final status = await _notificationService.getNotificationStatus();
                           print('📱 Статус системы: $status');
                           
-                          // Проверяем разрешения
                           final bool? granted = await _notificationService.areNotificationsEnabled();
                           print('📱 Разрешения на уведомления: $granted');
                           
-                          // Проверяем активные каналы
                           final activeChannels = await _notificationService.getActiveNotificationChannels();
                           print('📱 Активные каналы: ${activeChannels?.length ?? 0}');
                           

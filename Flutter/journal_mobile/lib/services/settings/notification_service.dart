@@ -220,36 +220,6 @@ class NotificationService {
     }
   }
 
-  Future<void> _showTestNotification() async {
-    try {
-      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-        'new_marks_channel',
-        'Новые оценки',
-        channelDescription: 'Уведомления о новых оценках',
-        importance: Importance.max,
-        priority: Priority.high,
-        enableVibration: true,
-        playSound: true,
-      );
-      
-      const NotificationDetails details = NotificationDetails(
-        android: androidDetails,
-        iOS: DarwinNotificationDetails(),
-      );
-      
-      await notifications.show(
-        0,
-        '🔔 Тест уведомлений',
-        'Система уведомлений работает!',
-        details,
-      );
-      
-      print('✅ Тестовое уведомление отправлено');
-    } catch (e) {
-      print('❌ Ошибка тестового уведомления: $e');
-    }
-  }
-
   Future<void> _createNotificationChannels() async {
     const AndroidNotificationChannel marksChannel = AndroidNotificationChannel(
       'new_marks_channel',
@@ -295,19 +265,6 @@ class NotificationService {
       }
       _startPollingLoop(token);
     });
-  }
-
-  // TODO: пересмотреть при необходимости время системы обновлений - Ди.
-  Duration _getPollingInterval() {
-    final hour = DateTime.now().hour;
-    
-    if (hour >= 23 || hour <= 6) {
-      return Duration(minutes: 60);
-    } else if (hour >= 8 && hour <= 18) {
-      return Duration(minutes: 10);
-    } else {
-      return Duration(minutes: 30);
-    }
   }
 
   Future<bool> _shouldCheckNow() async {

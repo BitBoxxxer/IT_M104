@@ -6,7 +6,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'services/api_service.dart';
 import 'services/theme_service.dart';
 import 'services/settings/notification_service.dart';
-import 'models/system/blue_theme.dart'; // Добавляем импорт синей темы
+import 'models/system/blue_theme.dart';
+// TODO: Добавить возможность кастомизации собственной темы + добавления заднего фона для всех окон
+// с автоматическим затемнением изображения.
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,11 +62,10 @@ class _MyAppState extends State<MyApp> {
     return {'isValid': isValid, 'token': isValid ? token : null};
   }
 
-  // Новый метод для получения правильной темы
   ThemeData _getDarkTheme() {
     return _currentTheme == ThemeService.blue 
-        ? blueTheme  // Используем синюю тему
-        : ThemeData.dark(); // Стандартная темная тема
+        ? blueTheme
+        : ThemeData.dark();
   }
 
   @override
@@ -73,7 +74,7 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       title: 'Student App',
       theme: ThemeData.light(),
-      darkTheme: _getDarkTheme(), // Используем наш метод
+      darkTheme: _getDarkTheme(),
       themeMode: _themeService.getThemeMode(_currentTheme),
       home: FutureBuilder<Map<String, dynamic>>(
         future: _getToken(),
