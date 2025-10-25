@@ -11,10 +11,14 @@ import 'login_screen.dart';
 import 'leaderboard_screen.dart';
 import 'feedback_review.dart';
 import 'test_develop_area.dart';
+import 'settings_screen.dart';
+import 'usersPersonal_screen/UserNotification_screen.dart';
 
 class MainMenuScreen extends StatefulWidget {
   final String token;
-  const MainMenuScreen({super.key, required this.token});
+  final String currentTheme;
+  final Function(String) onThemeChanged;
+  const MainMenuScreen({super.key, required this.token,required this.currentTheme,required this.onThemeChanged,});
 
   @override
   State<MainMenuScreen> createState() => _MainMenuScreenState();
@@ -207,7 +211,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
+          builder: (context) =>
+            LoginScreen(
+              currentTheme: widget.currentTheme,
+              onThemeChanged: widget.onThemeChanged,
+            ),
         ),
         (Route<dynamic> route) => false,
       );
@@ -235,6 +243,37 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Главное меню'),
+        actions: [
+          SizedBox(
+            width: 165,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.notification_important),
+              label: const Text('Уведомления'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => UserNotificationScreen()
+                  )
+                );
+              },
+            ),
+          ),
+          SizedBox(width: 50,),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(
+                    currentTheme: widget.currentTheme,
+                    onThemeChanged: widget.onThemeChanged,
+                  ),
+                ),
+              );
+            },
+          ),
+
+        ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _dataFuture,
@@ -461,6 +500,24 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                 builder: (_) => FeedbackReviewScreen(token: widget.token),
                               ),
                             ); // TODO: Написать окно для отзывов студента.
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: 250,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.settings),
+                          label: const Text('Настройки'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => SettingsScreen(
+                                  currentTheme: widget.currentTheme,
+                                  onThemeChanged: widget.onThemeChanged,
+                                ),
+                              ),
+                            );
                           },
                         ),
                       ),

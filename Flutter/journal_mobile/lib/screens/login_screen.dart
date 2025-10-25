@@ -4,7 +4,14 @@ import '../services/secure_storage_service.dart';
 import 'menu_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String currentTheme;
+  final Function(String) onThemeChanged;
+
+  const LoginScreen({
+    super.key,
+    required this.currentTheme,
+    required this.onThemeChanged,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -72,7 +79,13 @@ class _LoginScreenState extends State<LoginScreen> {
       if (token != null && mounted) {
         print("Auto-login successful!");
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => MainMenuScreen(token: token)),
+          MaterialPageRoute(
+            builder: (_) => MainMenuScreen(
+              token: token,
+              currentTheme: widget.currentTheme,
+              onThemeChanged: widget.onThemeChanged,
+            ),
+          ),
           (Route<dynamic> route) => false,
         );
       } else {
@@ -121,7 +134,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (token != null && mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => MainMenuScreen(token: token)),
+          MaterialPageRoute(
+            builder: (_) => MainMenuScreen(
+              token: token,
+              currentTheme: widget.currentTheme,
+              onThemeChanged: widget.onThemeChanged,
+            ),
+          ),
           (Route<dynamic> route) => false,
         );
       } else {
