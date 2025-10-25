@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:journal_mobile/models/mark.dart';
 import '../api_service.dart';
 import 'package:journal_mobile/services/secure_storage_service.dart';
+import 'package:app_settings/app_settings.dart';
 import 'package:journal_mobile/models/notification_item.dart';
 import 'dart:convert';
 
@@ -143,10 +144,18 @@ class NotificationService {
 
   Future<void> openAppNotificationSettings() async {
     try {
-      print('📱 Откройте настройки уведомлений вручную:');
-      print('   Настройки → Приложения → journal_mobile → Уведомления');
+      print('Opening notification settings...');
+      await AppSettings.openAppSettings();
+      print('Notification settings opened successfully');
     } catch (e) {
-      print('❌ Ошибка открытия настроек: $e');
+      print('Error opening notification settings: $e');
+      try {
+        await AppSettings.openAppSettings();
+        print('Fallback: App settings opened successfully');
+      } catch (fallbackError) {
+        print('Error opening app settings: $fallbackError');
+        throw fallbackError;
+      }
     }
   }
 

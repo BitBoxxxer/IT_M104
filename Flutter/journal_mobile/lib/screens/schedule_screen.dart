@@ -90,6 +90,31 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Widget _buildScheduleCard(ScheduleElement element) {
+  final String roomName = element.roomName;
+  
+  final String roomLower = roomName.toLowerCase();
+  final bool isDistance = roomLower.startsWith('дистант');
+  final bool isSrs = roomLower.startsWith('срс');
+  final bool isCpc = roomLower.startsWith('cpc');
+
+  IconData locationIcon;
+  Color iconColor;
+  String locationType = '';
+  
+  if (isDistance) {
+    locationIcon = Icons.computer;
+    iconColor = Colors.blue.shade700;
+  } else if (isSrs) {
+    locationIcon = Icons.auto_stories;
+    iconColor = Colors.green.shade700;
+  } else if (isCpc) {
+    locationIcon = Icons.code;
+    iconColor = Colors.orange.shade700;
+  } else {
+    locationIcon = Icons.location_on_outlined;
+    iconColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+  }
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       elevation: 2,
@@ -160,13 +185,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             
             Row(
               children: [
-                Icon(Icons.location_on_outlined, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                Icon(locationIcon, size: 14, color: iconColor),
                 const SizedBox(width: 4),
                 Text(
-                  element.roomName,
+                  '$locationType${element.roomName}',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                    color: iconColor,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],

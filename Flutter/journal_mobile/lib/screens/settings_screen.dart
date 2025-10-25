@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/theme_service.dart';
 import '../services/settings/notification_service.dart';
 
@@ -17,32 +18,82 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late String _selectedTheme;
+  String? _selectedTheme;
   bool _notificationsEnabled = true;
   bool _hasNotificationPermission = true;
+  bool _isLoading = true;
   final NotificationService _notificationService = NotificationService();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   @override
   void initState() {
     super.initState();
-    _selectedTheme = widget.currentTheme;
-    _loadNotificationSettings();
+    _initializeData();
   }
 
-  void _loadNotificationSettings() async {
-    final enabled = await _notificationService.isPollingEnabled();
-    final permissionStatus = await _notificationService.checkPermissionStatus();
+  Future<void> _initializeData() async {
+    await _loadThemeFromStorage();
+    await _loadNotificationSettings();
     
     setState(() {
-      _notificationsEnabled = enabled;
-      _hasNotificationPermission = permissionStatus['enabled'] ?? true;
+      _isLoading = false;
     });
   }
 
-  void _changeTheme(String theme) {
+  Future<void> _loadThemeFromStorage() async {
+    try {
+      final savedTheme = await _secureStorage.read(key: 'selected_theme');
+      
+      final themeToUse = savedTheme ?? widget.currentTheme;
+      
+      setState(() {
+        _selectedTheme = themeToUse;
+      });
+      
+      if (savedTheme != null && savedTheme != widget.currentTheme) {
+        widget.onThemeChanged(savedTheme);
+      }
+    } catch (e) {
+      print('Ошибка загрузки темы из secure_storage: $e');
+      setState(() {
+        _selectedTheme = widget.currentTheme;
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentTheme != widget.currentTheme && _selectedTheme != null) {
+      setState(() {
+        _selectedTheme = widget.currentTheme;
+      });
+    }
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    try {
+      final enabled = await _notificationService.isPollingEnabled();
+      final permissionStatus = await _notificationService.checkPermissionStatus();
+      
+      setState(() {
+        _notificationsEnabled = enabled;
+        _hasNotificationPermission = permissionStatus['enabled'] ?? true;
+      });
+    } catch (e) {
+      print('Ошибка загрузки настроек уведомлений: $e');
+    }
+  }
+
+  Future<void> _changeTheme(String theme) async {
     setState(() {
       _selectedTheme = theme;
     });
+    try {
+      await _secureStorage.write(key: 'selected_theme', value: theme);
+    } catch (e) {
+      print('Ошибка сохранения темы в secure_storage: $e');
+    }
     widget.onThemeChanged(theme);
   }
 
@@ -97,27 +148,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _openNotificationSettings() async {
-    await _notificationService.openAppNotificationSettings();
-    
-    await Future.delayed(const Duration(seconds: 1));
-    _loadNotificationSettings();
+    try {
+      print('Пытаемся открыть настройки уведомлений...');
+      await _notificationService.openAppNotificationSettings();
+      
+      // Ждем немного и проверяем обновились ли разрешения
+      await Future.delayed(const Duration(seconds: 3));
+      await _loadNotificationSettings();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Вернитесь в приложение после настройки разрешений'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      print('Ошибка открытия настроек уведомлений: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Не удалось открыть настройки. Попробуйте позже.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Future<void> _checkPermissions() async {
-    final permissionStatus = await _notificationService.checkPermissionStatus();
-    final hasPermission = permissionStatus['enabled'] ?? true;
-    
-    setState(() {
-      _hasNotificationPermission = hasPermission;
-    });
-    
-    if (!hasPermission) {
-      _showPermissionDialog();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Разрешения предоставлены ✅')),
-      );
-    }
+    await _openNotificationSettings();
   }
 
   @override
@@ -130,7 +187,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: ListView(
+      body: _isLoading || _selectedTheme == null
+    ? const Center(child: CircularProgressIndicator())
+    : ListView(
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
@@ -205,12 +264,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ListTile(
                     leading: const Icon(Icons.settings, size: 20),
                     title: const Text(
-                      'Проверить разрешения',
-                      style: TextStyle(fontSize: 14),
+                      'Настроить разрешения',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
+                    subtitle: const Text('Открыть настройки устройства'),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: _checkPermissions,
-                    dense: true,
                   ),
                 ],
               ],
@@ -226,7 +285,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: const Text('Настройки аккаунта'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
-                // (выйти из акка, смена аватарки, личных данных на аккаунте) - Ди
+                // (выйти из акка, смена аватарки, личных данных на аккаунте)
               },
             ),
           ),
@@ -268,7 +327,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(subtitle),
       trailing: Radio<String>(
         value: themeValue,
-        groupValue: _selectedTheme,
+        groupValue: _selectedTheme!,
         onChanged: (value) => _changeTheme(value!),
       ),
       onTap: () => _changeTheme(themeValue),
