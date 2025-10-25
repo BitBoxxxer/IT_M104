@@ -88,13 +88,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   Widget _buildLeaderItem(LeaderboardUser user, int index) {
+    final displayPosition = user.position > 0 ? user.position : index + 1;
+    
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       elevation: 2,
       child: ListTile(
-        leading: _buildRankIcon(user.position),
+        leading: _buildRankIcon(displayPosition),
         title: Text(
-          user.fullName,
+          user.fullName.trim().isEmpty ? 'Неизвестный пользователь' : user.fullName,
           style: TextStyle(
             fontWeight: user.position <= 3 ? FontWeight.bold : FontWeight.normal,
             fontSize: 16,
@@ -103,7 +105,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         subtitle: widget.isGroupLeaderboard
             ? null
             : Text(
-                user.groupName,
+                user.groupName ?? '',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
         trailing: Container(
@@ -130,6 +132,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         ),
       ),
     );
+  }
+
+  List<LeaderboardUser> _filterLeaders(List<LeaderboardUser> leaders) {
+    return leaders.where((user) => user.fullName.trim().isNotEmpty).toList();
   }
 
   @override
@@ -197,7 +203,23 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             );
           }
           
-          final leaders = snapshot.data!;
+          final leaders = _filterLeaders(snapshot.data!);
+          
+          if (leaders.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.leaderboard_outlined, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'Нет данных о лидерах',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
           
           return RefreshIndicator(
             onRefresh: () async {

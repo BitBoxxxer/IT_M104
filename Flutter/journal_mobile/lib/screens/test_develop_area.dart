@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/settings/notification_service.dart';
+import 'package:top_snackbar_flutter/custom_snack_bar.dart';
+import 'package:top_snackbar_flutter/top_snack_bar.dart';
 
 // TODO: Добавить список логинов разработчиков, чтобы не показывать этот экран в продакшн сборке.
 class AreaDevelopScreen extends StatefulWidget {
@@ -399,10 +401,46 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                             foregroundColor: Colors.amber.shade800,
                           ),
                         ),
+                        const SizedBox(height: 50),
                       ],
                     ),
                   ],
                 ),
+              ),
+            ),
+
+            const SizedBox(height: 50),
+
+            // Чисто по приколу слепила, заценить прикол с SnackBar - Ди :D
+            SizedBox(
+              child: ElevatedButton(
+                onPressed: () {
+                  if (!mounted) return;
+                  
+                  final overlay = Overlay.of(context);
+                  if (overlay != null && overlay.mounted) {
+                    showTopSnackBar(
+                      overlay,
+                      const CustomSnackBar.success(
+                        message: 'Пример новых CustomSnackBar.',
+                        backgroundColor: Color.fromARGB(255, 255, 153, 0),
+                        textStyle: TextStyle(
+                          fontSize: 17, 
+                          color: Colors.white, 
+                          fontWeight: FontWeight.bold
+                        ),
+                        icon: Icon(
+                          Icons.notifications_active,
+                          size: 80,
+                          color: Colors.white60,
+                        ),
+                        iconPositionLeft: -24,
+                      ),
+                      displayDuration: const Duration(seconds: 1),
+                    );
+                  }
+                },
+                child: Text('Показать новый стиль SnackBar'),
               ),
             ),
 

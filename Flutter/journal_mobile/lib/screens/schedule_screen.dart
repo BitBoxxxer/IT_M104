@@ -32,12 +32,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   final ApiService _apiService = ApiService();
   DateTime _currentDate = DateTime.now(); 
   late Future<List<ScheduleElement>> _scheduleFuture;
-  final PageController _pageController = PageController();
+  late PageController _pageController;
+  int _initialPageIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _calculateInitialPageIndex();
+    _pageController = PageController(initialPage: _initialPageIndex);
     _scheduleFuture = _loadSchedule(); 
+  }
+
+  void _calculateInitialPageIndex() {
+    final today = DateTime.now();
+    final monday = getMonday(_currentDate);
+    
+    final difference = today.difference(monday).inDays;
+    
+    _initialPageIndex = difference.clamp(0, 6);
   }
 
   Future<List<ScheduleElement>> _loadSchedule() {
@@ -55,7 +67,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     setState(() {
       _currentDate = _currentDate.add(Duration(days: delta * 7));
       _scheduleFuture = _loadSchedule(); 
-      _pageController.jumpToPage(0);
+      _calculateInitialPageIndex();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(_initialPageIndex);
+        }
+      });
+    });
+  }
+
+  void _goToToday() {
+    setState(() {
+      _currentDate = DateTime.now();
+      _scheduleFuture = _loadSchedule();
+      _calculateInitialPageIndex();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(_initialPageIndex);
+        }
+      });
     });
   }
 
@@ -152,6 +182,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final dayName = DateFormat('EEEE', 'ru_RU').format(date);
     final formattedDate = DateFormat('dd.MM.yyyy').format(date);
     
+    final isToday = _isSameDay(date, DateTime.now());
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: Column(
@@ -160,17 +192,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: isToday 
+                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                  : Theme.of(context).colorScheme.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
+              border: isToday
+                  ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                  : null,
             ),
             child: Column(
               children: [
                 Text(
-                  '${dayName[0].toUpperCase()}${dayName.substring(1)}',
+                  '${dayName[0].toUpperCase()}${dayName.substring(1)}${isToday ? ' (Сегодня)' : ''}',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: isToday
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -178,7 +217,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   formattedDate,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
+                    color: isToday
+                        ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
+                        : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
                   ),
                 ),
               ],
@@ -213,15 +254,38 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  bool _isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final monday = getMonday(_currentDate);
     final sunday = getSunday(_currentDate);
     final weekRange = '${DateFormat('dd.MM').format(monday)} - ${DateFormat('dd.MM').format(sunday)}';
 
+    final isCurrentWeek = DateTime.now().isAfter(monday.subtract(const Duration(days: 1))) && 
+                         DateTime.now().isBefore(sunday.add(const Duration(days: 1)));
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Расписание'),
+        actions: [
+          if (!isCurrentWeek)
+            IconButton(
+              icon: const Icon(Icons.today),
+              onPressed: _goToToday,
+              tooltip: 'Перейти к сегодняшнему дню',
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -292,6 +356,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           final date = DateTime.parse(dayKey);
                           final dayName = DateFormat('E', 'ru_RU').format(date);
                           final hasLessons = groupedSchedule.containsKey(dayKey);
+                          final isToday = _isSameDay(date, DateTime.now());
+                          final isSelected = _pageController.hasClients && 
+                                            (_pageController.page?.round() == index || 
+                                             (_pageController.initialPage == index && _pageController.page == null));
                           
                           return GestureDetector(
                             onTap: () => _pageController.animateToPage(
@@ -304,12 +372,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               margin: const EdgeInsets.symmetric(horizontal: 4),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: hasLessons 
-                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                                    : Theme.of(context).colorScheme.surfaceVariant,
+                                color: isToday
+                                    ? Theme.of(context).colorScheme.primary
+                                    : (hasLessons 
+                                        ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                                        : Theme.of(context).colorScheme.surfaceVariant),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: _pageController.hasClients && _pageController.page?.round() == index
+                                  color: isSelected
                                       ? Theme.of(context).colorScheme.primary
                                       : Colors.transparent,
                                   width: 2,
@@ -323,9 +393,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
-                                      color: hasLessons
-                                          ? Theme.of(context).colorScheme.primary
-                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color: isToday
+                                          ? Colors.white
+                                          : (hasLessons
+                                              ? Theme.of(context).colorScheme.primary
+                                              : Theme.of(context).colorScheme.onSurfaceVariant),
                                     ),
                                   ),
                                   Text(
@@ -333,9 +405,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
-                                      color: hasLessons
-                                          ? Theme.of(context).colorScheme.primary
-                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color: isToday
+                                          ? Colors.white
+                                          : (hasLessons
+                                              ? Theme.of(context).colorScheme.primary
+                                              : Theme.of(context).colorScheme.onSurfaceVariant),
                                     ),
                                   ),
                                 ],
