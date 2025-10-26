@@ -7,12 +7,18 @@ import 'package:journal_mobile/services/secure_storage_service.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:journal_mobile/models/notification_item.dart';
 import 'dart:convert';
+import 'dart:async';
 
 class NotificationService {
   final ApiService _apiService = ApiService();
   final SecureStorageService _secureStorage = SecureStorageService();
   final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
+
+  final StreamController<List<NotificationItem>> _notificationsController = 
+      StreamController<List<NotificationItem>>.broadcast();
+  
+  Stream<List<NotificationItem>> get notificationsStream => _notificationsController.stream;
   
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -60,8 +66,21 @@ class NotificationService {
     }
   }
 
+  void dispose() {
+    _notificationsController.close();
+  }
+
+  void _emitNotificationsUpdate() {
+    if (!_notificationsController.isClosed) {
+      getNotificationsHistory().then((notifications) {
+        _notificationsController.add(notifications);
+      });
+    }
+  }
+
   Future<void> saveNotificationToHistory(NotificationItem notification) async {
     await _secureStorage.addNotificationToHistory(notification);
+    _emitNotificationsUpdate();
   }
 
   Future<List<NotificationItem>> getNotificationsHistory() async {
@@ -70,10 +89,12 @@ class NotificationService {
 
   Future<void> markAsRead(int notificationId) async {
     await _secureStorage.markNotificationAsRead(notificationId);
+    _emitNotificationsUpdate();
   }
 
   Future<void> clearNotificationsHistory() async {
     await _secureStorage.clearNotificationsHistory();
+    _emitNotificationsUpdate();
   }
 
   Future<void> showTestNotification() async {
@@ -223,6 +244,7 @@ class NotificationService {
       final List<NotificationItem> notifications = await getNotificationsHistory();
       final updatedNotifications = notifications.where((n) => n.id != notificationId).toList();
       await _secureStorage.saveNotificationsHistory(updatedNotifications);
+      _emitNotificationsUpdate();
       print('🗑️ Уведомление $notificationId удалено');
     } catch (e) {
       print('❌ Ошибка удаления уведомления: $e');

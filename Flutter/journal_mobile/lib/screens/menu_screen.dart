@@ -28,12 +28,17 @@ class MainMenuScreen extends StatefulWidget {
 
 class _MainMenuScreenState extends State<MainMenuScreen> {
   final ApiService _apiService = ApiService();
-  late Future<Map<String, dynamic>> _dataFuture; 
+  final NotificationService _notificationService = NotificationService();
+  late Future<Map<String, dynamic>> _dataFuture;
+  late Stream<List<NotificationItem>> _notificationsStream;
 
   @override
   void initState() {
     super.initState();
     _dataFuture = _loadData();
+    _notificationsStream = _notificationService.notificationsStream;
+    
+    _loadInitialNotifications();
   }
 
   Future<Map<String, dynamic>> _loadData() async {
@@ -240,69 +245,77 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 }
 
+Future<void> _loadInitialNotifications() async {
+    final notifications = await _notificationService.getNotificationsHistory();
+  }
+
+  Widget _buildNotificationIcon() {
+    return StreamBuilder<List<NotificationItem>>(
+      stream: _notificationsStream,
+      initialData: const [],
+      builder: (context, snapshot) {
+        final notifications = snapshot.data ?? [];
+        final unreadCount = notifications.where((n) => !n.isRead).length;
+        
+        return Stack(
+          children: [
+            IconButton(
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: unreadCount > 0
+                    ? const Icon(Icons.notifications_active, key: ValueKey('active'))
+                    : const Icon(Icons.notifications, key: ValueKey('normal')),
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => UserNotificationScreen()
+                  )
+                );
+              },
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Text(
+                      unreadCount > 9 ? '9+' : unreadCount.toString(),
+                      key: ValueKey(unreadCount),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Главное меню'),
-        leading: FutureBuilder<List<NotificationItem>>(
-    future: NotificationService().getNotificationsHistory(),
-    builder: (context, snapshot) {
-      final unreadCount = snapshot.hasData 
-          ? snapshot.data!.where((n) => !n.isRead).length 
-          : 0;
-      
-      return Stack(
-        children: [
-          IconButton(
-            icon: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: unreadCount > 0
-                  ? const Icon(Icons.notifications_active, key: ValueKey('active'))
-                  : const Icon(Icons.notifications, key: ValueKey('normal')),
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => UserNotificationScreen()
-                )
-              );
-            },
-          ),
-          if (unreadCount > 0)
-            Positioned(
-              right: 8,
-              top: 8,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 16,
-                  minHeight: 16,
-                ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Text(
-                    unreadCount > 9 ? '9+' : unreadCount.toString(),
-                    key: ValueKey(unreadCount), // Анимация при изменении числа
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      );
-    },
-  ),
-        actions: [
+        actions: <Widget>[
+          _buildNotificationIcon(),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {

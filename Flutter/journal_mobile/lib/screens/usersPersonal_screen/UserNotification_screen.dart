@@ -13,16 +13,17 @@ class UserNotificationScreen extends StatefulWidget {
 
 class _UserNotificationScreenState extends State<UserNotificationScreen> {
   final NotificationService _notificationService = NotificationService();
-  late Future<List<NotificationItem>> _notificationsFuture;
+  late Stream<List<NotificationItem>> _notificationsStream;
   bool _isLoading = false;
   Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _notificationsFuture = _notificationService.getNotificationsHistory();
+    _notificationsStream = _notificationService.notificationsStream;
     _markAllAsRead();
     _startAutoRefresh();
+    _refreshNotifications();
   }
 
   @override
@@ -71,11 +72,9 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
   }
 
   void _refreshNotifications() {
-    if (mounted) {
-      setState(() {
-        _notificationsFuture = _notificationService.getNotificationsHistory();
-      });
-    }
+    _notificationService.getNotificationsHistory().then((_) {
+      // Поток автоматически обновится через механизм в NotificationService
+    });
   }
 
   Future<void> _manualCheck() async {
@@ -278,10 +277,11 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
           ),
 
           Expanded(
-            child: FutureBuilder<List<NotificationItem>>(
-              future: _notificationsFuture,
+            child: StreamBuilder<List<NotificationItem>>(
+              stream: _notificationsStream,
+              initialData: const [],
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
