@@ -20,12 +20,12 @@ class LeaderboardUser {
 
   factory LeaderboardUser.fromJson(Map<String, dynamic> json) {
     return LeaderboardUser(
-      studentId: json['student_id'] ?? 0,
+      studentId: json['id'] ?? 0,
       fullName: json['full_name'] ?? '',
       groupName: json['group_name'] ?? '',
       photoPath: json['photo'] ?? '',
       position: json['position'] ?? 0,
-      points: json['points'] ?? 0,
+      points: json['amount'] ?? 0,
       totalPoints: json['total_points'] ?? 0,
     );
   }

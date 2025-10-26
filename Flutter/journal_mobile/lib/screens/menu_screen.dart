@@ -520,6 +520,8 @@ Future<void> _loadInitialNotifications() async {
                                 builder: (_) => LeaderboardScreen(
                                   token: widget.token,
                                   isGroupLeaderboard: true,
+                                  currentUserId: userData.studentId,
+                                  currentUserName: userData.fullName,
                                 ),
                               ),
                             );
@@ -538,6 +540,8 @@ Future<void> _loadInitialNotifications() async {
                                 builder: (_) => LeaderboardScreen(
                                   token: widget.token,
                                   isGroupLeaderboard: false,
+                                  currentUserId: userData.studentId,
+                                  currentUserName: userData.fullName,
                                 ),
                               ),
                             );

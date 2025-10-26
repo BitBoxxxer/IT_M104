@@ -5,11 +5,15 @@ import '../services/api_service.dart';
 class LeaderboardScreen extends StatefulWidget {
   final String token;
   final bool isGroupLeaderboard;
+  final int? currentUserId;
+  final String? currentUserName;
 
   const LeaderboardScreen({
     super.key,
     required this.token,
     required this.isGroupLeaderboard,
+    required this.currentUserId,
+    this.currentUserName,
   });
 
   @override
@@ -87,47 +91,177 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     }
   }
 
+  String _normalizeName(String name) {
+    return name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
   Widget _buildLeaderItem(LeaderboardUser user, int index) {
     final displayPosition = user.position > 0 ? user.position : index + 1;
     
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      elevation: 2,
-      child: ListTile(
-        leading: _buildRankIcon(displayPosition),
-        title: Text(
-          user.fullName.trim().isEmpty ? 'Неизвестный пользователь' : user.fullName,
-          style: TextStyle(
-            fontWeight: user.position <= 3 ? FontWeight.bold : FontWeight.normal,
-            fontSize: 16,
-          ),
+    bool isCurrentUserById = widget.currentUserId != null && 
+                            user.studentId == widget.currentUserId &&
+                            user.studentId != 0;
+    
+    bool isCurrentUserByName = widget.currentUserName != null &&
+                              user.fullName.trim().isNotEmpty &&
+                              _normalizeName(user.fullName) == _normalizeName(widget.currentUserName!);
+    
+    final isCurrentUser = isCurrentUserById || isCurrentUserByName;
+
+    if (isCurrentUser) {
+      print('🎯 НАЙДЕН ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ!');
+      print('   По ID: $isCurrentUserById');
+      print('   По имени: $isCurrentUserByName');
+      print('   Имя в лидерборде: "${user.fullName}"');
+      print('   Имя текущее: "${widget.currentUserName}"');
+    }
+    
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        elevation: isCurrentUser ? 8 : 2,
+        shadowColor: isCurrentUser ? Colors.blue.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: isCurrentUser 
+              ? BorderSide(
+                  color: Colors.blue.shade400.withOpacity(0.6),
+                  width: 2,
+                  strokeAlign: BorderSide.strokeAlignOutside,
+                )
+              : BorderSide.none,
         ),
-        subtitle: widget.isGroupLeaderboard
-            ? null
-            : Text(
-                user.groupName ?? '',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-        trailing: Container(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.blue.shade200),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.monetization_on, size: 16, color: Colors.amber),
-              SizedBox(width: 4),
-              Text(
-                (user.points > 0 ? user.points : user.totalPoints ?? 0).toString(),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade800,
+        child: Container(
+          decoration: isCurrentUser
+              ? BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.blue.shade50.withOpacity(0.3),
+                      Colors.lightBlue.shade50.withOpacity(0.1),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                )
+              : null,
+          child: ListTile(
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: _buildRankIcon(displayPosition),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    user.fullName.trim().isEmpty ? 'Неизвестный пользователь' : user.fullName,
+                    style: TextStyle(
+                      fontWeight: user.position <= 3 ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 16,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                if (isCurrentUser) ...[
+                  SizedBox(width: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue.shade400, Colors.lightBlue.shade400],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person, size: 14, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'Вы',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            subtitle: widget.isGroupLeaderboard
+                ? null
+                : Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      user.groupName ?? '',
+                      style: TextStyle(
+                        fontSize: 12, 
+                        color: isCurrentUser ? Colors.blue.shade600 : Colors.grey.shade600
+                      ),
+                    ),
+                  ),
+            trailing: Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: isCurrentUser 
+                    ? LinearGradient(
+                        colors: [Colors.blue.shade100, Colors.lightBlue.shade100],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : LinearGradient(
+                        colors: [Colors.blue.shade50, Colors.lightBlue.shade50],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isCurrentUser 
+                      ? Colors.blue.shade300 
+                      : Colors.blue.shade200,
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  if (isCurrentUser)
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.1),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                ],
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.monetization_on, 
+                    size: 16, 
+                    color: isCurrentUser ? Colors.orange.shade600 : Colors.amber.shade600,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    (user.points > 0 ? user.points : user.totalPoints ?? 0).toString(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isCurrentUser ? Colors.blue.shade900 : Colors.blue.shade800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -152,7 +286,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         future: _leadersFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Загрузка рейтинга...',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
           }
           
           if (snapshot.hasError) {
@@ -168,14 +314,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    snapshot.error.toString(),
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                    textAlign: TextAlign.center,
+                    'Попробуйте обновить',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
-                  SizedBox(height: 16),
-                  ElevatedButton(
+                  SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.refresh),
+                    label: Text('Обновить'),
                     onPressed: _loadLeaders,
-                    child: Text('Попробовать снова'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ],
               ),
