@@ -108,13 +108,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     
     final isCurrentUser = isCurrentUserById || isCurrentUserByName;
 
-    if (isCurrentUser) {
-      print('🎯 НАЙДЕН ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ!');
-      print('   По ID: $isCurrentUserById');
-      print('   По имени: $isCurrentUserByName');
-      print('   Имя в лидерборде: "${user.fullName}"');
-      print('   Имя текущее: "${widget.currentUserName}"');
-    }
     
     return AnimatedContainer(
       duration: Duration(milliseconds: 300),
@@ -205,7 +198,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 : Padding(
                     padding: EdgeInsets.only(top: 4),
                     child: Text(
-                      user.groupName ?? '',
+                      user.groupName,
                       style: TextStyle(
                         fontSize: 12, 
                         color: isCurrentUser ? Colors.blue.shade600 : Colors.grey.shade600

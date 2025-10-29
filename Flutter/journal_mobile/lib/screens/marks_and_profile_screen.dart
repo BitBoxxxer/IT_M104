@@ -85,6 +85,26 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
         color = Colors.orange.shade700;
         tooltipText = 'Опоздал(а)';
         break;
+      case 3:
+        icon = Icons.check_circle;
+        color = const Color.fromARGB(255, 0, 172, 114);
+        tooltipText = 'Уважительная причина';
+        break;
+      case 4:
+        icon = Icons.watch_later;
+        color = const Color.fromARGB(255, 147, 0, 245);
+        tooltipText = 'Больничный';
+        break;
+      case 5:
+        icon = Icons.watch_later;
+        color = const Color.fromARGB(255, 99, 96, 255);
+        tooltipText = 'Практика';
+        break;
+      case 6:
+        icon = Icons.watch_later;
+        color = const Color.fromARGB(255, 141, 141, 141);
+        tooltipText = 'Другое';
+        break;
       default:
         return const SizedBox.shrink();
     }
@@ -116,6 +136,8 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
       case 'class':
         color = Colors.blue.shade700;
         break;
+      case 'practical':
+        color = Colors.orange.shade700;
       default:
         color = Colors.white;
     }
@@ -196,13 +218,20 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                     onPressed: () {
                       _scaffoldKey.currentState?.openDrawer();
                     },
-                  ), // TODO: Какие предметы посмотреть из списка - список не просто column // row, а матрица !
+                  ), // TODO: Какие предметы посмотреть из списка -
+                     // список не просто column // row, а матрица !
+                     // Сепарировать список пройденных пар:
+                     // 1)по курсам, 2) Статус: проходятся, прошли
                   
                   Expanded(
                     child: TextField(
                       controller: _searchController,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                      ),
                       decoration: const InputDecoration(
-                        hintText: "Поиск по предметам, темам...",
+                        hintText: "Поиск по предметам, темам..." ,
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -212,7 +241,7 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                     IconButton(
                       icon: Icon(
                         Icons.clear,
-                        color: Colors.grey.shade600,
+                        color: const Color.fromARGB(255, 0, 0, 0),
                       ),
                       onPressed: _clearSearch,
                     ),
@@ -319,11 +348,13 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                                             _buildMarkChip(mark.controlWorkMark, 'control'),
                                             _buildMarkChip(mark.labWorkMark, 'lab'),
                                             _buildMarkChip(mark.classWorkMark, 'class'),
+                                            _buildMarkChip(mark.practicalWorkMark, 'practical'),
                                             
                                             if (mark.homeWorkMark == null && 
                                                 mark.controlWorkMark == null && 
                                                 mark.labWorkMark == null && 
-                                                mark.classWorkMark == null)
+                                                mark.classWorkMark == null &&
+                                                mark.practicalWorkMark == null)
                                               const Text('Б/О', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                                           ],
                                         ),
