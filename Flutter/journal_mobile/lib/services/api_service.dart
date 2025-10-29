@@ -8,6 +8,7 @@ import '../models/days_element.dart';
 import '../models/leaderboard_user.dart';
 import '../models/leader_position_model.dart';
 import  '../models/feedback_review.dart';
+import '../models/exam.dart';
 
 /// не трогать КОД - НИКОМУ кроме КЕЙСИ (Дианы) !!! НИЗАЧТО (сломаю пальцы и в жопу засуну). 
 /// Исключение, если КЕЙСИ попросит помочь с доработкой этого кода и ВЫ точно знаете что делаете. 
@@ -316,6 +317,104 @@ Future<List<FeedbackReview>> getFeedbackReview(String token) async {
     print("Failed to load feedback: ${response.statusCode}");
     print("Response body: ${response.body}");
     throw Exception('Failed to load feedback: ${response.statusCode}');
+  }
+}
+
+/// получение экзаменов студента [api]
+Future<List<Exam>> getExams(String token) async {
+  var response = await http.get(
+    Uri.parse('$_baseUrl/progress/operations/student-exams'),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'Referer': 'https://journal.top-academy.ru',
+    },
+  );
+
+  if (response.statusCode == 401) {
+    final newToken = await _reauthenticate();
+    if (newToken != null) {
+      response = await http.get(
+        Uri.parse('$_baseUrl/progress/operations/student-exams'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $newToken',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+      );
+    }
+  }
+
+  if (response.statusCode == 200) {
+    try {
+      print("Raw exams response: ${response.body}");
+      
+      final responseData = jsonDecode(response.body);
+      List<dynamic> examsData = [];
+      
+      // Обработка разных форматов ответа API
+      if (responseData is List) {
+        examsData = responseData;
+      } else if (responseData['data'] is List) {
+        examsData = responseData['data'];
+      } else if (responseData['exams'] is List) {
+        examsData = responseData['exams'];
+      } else if (responseData['grades'] is List) {
+        examsData = responseData['grades'];
+      } else if (responseData['items'] is List) {
+        examsData = responseData['items'];
+      }
+      
+      print("Parsed exams data: ${examsData.length} items");
+      
+      return examsData.map((json) => Exam.fromJson(json)).toList();
+    } catch (e) {
+      print("Error parsing exams: $e");
+      throw Exception('Failed to parse exams data: $e');
+    }
+  } else {
+    print("Failed to load exams: ${response.statusCode}");
+    print("Response body: ${response.body}");
+    throw Exception('Failed to load exams: ${response.statusCode}');
+  }
+}
+
+/// получение предстоящих экзаменов [api]
+Future<List<Exam>> getFutureExams(String token) async {
+  var response = await http.get(
+    Uri.parse('$_baseUrl/dashboard/info/future-exams'),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'Referer': 'https://journal.top-academy.ru',
+    },
+  );
+
+  if (response.statusCode == 401) {
+    final newToken = await _reauthenticate();
+    if (newToken != null) {
+      response = await http.get(
+        Uri.parse('$_baseUrl/dashboard/info/future-exams'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $newToken',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+      );
+    }
+  }
+
+  if (response.statusCode == 200) {
+    try {
+      final List<dynamic> futureExamsData = jsonDecode(response.body);
+      return futureExamsData.map((json) => Exam.fromJson(json)).toList();
+    } catch (e) {
+      print("Error parsing future exams: $e");
+      throw Exception('Failed to parse future exams data: $e');
+    }
+  } else {
+    print("Failed to load future exams: ${response.statusCode}");
+    throw Exception('Failed to load future exams: ${response.statusCode}');
   }
 }
 
