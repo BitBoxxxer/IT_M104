@@ -3,8 +3,6 @@ import '../models/mark.dart';
 import '../models/user_data.dart';
 import '../services/api_service.dart';
 
-GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();
-
 class MarksAndProfileScreen extends StatefulWidget {
   final String token;
   const MarksAndProfileScreen({super.key, required this.token});
@@ -20,6 +18,12 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<Mark> _filteredMarks = [];
   List<Mark> _allMarks = [];
+  
+  bool _showOnlyWithMarks = false;
+  bool _showOnlyWithAbsence = false;
+  bool _showOnlyWithLateness = false;
+  int? _selectedMarkFilter;
+  Set<String> _selectedSubjects = Set<String>();
 
   @override
   void initState() {
@@ -27,6 +31,13 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
     _marksFuture = _apiService.getMarks(widget.token);
     _userFuture = _apiService.getUser(widget.token);
     _searchController.addListener(_onSearchChanged);
+
+    _marksFuture.then((marks) {
+      setState(() {
+        _allMarks = marks;
+        _filteredMarks = List.from(_allMarks);
+      });
+    });
   }
 
   @override
@@ -42,24 +53,345 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
   void _filterMarks() {
     final query = _searchController.text.toLowerCase();
     
-    if (query.isEmpty) {
-      setState(() {
-        _filteredMarks = List.from(_allMarks);
-      });
-      return;
-    }
+    List<Mark> filtered = List.from(_allMarks);
 
-    setState(() {
-      _filteredMarks = _allMarks.where((mark) {
+    if (query.isNotEmpty) {
+      filtered = filtered.where((mark) {
         return mark.specName.toLowerCase().contains(query) ||
                mark.lessonTheme.toLowerCase().contains(query) ||
                mark.dateVisit.toLowerCase().contains(query);
       }).toList();
+    }
+
+    if (_showOnlyWithMarks) {
+      filtered = filtered.where((mark) {
+        return mark.homeWorkMark != null ||
+               mark.controlWorkMark != null ||
+               mark.labWorkMark != null ||
+               mark.classWorkMark != null ||
+               mark.practicalWorkMark != null;
+      }).toList();
+    }
+
+    if (_showOnlyWithAbsence) {
+      filtered = filtered.where((mark) => mark.statusWas == 0).toList();
+    }
+
+    if (_showOnlyWithLateness) {
+      filtered = filtered.where((mark) => mark.statusWas == 2).toList();
+    }
+
+    if (_selectedMarkFilter != null) {
+      filtered = filtered.where((mark) {
+        return mark.homeWorkMark == _selectedMarkFilter ||
+               mark.controlWorkMark == _selectedMarkFilter ||
+               mark.labWorkMark == _selectedMarkFilter ||
+               mark.classWorkMark == _selectedMarkFilter ||
+               mark.practicalWorkMark == _selectedMarkFilter;
+      }).toList();
+    }
+
+    if (_selectedSubjects.isNotEmpty) {
+      filtered = filtered.where((mark) => _selectedSubjects.contains(mark.specName)).toList();
+    }
+
+    setState(() {
+      _filteredMarks = filtered;
     });
   }
 
   void _clearSearch() {
     _searchController.clear();
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _showOnlyWithMarks = false;
+      _showOnlyWithAbsence = false;
+      _showOnlyWithLateness = false;
+      _selectedMarkFilter = null;
+      _selectedSubjects.clear();
+    });
+    _filterMarks();
+  }
+
+  List<String> _getUniqueSubjects() {
+    return _allMarks.map((mark) => mark.specName).toSet().toList();
+  }
+
+  void _openFilterDrawer(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _buildFilterDrawerContent(),
+    );
+  }
+
+  void _openSubjectSelectionDrawer(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _buildSubjectSelectionDrawerContent(),
+    );
+  }
+
+  Widget _buildFilterDrawerContent() {
+    return FutureBuilder<List<Mark>>(
+      future: _marksFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: Center(child: Text('Ошибка загрузки данных')),
+          );
+        }
+
+        final uniqueSubjects = _getUniqueSubjects();
+        
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Фильтры оценок',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              
+              const Text('Основные фильтры:', style: TextStyle(fontWeight: FontWeight.bold)),
+              CheckboxListTile(
+                title: const Text('Только с оценками'),
+                value: _showOnlyWithMarks,
+                onChanged: (value) {
+                  setState(() {
+                    _showOnlyWithMarks = value!;
+                  });
+                  _filterMarks();
+                  Navigator.pop(context);
+                },
+              ),
+              CheckboxListTile(
+                title: const Text('Только с пропусками'),
+                value: _showOnlyWithAbsence,
+                onChanged: (value) {
+                  setState(() {
+                    _showOnlyWithAbsence = value!;
+                  });
+                  _filterMarks();
+                  Navigator.pop(context);
+                },
+              ),
+              CheckboxListTile(
+                title: const Text('Только с опозданиями'),
+                value: _showOnlyWithLateness,
+                onChanged: (value) {
+                  setState(() {
+                    _showOnlyWithLateness = value!;
+                  });
+                  _filterMarks();
+                  Navigator.pop(context);
+                },
+              ),
+              
+              const SizedBox(height: 20),
+              
+              const Text('Оценки:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Wrap(
+                spacing: 8,
+                children: [1, 2, 3, 4, 5].map((mark) {
+                  return FilterChip(
+                    label: Text('$mark'),
+                    selected: _selectedMarkFilter == mark,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedMarkFilter = selected ? mark : null;
+                      });
+                      _filterMarks();
+                      Navigator.pop(context);
+                    },
+                  );
+                }).toList(),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              const Text('Предметы:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Expanded(
+                child: uniqueSubjects.isEmpty
+                    ? Center(child: Text('Предметы не найдены'))
+                    : ListView.builder(
+                        itemCount: uniqueSubjects.length,
+                        itemBuilder: (context, index) {
+                          final subject = uniqueSubjects[index];
+                          return CheckboxListTile(
+                            title: Text(subject),
+                            value: _selectedSubjects.contains(subject),
+                            onChanged: (value) {
+                              setState(() {
+                                if (value!) {
+                                  _selectedSubjects.add(subject);
+                                } else {
+                                  _selectedSubjects.remove(subject);
+                                }
+                              });
+                              _filterMarks();
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+              ),
+              
+              Center(
+                child: ElevatedButton(
+                  onPressed: () {
+                    _resetFilters();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Сбросить фильтры'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubjectSelectionDrawerContent() {
+    return FutureBuilder<List<Mark>>(
+      future: _marksFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            child: Center(child: Text('Ошибка загрузки данных')),
+          );
+        }
+
+        final uniqueSubjects = _getUniqueSubjects();
+        
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Выбор предметов',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Выберите предметы для отображения:',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              
+              Expanded(
+                child: uniqueSubjects.isEmpty
+                    ? Center(child: Text('Предметы не найдены'))
+                    : SingleChildScrollView(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: uniqueSubjects.map((subject) {
+                            return FilterChip(
+                              label: Text(
+                                subject,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              selected: _selectedSubjects.contains(subject),
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedSubjects.add(subject);
+                                  } else {
+                                    _selectedSubjects.remove(subject);
+                                  }
+                                });
+                                _filterMarks();
+                                Navigator.pop(context);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              if (uniqueSubjects.isNotEmpty)
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedSubjects.addAll(uniqueSubjects);
+                          });
+                          _filterMarks();
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Выбрать все'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedSubjects.clear();
+                          });
+                          _filterMarks();
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Очистить'),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildStatusIcon(int? statusWas) {
@@ -163,7 +495,6 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
       appBar: AppBar(
         title: FutureBuilder<UserData>(
           future: _userFuture,
@@ -206,22 +537,15 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                       Icons.filter_alt,
                       color: Theme.of(context).primaryColor,
                     ),
-                    onPressed: () {
-                      _scaffoldKey.currentState?.openDrawer();
-                    },
-                  ), // TODO: Фильтр списка: Пары с оценками, без оценок. Пары с пропуском, опазданием. Фильтр оценок 1 - 5
+                    onPressed: () => _openFilterDrawer(context),
+                  ),                  
                   IconButton(
                     icon: Icon(
                       Icons.menu,
                       color: Theme.of(context).primaryColor,
                     ),
-                    onPressed: () {
-                      _scaffoldKey.currentState?.openDrawer();
-                    },
-                  ), // TODO: Какие предметы посмотреть из списка -
-                     // список не просто column // row, а матрица !
-                     // Сепарировать список пройденных пар:
-                     // 1)по курсам, 2) Статус: проходятся, прошли
+                    onPressed: () => _openSubjectSelectionDrawer(context),
+                  ),
                   
                   Expanded(
                     child: TextField(
@@ -231,7 +555,7 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                         fontSize: 16,
                       ),
                       decoration: const InputDecoration(
-                        hintText: "Поиск по предметам, темам..." ,
+                        hintText: "Поиск по предметам, темам...",
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -245,21 +569,71 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                       ),
                       onPressed: _clearSearch,
                     ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.search,
-                      color: Theme.of(context).primaryColor,
-                    ),
-                    onPressed: () {
-                      // Фокус уже в поле поиска
-                    },
-                  ),
                 ],
               ),
             ),
           ),
 
-          // Список оценок
+          if (_showOnlyWithMarks || _showOnlyWithAbsence || _showOnlyWithLateness || _selectedMarkFilter != null || _selectedSubjects.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  if (_showOnlyWithMarks)
+                    Chip(
+                      label: const Text('С оценками'),
+                      onDeleted: () {
+                        setState(() {
+                          _showOnlyWithMarks = false;
+                        });
+                        _filterMarks();
+                      },
+                    ),
+                  if (_showOnlyWithAbsence)
+                    Chip(
+                      label: const Text('С пропусками'),
+                      onDeleted: () {
+                        setState(() {
+                          _showOnlyWithAbsence = false;
+                        });
+                        _filterMarks();
+                      },
+                    ),
+                  if (_showOnlyWithLateness)
+                    Chip(
+                      label: const Text('С опозданиями'),
+                      onDeleted: () {
+                        setState(() {
+                          _showOnlyWithLateness = false;
+                        });
+                        _filterMarks();
+                      },
+                    ),
+                  if (_selectedMarkFilter != null)
+                    Chip(
+                      label: Text('Оценка: $_selectedMarkFilter'),
+                      onDeleted: () {
+                        setState(() {
+                          _selectedMarkFilter = null;
+                        });
+                        _filterMarks();
+                      },
+                    ),
+                  ..._selectedSubjects.map((subject) => Chip(
+                    label: Text(subject),
+                    onDeleted: () {
+                      setState(() {
+                        _selectedSubjects.remove(subject);
+                      });
+                      _filterMarks();
+                    },
+                  )).toList(),
+                ],
+              ),
+            ),
+
           Expanded(
             child: FutureBuilder<List<Mark>>(
               future: _marksFuture,
@@ -274,7 +648,6 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                   return const Center(child: Text('Оценок не найдено'));
                 }
 
-                // Сохраняем все оценки и фильтруем их
                 if (_allMarks.isEmpty) {
                   _allMarks = snapshot.data!;
                   _filteredMarks = List.from(_allMarks);
@@ -296,7 +669,7 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Попробуйте изменить запрос',
+                              'Попробуйте изменить запрос или фильтры',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade500,
