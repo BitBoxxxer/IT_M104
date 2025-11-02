@@ -65,10 +65,6 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
       final allExams = await _apiService.getExams(token);
       final futureExams = await _apiService.getFutureExams(token);
 
-      // Добавляем тестовые экзамены с 12-балльной системой
-      final testTwelvePointExams = _createTestTwelvePointExams();
-      allExams.addAll(testTwelvePointExams);
-
       final pastExams = allExams.where((exam) => exam.isPast).toList();
       
       final twelvePointExams = pastExams.where((exam) => exam.isTwelvePointSystem && exam.hasGrade).toList();
@@ -138,33 +134,6 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
 
     _tabController.dispose();
     _tabController = TabController(length: _tabs.length, vsync: this);
-  }
-
-  // Создаем тестовые экзамены с 12-балльной системой
-  List<Exam> _createTestTwelvePointExams() {
-    return [
-      Exam(
-        subjectName: 'Математика',
-        specName: 'Математика',
-        grade: 12, // Отлично в 12-балльной системе
-        date: '2024-05-15',
-        teacherName: 'Иванова А.П.',
-      ),
-      Exam(
-        subjectName: 'Физика',
-        specName: 'Физика',
-        grade: 10, // Хорошо в 12-балльной системе
-        date: '2024-04-20',
-        teacherName: 'Петров С.М.',
-      ),
-      Exam(
-        subjectName: 'Программирование',
-        specName: 'Программирование',
-        grade: 8, // Удовлетворительно в 12-балльной системе
-        date: '2024-03-10',
-        teacherName: 'Сидоров В.К.',
-      ),
-    ];
   }
 
   Widget _buildFutureExamCard(Exam exam, int index) {
