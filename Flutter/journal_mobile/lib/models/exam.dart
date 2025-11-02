@@ -25,6 +25,21 @@ class Exam {
     );
   }
 
+  bool get isTwelvePointSystem {
+    try {
+      if (date.isEmpty || date == 'null') return false;
+      
+      final examDate = DateTime.parse(date);
+      final transitionDate = DateTime(2024, 9, 1);
+      // Стас сказал с 24 года 1 сент. 
+      // - ввели 5-ую систему оценивания
+      
+      return examDate.isBefore(transitionDate);
+    } catch (e) {
+      return false;
+    }
+  }
+
   bool get isFuture {
     try {
       if (date.isEmpty || date == 'null') return true;
@@ -109,11 +124,55 @@ class Exam {
     if (isFuture) return null;
     
     final gradeValue = grade ?? value;
+    
+    if (gradeValue is int && gradeValue > 0) {
+      return _convertToFivePointSystem(gradeValue);
+    }
+    if (gradeValue is double && gradeValue > 0) {
+      return _convertToFivePointSystem(gradeValue.round());
+    }
+    if (gradeValue is String) {
+      final parsed = int.tryParse(gradeValue);
+      return parsed != null && parsed > 0 ? _convertToFivePointSystem(parsed) : null;
+    }
+    return null;
+  }
+
+  int _convertToFivePointSystem(int grade) {
+    if (!isTwelvePointSystem) {
+      return grade;
+    }
+    
+    switch (grade) {
+      case 12:
+      case 11:
+      case 10:
+        return 5;
+      case 9:
+      case 8:
+        return 4;
+      case 7:
+      case 6:
+      case 5:
+        return 3;
+      case 4:
+      case 3:
+      case 2:
+      case 1:
+        return 2;
+      default:
+        return grade;
+    }
+  }
+
+  int? get originalNumericGrade {
+    if (isFuture) return null;
+    
+    final gradeValue = grade ?? value;
     if (gradeValue is int && gradeValue > 0) return gradeValue;
     if (gradeValue is double && gradeValue > 0) return gradeValue.round();
     if (gradeValue is String) {
-      final parsed = int.tryParse(gradeValue);
-      return parsed != null && parsed > 0 ? parsed : null;
+      return int.tryParse(gradeValue);
     }
     return null;
   }
