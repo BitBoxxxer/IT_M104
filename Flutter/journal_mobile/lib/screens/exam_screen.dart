@@ -19,11 +19,6 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   final SecureStorageService _secureStorage = SecureStorageService();
   
-  List<Exam> _allExams = [];
-  List<Exam> _futureExams = [];
-  List<Exam> _pastExams = [];
-  List<Exam> _twelvePointExams = [];
-  List<Exam> _fivePointExams = [];
   bool _isLoading = true;
   String _errorMessage = '';
   String _debugInfo = '';
@@ -73,11 +68,6 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
       _createTabs(twelvePointExams, fivePointExams, futureExams);
 
       setState(() {
-        _allExams = allExams;
-        _futureExams = futureExams;
-        _pastExams = pastExams;
-        _twelvePointExams = twelvePointExams;
-        _fivePointExams = fivePointExams;
         _isLoading = false;
         _debugInfo = 'Загружено: ${allExams.length} всех экзаменов, ${futureExams.length} предстоящих, ${pastExams.length} прошедших (${twelvePointExams.length} 12-балльных, ${fivePointExams.length} 5-балльных)';
       });

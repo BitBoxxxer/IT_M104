@@ -9,6 +9,7 @@ import '../models/leaderboard_user.dart';
 import '../models/leader_position_model.dart';
 import  '../models/feedback_review.dart';
 import '../models/exam.dart';
+import '../models/activity_record.dart';
 
 /// не трогать КОД - НИКОМУ кроме КЕЙСИ (Дианы) !!! НИЗАЧТО (сломаю пальцы и в жопу засуну). 
 /// Исключение, если КЕЙСИ попросит помочь с доработкой этого кода и ВЫ точно знаете что делаете. 
@@ -432,6 +433,48 @@ Future<bool> validateToken(String token) async {
     return response.statusCode == 200;
   } catch (e) {
     return false;
+  }
+}
+
+/// получение истории активности и наград студента [api]
+Future<List<ActivityRecord>> getProgressActivity(String token) async {
+  var response = await http.get(
+    Uri.parse('$_baseUrl/dashboard/progress/activity'),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'Referer': 'https://journal.top-academy.ru',
+    },
+  );
+
+  if (response.statusCode == 401) {
+    final newToken = await _reauthenticate();
+    if (newToken != null) {
+      response = await http.get(
+        Uri.parse('$_baseUrl/dashboard/progress/activity'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $newToken',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+      );
+    }
+  }
+
+  if (response.statusCode == 200) {
+    try {
+      print("Raw activity response: ${response.body}");
+      
+      final List<dynamic> activityData = jsonDecode(response.body);
+      return activityData.map((json) => ActivityRecord.fromJson(json)).toList();
+    } catch (e) {
+      print("Error parsing activity data: $e");
+      throw Exception('Failed to parse activity data: $e');
+    }
+  } else {
+    print("Failed to load activity data: ${response.statusCode}");
+    print("Response body: ${response.body}");
+    throw Exception('Failed to load activity data: ${response.statusCode}');
   }
 }
 

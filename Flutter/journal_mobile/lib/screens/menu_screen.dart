@@ -16,6 +16,7 @@ import 'test_develop_area.dart';
 import 'settings_screen.dart';
 import 'usersPersonal_screen/UserNotification_screen.dart';
 import 'exam_screen.dart';
+import 'history_of_awards.dart';
 
 class MainMenuScreen extends StatefulWidget {
   final String token;
@@ -560,7 +561,7 @@ Future<void> _loadInitialNotifications() async {
                               MaterialPageRoute(
                                 builder: (_) => FeedbackReviewScreen(token: widget.token),
                               ),
-                            ); // TODO: Написать окно для отзывов студента.
+                            );
                           },
                         ),
                       ),
@@ -592,6 +593,22 @@ Future<void> _loadInitialNotifications() async {
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => ExamScreen(
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: 250,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.list),
+                          label: const Text('Список наград'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => HistoryOfAwardsScreen(
                                 ),
                               ),
                             );
