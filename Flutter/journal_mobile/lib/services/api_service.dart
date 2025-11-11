@@ -294,8 +294,6 @@ Future<List<FeedbackReview>> getFeedbackReview(String token) async {
 
   if (response.statusCode == 200) {
     try {
-      print("Raw feedback response: ${response.body}");
-      
       final responseData = jsonDecode(response.body);
       List<dynamic> feedbackData = [];
       
@@ -350,8 +348,6 @@ Future<List<Exam>> getExams(String token) async {
 
   if (response.statusCode == 200) {
     try {
-      print("Raw exams response: ${response.body}");
-      
       final responseData = jsonDecode(response.body);
       List<dynamic> examsData = [];
       
@@ -465,8 +461,6 @@ Future<List<ActivityRecord>> getProgressActivity(String token) async {
 
   if (response.statusCode == 200) {
     try {
-      print("Raw activity response: ${response.body}");
-      
       final List<dynamic> activityData = jsonDecode(response.body);
       return activityData.map((json) => ActivityRecord.fromJson(json)).toList();
     } catch (e) {
@@ -526,8 +520,6 @@ Future<List<Homework>> getHomeworks(
 
   if (response.statusCode == 200) {
     try {
-      print("Raw homework response: ${response.body}");
-      
       final responseData = jsonDecode(response.body);
       List<dynamic> homeworkData = [];
       
@@ -701,41 +693,6 @@ Future<void> clearTokenForTesting() async {
   final secureStorage = SecureStorageService();
   await secureStorage.clearAll();
   print('Все данные очищены для тестирования!');
-}
-
-/// метод для тестирования доступных endpoints [api]
-Future<void> testEndpoints(String token) async {
-  final testEndpoints = [
-    '$_baseUrl/assignments',
-    '$_baseUrl/assignments/homework',
-    '$_baseUrl/assignments/lab',
-    '$_baseUrl/homeworks',
-    '$_baseUrl/lab-works',
-    '$_baseUrl/tasks',
-    '$_baseUrl/dashboard/assignments',
-    '$_baseUrl/dashboard/homeworks',
-    '$_baseUrl/dashboard/lab-works',
-  ];
-
-  for (var endpoint in testEndpoints) {
-    try {
-      var response = await http.get(
-        Uri.parse(endpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-          'Referer': 'https://journal.top-academy.ru',
-        },
-      );
-      
-      print('Endpoint: $endpoint - Status: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        print('Response sample: ${response.body.length > 100 ? response.body.substring(0, 100) + "..." : response.body}');
-      }
-    } catch (e) {
-      print('Endpoint: $endpoint - Error: $e');
-    }
-  }
 }
 
 }
