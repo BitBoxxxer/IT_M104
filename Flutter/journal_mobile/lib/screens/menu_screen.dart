@@ -617,10 +617,12 @@ Future<void> _loadInitialNotifications() async {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      Row(
+                      /* Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         spacing: 30,
                         children: [
+                        ]
+                      ), */
                           SizedBox(
                             width: 250,
                             child: ElevatedButton.icon(
@@ -656,8 +658,6 @@ Future<void> _loadInitialNotifications() async {
                               },
                             ),
                           ),
-                        ]
-                      ),
                       const SizedBox(height: 80),
                       SizedBox(
                         width: 250,

@@ -81,6 +81,17 @@ class Homework {
   bool get isOpened => _getRealStatus() == 3;
   bool get isDeleted => _getRealStatus() == 5;
 
+  bool get hasAttachment => filename != null && filename!.isNotEmpty;
+  String? get downloadUrl => filePath != null ? _buildDownloadUrl(filePath!) : null;
+  
+  String _buildDownloadUrl(String filePath) {
+    if (filePath.startsWith('http')) {
+      return filePath;
+    } else {
+      return 'https://msapi.top-academy.ru$filePath';
+    }
+  }
+
   /// Определение реального статуса на основе всех доступных данных
   int _getRealStatus() {
     if (homeworkStud?.mark != null) {

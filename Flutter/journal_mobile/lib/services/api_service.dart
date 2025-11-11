@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 import '../services/secure_storage_service.dart';
+import '../services/file_service.dart';
+
 import '../models/mark.dart';
 import '../models/user_data.dart';
 import '../models/days_element.dart';
@@ -678,6 +682,61 @@ Future<bool> deleteHomework(String token, int homeworkId) async {
   }
 
   return response.statusCode == 200;
+}
+
+ /// загрузка файла задания [api]
+Future<File?> downloadHomeworkFile(String token, Homework homework) async {
+  try {
+    if (homework.downloadUrl == null || homework.downloadUrl!.isEmpty) {
+      throw Exception('URL файла недоступен');
+    }
+
+    var client = http.Client();
+    try {
+      final response = await client.get(
+        Uri.parse(homework.downloadUrl!),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': '*/*',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final directory = await _getDownloadDirectory();
+        
+        final fileService = FileService();
+        String fileName = fileService.getFileName(homework, response);
+        
+        final filePath = '${directory.path}/$fileName';
+        final file = File(filePath);
+        
+        await file.writeAsBytes(response.bodyBytes);
+        
+        print('Файл загружен: $fileName по пути: ${file.path}');
+        print('Content-Type: ${response.headers['content-type']}');
+        return file;
+      } else {
+        throw Exception('Ошибка загрузки файла: ${response.statusCode}');
+      }
+    } finally {
+      client.close();
+    }
+  } catch (e) {
+    print('Ошибка при скачивании файла: $e');
+    rethrow;
+  }
+}
+
+Future<Directory> _getDownloadDirectory() async {
+  if (Platform.isAndroid || Platform.isIOS) {
+    // Для мобильных устройств
+    final directory = await getExternalStorageDirectory();
+    return directory ?? await getApplicationDocumentsDirectory();
+  } else {
+    // Для desktop (Windows, macOS, Linux) потомму что мне лень заходить в телефон -Ди
+    return await getApplicationDocumentsDirectory();
+  }
 }
 
 // Для тестов. Запросы чисто для проверок РАЗРАБОТЧИКАМ

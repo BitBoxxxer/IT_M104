@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+
+import '../services/api_service.dart';
+
 import '../models/homework.dart';
 import '../models/homework_counter.dart';
-import '../services/api_service.dart';
+import '../models/dialog/homework_submit_dialog.dart';
 
 class HomeworkListScreen extends StatefulWidget {
   final String token;
@@ -19,6 +22,7 @@ class HomeworkListScreen extends StatefulWidget {
 
 class _HomeworkListScreenState extends State<HomeworkListScreen> {
   final ApiService _apiService = ApiService();
+
   late Future<List<Homework>> _homeworksFuture;
   List<HomeworkCounter> _counters = [];
   String _filterStatus = 'all';
@@ -669,20 +673,58 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
   );
 }
 
-  void _downloadHomeworkFile(Homework homework) {
+Future<void> _downloadHomeworkFile(Homework homework) async {
+  try {
+    setState(() {
+      _isLoading = true;
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Скачивание: ${homework.filename}'),
-        backgroundColor: Colors.green,
+        content: Text('Скачивание: ${homework.filename ?? "файла"}'),
+        backgroundColor: Colors.blue,
       ),
     );
-  }
 
-  void _submitHomework(Homework homework) {
+    final downloadedFile = await _apiService.downloadHomeworkFile(widget.token, homework);
+    
+    if (downloadedFile != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Файл скачан: ${homework.filename}'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      throw Exception('Не удалось сохранить файл');
+    }
+  } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Сдача работы: ${homework.theme}'),
-        backgroundColor: Colors.blue,
+        content: Text('Ошибка скачивания: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
+  }
+}
+
+Future<void> _submitHomework(Homework homework) async {
+    _showSubmitDialog(homework);
+  }
+
+  void _showSubmitDialog(Homework homework) {
+    showDialog(
+      context: context,
+      builder: (context) => HomeworkSubmitDialog(
+        homework: homework,
+        token: widget.token,
+        onSubmitted: () {
+          _refreshData();
+        },
       ),
     );
   }
