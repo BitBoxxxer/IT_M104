@@ -24,6 +24,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
   String _filterStatus = 'all';
   bool _isLoading = false;
   String _errorMessage = '';
+  bool _showFilters = false;
 
   @override
   void initState() {
@@ -686,12 +687,26 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     );
   }
 
+  void _toggleFilters() {
+    setState(() {
+      _showFilters = !_showFilters;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isLabWork ? 'Лабораторные работы' : 'Домашние задания'),
         actions: [
+          IconButton(
+            icon: Icon(
+              _showFilters ? Icons.filter_alt : Icons.filter_alt_outlined,
+              color: _showFilters ? Colors.blue : null,
+            ),
+            onPressed: _toggleFilters,
+            tooltip: 'Фильтры',
+          ),
           IconButton(
             icon: Icon(Icons.refresh),
             onPressed: _isLoading ? null : _refreshData,
@@ -789,16 +804,20 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                     return Column(
                       children: [
                         _buildStatsCard(allHomeworks),
-                        _buildFilterChips(),
-                        SizedBox(height: 8),
-                        Text(
-                          'Найдено заданий: ${filteredHomeworks.length}',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 14,
+                        
+                        if (_showFilters) ...[
+                          _buildFilterChips(),
+                          SizedBox(height: 8),
+                          Text(
+                            'Найдено заданий: ${filteredHomeworks.length}',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 8),
+                          SizedBox(height: 8),
+                        ],
+                        
                         Expanded(
                           child: RefreshIndicator(
                             onRefresh: _refreshData,
