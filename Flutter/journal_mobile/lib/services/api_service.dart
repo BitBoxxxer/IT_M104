@@ -10,6 +10,8 @@ import '../models/leader_position_model.dart';
 import  '../models/feedback_review.dart';
 import '../models/exam.dart';
 import '../models/activity_record.dart';
+import '../models/homework.dart';
+import '../models/homework_counter.dart';
 
 /// не трогать КОД - НИКОМУ кроме КЕЙСИ (Дианы) !!! НИЗАЧТО (сломаю пальцы и в жопу засуну). 
 /// Исключение, если КЕЙСИ попросит помочь с доработкой этого кода и ВЫ точно знаете что делаете. 
@@ -478,6 +480,213 @@ Future<List<ActivityRecord>> getProgressActivity(String token) async {
   }
 }
 
+/// получение списка домашних заданий [api]
+Future<List<Homework>> getHomeworks(
+  String token, {
+  int? page, 
+  int? status, 
+  int? groupId, 
+  int? specId,
+  int? type, // 0 - домашние, 1 - лабораторные
+}) async {
+
+  final uri = Uri.parse('$_baseUrl/homework/operations/list');
+  final params = <String, String>{};
+  
+  if (type != null) params['type'] = type.toString();
+  if (page != null) params['page'] = page.toString();
+  if (status != null) params['status'] = status.toString();
+  if (groupId != null) params['group_id'] = groupId.toString();
+  if (specId != null) params['spec_id'] = specId.toString();
+  
+  final url = uri.replace(queryParameters: params.isNotEmpty ? params : null);
+  
+  var response = await http.get(
+    url,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'Referer': 'https://journal.top-academy.ru',
+    },
+  );
+
+  if (response.statusCode == 401) {
+    final newToken = await _reauthenticate();
+    if (newToken != null) {
+      response = await http.get(
+        Uri.parse('$_baseUrl/homework/operations/list'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $newToken',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+      );
+    }
+  }
+
+  if (response.statusCode == 200) {
+    try {
+      print("Raw homework response: ${response.body}");
+      
+      final responseData = jsonDecode(response.body);
+      List<dynamic> homeworkData = [];
+      
+      if (responseData is List) {
+        homeworkData = responseData;
+      } else if (responseData['data'] is List) {
+        homeworkData = responseData['data'];
+      } else if (responseData['homeworks'] is List) {
+        homeworkData = responseData['homeworks'];
+      } else if (responseData['items'] is List) {
+        homeworkData = responseData['items'];
+      } else if (responseData['models_list'] is List) {
+        homeworkData = responseData['models_list'];
+      }
+      
+      print("Parsed homework data: ${homeworkData.length} items");
+      
+      return homeworkData.map((json) => Homework.fromJson(json)).toList();
+    } catch (e) {
+      print("Error parsing homeworks: $e");
+      print("Raw response that failed to parse: ${response.body}");
+      throw Exception('Failed to parse homeworks data: $e');
+    }
+  } else {
+    print("Failed to load homeworks: ${response.statusCode}");
+    print("Response body: ${response.body}");
+    throw Exception('Failed to load homeworks: ${response.statusCode}');
+  }
+}
+
+/// получение счетчиков домашних заданий [api]
+Future<List<HomeworkCounter>> getHomeworkCounters(
+  String token, {
+  int? type, // 0 - домашние, 1 - лабораторные
+  int? groupId, 
+  int? specId,
+}) async {
+  final uri = Uri.parse('$_baseUrl/count/homework');
+  final params = <String, String>{};
+  
+  if (type != null) params['type'] = type.toString();
+  if (groupId != null) params['group_id'] = groupId.toString();
+  if (specId != null) params['spec_id'] = specId.toString();
+  
+  final url = uri.replace(queryParameters: params.isNotEmpty ? params : null);
+  
+  var response = await http.get(
+    url,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'Referer': 'https://journal.top-academy.ru',
+    },
+  );
+
+  if (response.statusCode == 401) {
+    final newToken = await _reauthenticate();
+    if (newToken != null) {
+      response = await http.get(
+        Uri.parse('$_baseUrl/count/homework'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $newToken',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+      );
+    }
+  }
+
+  if (response.statusCode == 200) {
+    try {
+      final List<dynamic> counterData = jsonDecode(response.body);
+      return counterData.map((json) => HomeworkCounter.fromJson(json)).toList();
+    } catch (e) {
+      print("Error parsing homework counters: $e");
+      throw Exception('Failed to parse homework counters: $e');
+    }
+  } else {
+    print("Failed to load homework counters: ${response.statusCode}");
+    throw Exception('Failed to load homework counters: ${response.statusCode}');
+  }
+}
+
+/// отправка домашнего задания [api]
+Future<Map<String, dynamic>> submitHomework(
+  String token, {
+  required int id,
+  required int spentTimeHour,
+  required int spentTimeMin,
+  String? answerText,
+  http.MultipartFile? file,
+}) async {
+  try {
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_baseUrl/homework/operations/create'),
+    );
+
+    request.headers.addAll({
+      'Authorization': 'Bearer $token',
+      'Referer': 'https://journal.top-academy.ru',
+    });
+
+    request.fields['id'] = id.toString();
+    request.fields['spentTimeHour'] = spentTimeHour.toString();
+    request.fields['spentTimeMin'] = spentTimeMin.toString();
+    if (answerText != null && answerText.isNotEmpty) {
+      request.fields['answerText'] = answerText;
+    }
+
+    if (file != null) {
+      request.files.add(file);
+    } // TO-DO: Добавить исключения на тип файлов ? (Разобраться.)
+
+    var response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    if (response.statusCode == 200) {
+      return jsonDecode(responseBody);
+    } else {
+      print("Homework submission failed: ${response.statusCode}");
+      print("Response body: $responseBody");
+      throw Exception('Homework submission failed: ${response.statusCode}');
+    }
+  } catch (e) {
+    print("Error submitting homework: $e");
+    throw Exception('Error submitting homework: $e');
+  }
+}
+
+/// удаление домашнего задания [api]
+Future<bool> deleteHomework(String token, int homeworkId) async {
+  var response = await http.post(
+    Uri.parse('$_baseUrl/homework/operations/delete'),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'Referer': 'https://journal.top-academy.ru',
+    },
+    body: jsonEncode({'id': homeworkId}),
+  );
+
+  if (response.statusCode == 401) {
+    final newToken = await _reauthenticate();
+    if (newToken != null) {
+      response = await http.post(
+        Uri.parse('$_baseUrl/homework/operations/delete'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $newToken',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+        body: jsonEncode({'id': homeworkId}),
+      );
+    }
+  }
+
+  return response.statusCode == 200;
+}
 
 // Для тестов. Запросы чисто для проверок РАЗРАБОТЧИКАМ
 /// замена токена на некорректный для тестирования обработки ошибки [api]
@@ -487,10 +696,46 @@ Future<void> simulateTokenError() async {
   print('Искусственная ошибка токена активирована!');
 }
 
+/// очищение токена для тестирования обработки ошибки [api]
 Future<void> clearTokenForTesting() async {
   final secureStorage = SecureStorageService();
   await secureStorage.clearAll();
   print('Все данные очищены для тестирования!');
+}
+
+/// метод для тестирования доступных endpoints [api]
+Future<void> testEndpoints(String token) async {
+  final testEndpoints = [
+    '$_baseUrl/assignments',
+    '$_baseUrl/assignments/homework',
+    '$_baseUrl/assignments/lab',
+    '$_baseUrl/homeworks',
+    '$_baseUrl/lab-works',
+    '$_baseUrl/tasks',
+    '$_baseUrl/dashboard/assignments',
+    '$_baseUrl/dashboard/homeworks',
+    '$_baseUrl/dashboard/lab-works',
+  ];
+
+  for (var endpoint in testEndpoints) {
+    try {
+      var response = await http.get(
+        Uri.parse(endpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Referer': 'https://journal.top-academy.ru',
+        },
+      );
+      
+      print('Endpoint: $endpoint - Status: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        print('Response sample: ${response.body.length > 100 ? response.body.substring(0, 100) + "..." : response.body}');
+      }
+    } catch (e) {
+      print('Endpoint: $endpoint - Error: $e');
+    }
+  }
 }
 
 }

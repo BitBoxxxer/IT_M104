@@ -17,6 +17,7 @@ import 'settings_screen.dart';
 import 'usersPersonal_screen/UserNotification_screen.dart';
 import 'exam_screen.dart';
 import 'history_of_awards.dart';
+import 'homework_list_screen.dart';
 
 class MainMenuScreen extends StatefulWidget {
   final String token;
@@ -616,6 +617,48 @@ Future<void> _loadInitialNotifications() async {
                         ),
                       ),
                       const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        spacing: 30,
+                        children: [
+                          SizedBox(
+                            width: 250,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.book),
+                              label: const Text('Домашние задания'),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => HomeworkListScreen(
+                                      token: widget.token,
+                                      isLabWork: false,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: 250,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.computer),
+                              label: const Text('Лабораторные задания'),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => HomeworkListScreen(
+                                      token: widget.token,
+                                      isLabWork: true,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ]
+                      ),
+                      const SizedBox(height: 80),
                       SizedBox(
                         width: 250,
                         child: FloatingActionButton(
