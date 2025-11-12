@@ -418,7 +418,7 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                   if (!mounted) return;
                   
                   final overlay = Overlay.of(context);
-                  if (overlay != null && overlay.mounted) {
+                  if (overlay.mounted) {
                     showTopSnackBar(
                       overlay,
                       const CustomSnackBar.success(

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 
-import 'package:journal_mobile/services/file_service.dart';
+import 'package:journal_mobile/services/download_service.dart';
 import 'package:journal_mobile/models/homework.dart';
 
 
@@ -22,7 +22,7 @@ class HomeworkSubmitDialog extends StatefulWidget {
 }
 
 class _HomeworkSubmitDialogState extends State<HomeworkSubmitDialog> {
-  final FileService _fileService = FileService();
+  final DownloadService _downloadService = DownloadService();
   final TextEditingController _answerController = TextEditingController();
   File? _selectedFile;
   int _spentTimeHour = 0;
@@ -113,7 +113,7 @@ class _HomeworkSubmitDialogState extends State<HomeworkSubmitDialog> {
   }
 
   Future<void> _pickFile() async {
-    final file = await _fileService.pickFile();
+    final file = await DownloadService.pickFile();
     if (file != null) {
       setState(() {
         _selectedFile = file;
@@ -137,7 +137,7 @@ class _HomeworkSubmitDialogState extends State<HomeworkSubmitDialog> {
     });
 
     try {
-      await _fileService.uploadHomeworkFile(
+      await DownloadService.uploadHomeworkFile(
         homeworkId: widget.homework.id,
         file: _selectedFile!,
         answerText: _answerController.text,

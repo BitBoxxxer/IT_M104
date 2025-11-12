@@ -1,10 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 
 import '../services/secure_storage_service.dart';
-import '../services/file_service.dart';
+import '../services/download_service.dart';
 
 import '../models/mark.dart';
 import '../models/user_data.dart';
@@ -684,58 +683,34 @@ Future<bool> deleteHomework(String token, int homeworkId) async {
   return response.statusCode == 200;
 }
 
- /// загрузка файла задания [api]
+/// загрузка файла задания [api]
 Future<File?> downloadHomeworkFile(String token, Homework homework) async {
   try {
     if (homework.downloadUrl == null || homework.downloadUrl!.isEmpty) {
       throw Exception('URL файла недоступен');
     }
 
-    var client = http.Client();
-    try {
-      final response = await client.get(
-        Uri.parse(homework.downloadUrl!),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': '*/*',
-          'Referer': 'https://journal.top-academy.ru',
-        },
-      );
+    final String fileName = homework.filename ?? 
+        'homework_${homework.id}_${DateTime.now().millisecondsSinceEpoch}';
 
-      if (response.statusCode == 200) {
-        final directory = await _getDownloadDirectory();
-        
-        final fileService = FileService();
-        String fileName = fileService.getFileName(homework, response);
-        
-        final filePath = '${directory.path}/$fileName';
-        final file = File(filePath);
-        
-        await file.writeAsBytes(response.bodyBytes);
-        
-        print('Файл загружен: $fileName по пути: ${file.path}');
-        print('Content-Type: ${response.headers['content-type']}');
-        return file;
-      } else {
-        throw Exception('Ошибка загрузки файла: ${response.statusCode}');
-      }
-    } finally {
-      client.close();
-    }
+    print('Downloading homework file: $fileName');
+
+    final file = await DownloadService.downloadFile(
+      url: homework.downloadUrl!,
+      fileName: fileName,
+      token: token,
+      onProgress: (received, total) {
+        if (total != -1) {
+          double progress = (received / total * 100);
+          print('Download progress: ${progress.toStringAsFixed(2)}%');
+        }
+      },
+    );
+
+    return file;
   } catch (e) {
-    print('Ошибка при скачивании файла: $e');
+    print('Ошибка при скачивании файла задания: $e');
     rethrow;
-  }
-}
-
-Future<Directory> _getDownloadDirectory() async {
-  if (Platform.isAndroid || Platform.isIOS) {
-    // Для мобильных устройств
-    final directory = await getExternalStorageDirectory();
-    return directory ?? await getApplicationDocumentsDirectory();
-  } else {
-    // Для desktop (Windows, macOS, Linux) потомму что мне лень заходить в телефон -Ди
-    return await getApplicationDocumentsDirectory();
   }
 }
 

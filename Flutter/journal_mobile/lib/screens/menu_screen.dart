@@ -40,8 +40,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     super.initState();
     _dataFuture = _loadData();
     _notificationsStream = _notificationService.notificationsStream;
-    
-    _loadInitialNotifications();
   }
 
   Future<Map<String, dynamic>> _loadData() async {
@@ -247,10 +245,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     return 0;
   }
 }
-
-Future<void> _loadInitialNotifications() async {
-    final notifications = await _notificationService.getNotificationsHistory();
-  }
 
   Widget _buildNotificationIcon() {
     return StreamBuilder<List<NotificationItem>>(

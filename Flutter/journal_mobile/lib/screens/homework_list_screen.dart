@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 import '../services/api_service.dart';
+import '../services/download_service.dart';
 
 import '../models/homework.dart';
 import '../models/homework_counter.dart';
 import '../models/dialog/homework_submit_dialog.dart';
+import '../models/widgets/error_snackBar.dart';
 
 class HomeworkListScreen extends StatefulWidget {
   final String token;
@@ -44,7 +47,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
         _errorMessage = '';
       });
       
-      // Используем тип: 0 - домашние, 1 - лабораторные
+      // тип: 0 - домашние, 1 - лабораторные
       final type = widget.isLabWork ? 1 : 0;
       
       final homeworks = await _apiService.getHomeworks(
@@ -675,41 +678,52 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
 
 Future<void> _downloadHomeworkFile(Homework homework) async {
   try {
-    setState(() {
-      _isLoading = true;
-    });
+    ErrorSnackBar.showWarningSnackBar(context, 'Начинаем загрузку...');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Скачивание: ${homework.filename ?? "файла"}'),
-        backgroundColor: Colors.blue,
-      ),
+    final downloadedFile = await _apiService.downloadHomeworkFile(
+      widget.token, 
+      homework
     );
-
-    final downloadedFile = await _apiService.downloadHomeworkFile(widget.token, homework);
     
     if (downloadedFile != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Файл скачан: ${homework.filename}'),
-          backgroundColor: Colors.green,
-        ),
+      ErrorSnackBar.showSuccessSnackBar(
+        context, 
+        'Файл "${homework.filename}" скачан!'
       );
-    } else {
-      throw Exception('Не удалось сохранить файл');
+      
+      _showOpenFileDialog(downloadedFile, homework.filename ?? 'Файл');
     }
   } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Ошибка скачивания: $e'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
+    String errorMessage = 'Ошибка скачивания: $e';
+    
+    if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+      errorMessage = 'Проблема с доступом к хранилищу. Файл будет сохранен в папку Downloads.';
+    }
+    ErrorSnackBar.showErrorSnackBar(context, errorMessage);
   }
+}
+
+void _showOpenFileDialog(File file, String fileName) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Файл скачан'),
+      content: Text('Файл "$fileName" успешно скачан. Хотите открыть его?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Закрыть'),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+            DownloadService.openDownloadedFile(file);
+          },
+          child: Text('Открыть'),
+        ),
+      ],
+    ),
+  );
 }
 
 Future<void> _submitHomework(Homework homework) async {
