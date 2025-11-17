@@ -177,9 +177,9 @@ int _getCounterForDeletedTab() {
         }
         
         _tabHasMoreData[tabStatus] = homeworks.isNotEmpty && homeworks.length >= _pageSize;
-        if (_tabHasMoreData[tabStatus]!) {
-          _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! + 1;
-        }
+        if (_tabHasMoreData[tabStatus]! && loadMore) {
+        _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! + 1;
+      }
         
         _tabIsLoading[tabStatus] = false;
         _tabIsLoadingMore[tabStatus] = false;
@@ -1021,17 +1021,6 @@ void _showOpenFileDialog(File file, String fileName) {
 
   Widget _buildTabContent(int tabIndex) {
     String tabStatus = _tabs[tabIndex]['status'];
-    
-    /* if (tabStatus == 'deleted' && 
-        _tabHomeworks[tabStatus]!.isEmpty && 
-        !_tabIsLoading[tabStatus]! &&
-        _tabErrorMessages[tabStatus]!.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_tabIsLoading[tabStatus]! && _tabHomeworks[tabStatus]!.isEmpty) {
-          _loadHomeworksForTab(tabStatus);
-        }
-      });
-    } */
     if (_tabIsLoading[tabStatus]! && _tabHomeworks[tabStatus]!.isEmpty) {
       return Center(
         child: Column(
