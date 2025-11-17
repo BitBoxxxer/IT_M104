@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
@@ -271,7 +273,24 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return Scaffold(
-      body: SafeArea(
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/login_background.jpg'),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+              child: Container(
+                color: Colors.black.withOpacity(0.8),
+              ),
+            ),
+          ),
+          
+        SafeArea(
         child: SingleChildScrollView(
           child: Container(
             height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top,
@@ -287,13 +306,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          color: Colors.white.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Icon(
                           Icons.school_outlined,
                           size: 40,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -302,7 +321,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -310,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Войдите в свой аккаунт',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                          color: Colors.white.withOpacity(0.8),
                         ),
                       ),
                     ],
@@ -327,10 +346,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         // логин
                         Container(
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceVariant,
+                            color: Colors.black.withOpacity(0.4),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                              color: Colors.white.withOpacity(0.3),
                             ),
                           ),
                           child: TextFormField(
@@ -339,22 +358,23 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: InputDecoration(
                               labelText: 'Логин',
                               labelStyle: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Colors.white.withOpacity(0.8),
                               ),
                               prefixIcon: Icon(
                                 Icons.person_outline, 
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Colors.white.withOpacity(0.8),
                               ),
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                               errorStyle: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                                color: Colors.orange[300],
                               ),
                             ),
                             style: TextStyle(
                               fontSize: 16, 
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Colors.white,
                             ),
+                            cursorColor: Colors.white,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -362,10 +382,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         // пароль
                         Container(
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceVariant,
+                            color: Colors.black.withOpacity(0.4),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                              color: Colors.white.withOpacity(0.3),
                             ),
                           ),
                           child: TextFormField(
@@ -375,16 +395,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: InputDecoration(
                               labelText: 'Пароль',
                               labelStyle: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Colors.white.withOpacity(0.8),
                               ),
                               prefixIcon: Icon(
                                 Icons.lock_outline, 
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Colors.white.withOpacity(0.8),
                               ),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  color: Colors.white.withOpacity(0.8),
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -395,20 +415,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                               errorStyle: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                                color: Colors.orange[300],
                               ),
                             ),
                             style: TextStyle(
                               fontSize: 16, 
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Colors.white,
                             ),
+                            cursorColor: Colors.white,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Student Journal',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                            color: Colors.white.withOpacity(0.6),
                             fontSize: 12,
                           ),
                         ),
@@ -423,10 +444,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _login,
                             style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white.withOpacity(0.2),
                               foregroundColor: Colors.white,
-                              elevation: 2,
+                              elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: Colors.white.withOpacity(0.3),
+                                ),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
@@ -458,7 +483,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               Text(
                                 'Соц. сети разработчиков:',
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                  color: Colors.white.withOpacity(0.7),
                                   fontSize: 12,
                                 ),
                               ),
@@ -472,7 +497,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       IconButton(
                                         onPressed: () => _launchURL('https://t.me/ImKaseyFuck'),
                                         icon: Icon(Icons.telegram, size: 28),
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Colors.white,
                                         tooltip: 'Telegram',
                                       ),
                                       SizedBox(height: 4),
@@ -480,7 +505,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         'Telegram',
                                         style: TextStyle(
                                           fontSize: 10,
-                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                          color: Colors.white.withOpacity(0.7),
                                         ),
                                       ),
                                     ],
@@ -492,7 +517,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       IconButton(
                                         onPressed: () => _launchURL('https://github.com/BitBoxxxer/Journal_Mobile'),
                                         icon: Icon(Icons.castle, size: 28),
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Colors.white,
                                         tooltip: 'GitHub',
                                       ),
                                       SizedBox(height: 4),
@@ -500,7 +525,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         'GitHub',
                                         style: TextStyle(
                                           fontSize: 10,
-                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                          color: Colors.white.withOpacity(0.7),
                                         ),
                                       ),
                                     ],
@@ -518,6 +543,8 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+          ),
+        ],
       ),
     );
   }
