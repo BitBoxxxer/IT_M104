@@ -1025,9 +1025,11 @@ void _showOpenFileDialog(File file, String fileName) {
     if (tabStatus == 'deleted' && 
         _tabHomeworks[tabStatus]!.isEmpty && 
         !_tabIsLoading[tabStatus]! &&
-        !_tabErrorMessages[tabStatus]!.isNotEmpty) {
+        _tabErrorMessages[tabStatus]!.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _loadHomeworksForTab(tabStatus);
+        if (!_tabIsLoading[tabStatus]! && _tabHomeworks[tabStatus]!.isEmpty) {
+          _loadHomeworksForTab(tabStatus);
+        }
       });
     }
     if (_tabIsLoading[tabStatus]! && _tabHomeworks[tabStatus]!.isEmpty) {
