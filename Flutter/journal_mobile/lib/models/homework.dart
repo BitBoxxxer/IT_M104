@@ -17,6 +17,7 @@ class Homework {
   final String? coverImage;
   final String teacherName;
   final int? materialType;
+  final bool? isDeleted;
 
   Homework({
     required this.id,
@@ -37,6 +38,7 @@ class Homework {
     this.coverImage,
     required this.teacherName,
     this.materialType,
+    this.isDeleted,
   });
 
   factory Homework.fromJson(Map<String, dynamic> json) {
@@ -72,14 +74,15 @@ class Homework {
       coverImage: json['cover_image']?.toString(),
       teacherName: json['fio_teach'] ?? 'Не указан',
       materialType: json['material_type'] ?? json['type_id'],
+      isDeleted: json['is_deleted'] as bool? ?? false,
     );
   }
 
-  bool get isExpired => _getRealStatus() == 0;
-  bool get isDone => _getRealStatus() == 1;
-  bool get isInspection => _getRealStatus() == 2;
-  bool get isOpened => _getRealStatus() == 3;
-  bool get isDeleted => _getRealStatus() == 5;
+  bool get isExpired => getRealStatus() == 0;
+  bool get isDone => getRealStatus() == 1;
+  bool get isInspection => getRealStatus() == 2;
+  bool get isOpened => getRealStatus() == 3;
+  bool get isDeletedStatus => getRealStatus() == 5;
 
   bool get hasAttachment => filename != null && filename!.isNotEmpty;
   String? get downloadUrl => filePath != null ? _buildDownloadUrl(filePath!) : null;
@@ -101,30 +104,57 @@ String? get studentDownloadUrl {
 
 String? get studentFilename => homeworkStud?.filename;
 
-  /// Определение реального статуса на основе всех доступных данных
-  int _getRealStatus() {
-    if (homeworkStud?.mark != null) {
-      return 1; // DONE
+  int getRealStatus() {
+    // 1. САМЫЙ ПРИОРИТЕТНЫЙ: проверяем явное поле isDeleted
+    if (isDeleted == true) {
+      return 5; // DELETED
     }
     
-    if (homeworkStud != null && homeworkStud?.mark == null) {
-      return 2; // INSPECTION
-    }
-
+    // 2. Проверяем старые способы определения удаления
     if (status == 5 || commonStatus == 5) {
       return 5; // DELETED
     }
     
+    // 3. Если работа помечена как удаленная в теме или описании
+    if (theme.toLowerCase().contains('удален') || 
+        (description?.toLowerCase().contains('удален') == true)) {
+      return 5; // DELETED
+    }
+    
+    // 4. ОСТАЛЬНАЯ ЛОГИКА СТАТУСОВ для НЕудаленных работ
+    
+    // Если работа сдана и есть оценка - проверено
+    if (homeworkStud?.mark != null) {
+      return 1; // DONE
+    }
+    
+    // Если работа сдана, но нет оценки - на проверке
+    if (homeworkStud != null) {
+      return 2; // INSPECTION
+    }
+    
+    // Если срок сдачи прошел - просрочено
     final now = DateTime.now();
-    if (_isDateAfter(now, completionTime)) {
+    if (now.isAfter(completionTime)) {
       return 0; // EXPIRED
     }
     
+    // Во всех остальных случаях - активно
     return 3; // OPENED
+  }
+  
+  // Добавим метод для получения "чистого" статуса без удаления
+  int getDisplayStatus() {
+    final realStatus = getRealStatus();
+    // Если работа удалена, возвращаем специальный статус
+    if (realStatus == 5) {
+      return 5; // DELETED
+    }
+    return realStatus;
   }
 
   String get statusString {
-    switch (_getRealStatus()) {
+    switch (getRealStatus()) {
       case 0: return 'expired';
       case 1: return 'done';
       case 2: return 'inspection';
@@ -134,13 +164,7 @@ String? get studentFilename => homeworkStud?.filename;
     }
   }
 
-  bool _isDateAfter(DateTime date1, DateTime date2) {
-    final date1Normalized = DateTime(date1.year, date1.month, date1.day);
-    final date2Normalized = DateTime(date2.year, date2.month, date2.day);
-    return date1Normalized.isAfter(date2Normalized);
-  }
-
-  bool get canUpload => isOpened || isExpired;
+  bool get canUpload => (isOpened || isExpired) && !isDeletedStatus;
 }
 
 class HomeworkStud {

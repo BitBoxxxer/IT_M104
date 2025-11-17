@@ -516,7 +516,7 @@ Future<List<Homework>> getHomeworks(
     final newToken = await _reauthenticate();
     if (newToken != null) {
       response = await http.get(
-        Uri.parse('$_baseUrl/homework/operations/list'),
+        url,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $newToken',

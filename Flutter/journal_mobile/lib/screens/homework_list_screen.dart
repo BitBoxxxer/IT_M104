@@ -22,77 +22,176 @@ class HomeworkListScreen extends StatefulWidget {
   State<HomeworkListScreen> createState() => _HomeworkListScreenState();
 }
 
-class _HomeworkListScreenState extends State<HomeworkListScreen> {
+class _HomeworkListScreenState extends State<HomeworkListScreen>
+    with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
 
-  List<Homework> _allHomeworks = [];
+  Map<String, List<Homework>> _tabHomeworks = {};
+  Map<String, int> _tabCurrentPages = {};
+  Map<String, bool> _tabHasMoreData = {};
+  Map<String, bool> _tabIsLoading = {};
+  Map<String, bool> _tabIsLoadingMore = {};
+  Map<String, String> _tabErrorMessages = {};
+
   List<HomeworkCounter> _counters = [];
-  String _filterStatus = 'all';
-  bool _isLoading = false;
-  bool _isLoadingMore = false;
-  String _errorMessage = '';
-  bool _showFilters = false;
   
-  int _currentPage = 1;
-  bool _hasMoreData = true;
-  final int _pageSize = 20;
+  final int _pageSize = 6;
+
+  late TabController _tabController;
+  int _currentTabIndex = 0;
+
+  final List<Map<String, dynamic>> _tabs = [
+    {'label': 'Активные', 'status': 'opened', 'icon': Icons.assignment, 'counterType': HomeworkCounter.HOMEWORK_STATUS_OPENED},
+    {'label': 'На проверке', 'status': 'inspection', 'icon': Icons.hourglass_top, 'counterType': HomeworkCounter.HOMEWORK_STATUS_INSPECTION},
+    {'label': 'Проверенные', 'status': 'done', 'icon': Icons.check_circle, 'counterType': HomeworkCounter.HOMEWORK_STATUS_DONE},
+    {'label': 'Просроченные', 'status': 'expired', 'icon': Icons.warning, 'counterType': HomeworkCounter.HOMEWORK_STATUS_EXPIRED},
+    {'label': 'Удаленные', 'status': 'deleted', 'icon': Icons.delete, 'counterType': HomeworkCounter.HOMEWORK_STATUS_DELETED},
+  ];
 
   @override
   void initState() {
     super.initState();
-    _loadHomeworks();
+    _tabController = TabController(length: _tabs.length, vsync: this);
+    
+    for (var tab in _tabs) {
+      String status = tab['status'];
+      _tabHomeworks[status] = [];
+      _tabCurrentPages[status] = 1;
+      _tabHasMoreData[status] = true;
+      _tabIsLoading[status] = false;
+      _tabIsLoadingMore[status] = false;
+      _tabErrorMessages[status] = '';
+    }
+
+    _tabController.addListener(_handleTabSelection);
     _loadCounters();
+    _loadHomeworksForTab(_tabs[_currentTabIndex]['status']);
   }
 
-Future<void> _loadHomeworks({bool loadMore = false}) async {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _handleTabSelection() {
+  if (_tabController.index != _currentTabIndex) {
+    setState(() {
+      _currentTabIndex = _tabController.index;
+    });
+    
+    String newTabStatus = _tabs[_currentTabIndex]['status'];
+    
+    if (newTabStatus == 'deleted') {
+      _loadCounters();
+    }
+    
+    if (_tabHomeworks[newTabStatus]!.isEmpty && 
+        !_tabIsLoading[newTabStatus]! && 
+        _tabErrorMessages[newTabStatus]!.isEmpty) {
+      _loadHomeworksForTab(newTabStatus);
+    }
+  }
+}
+
+int _getCounterForDeletedTab() {
   try {
-    if (!loadMore) {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = '';
-          _currentPage = 1;
-          _hasMoreData = true;
-          _allHomeworks = [];
+    final counter = _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_DELETED);
+    if (counter > 0) return counter;
+    
+    final deletedHomeworks = _tabHomeworks['deleted'] ?? [];
+    if (deletedHomeworks.isNotEmpty) {
+      return deletedHomeworks.length;
+    }
+    
+    return 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+  String get _currentFilterStatus {
+    return _tabs[_currentTabIndex]['status'];
+  }
+
+  int get _currentCounterType {
+    return _tabs[_currentTabIndex]['counterType'];
+  }
+
+  int get _currentTabCounter {
+    return _getCounterByStatus(_currentCounterType);
+  }
+
+  Future<void> _loadHomeworksForTab(String tabStatus, {bool loadMore = false}) async {
+    try {
+      if (!loadMore) {
+        setState(() {
+          _tabIsLoading[tabStatus] = true;
+          _tabErrorMessages[tabStatus] = '';
+          _tabCurrentPages[tabStatus] = 1;
+          _tabHasMoreData[tabStatus] = true;
         });
       } else {
         setState(() {
-          _isLoadingMore = true;
+          _tabIsLoadingMore[tabStatus] = true;
         });
       }
+      
       final type = widget.isLabWork ? 1 : 0;
+
+      int? statusParam;
+      switch (tabStatus) {
+        case 'expired':
+          statusParam = 0;
+          break;
+        case 'done':
+          statusParam = 1;
+          break;
+        case 'inspection':
+          statusParam = 2;
+          break;
+        case 'opened':
+          statusParam = 3;
+          break;
+        case 'deleted':
+          statusParam = 5;
+          break;
+        default:
+          statusParam = null;
+      }
+
+      await Future.delayed(Duration(milliseconds: 300));
 
       final homeworks = await _apiService.getHomeworks(
         widget.token, 
         type: type,
-        page: _currentPage,
+        page: _tabCurrentPages[tabStatus]!,
+        status: statusParam,
       );
 
       setState(() {
         if (!loadMore) {
-          _allHomeworks = homeworks;
+          _tabHomeworks[tabStatus] = homeworks;
         } else {
-          final newHomeworks = homeworks.where((newHw) => 
-            !_allHomeworks.any((existingHw) => existingHw.id == newHw.id)
-          ).toList();
-          _allHomeworks.addAll(newHomeworks);
+          _tabHomeworks[tabStatus]!.addAll(homeworks);
         }
-        if (homeworks.isNotEmpty) {
-          _currentPage++;
-          _hasMoreData = homeworks.length >= 6;
-        } else {
-          _hasMoreData = false;
+        
+        _tabHasMoreData[tabStatus] = homeworks.isNotEmpty && homeworks.length >= _pageSize;
+        if (_tabHasMoreData[tabStatus]!) {
+          _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! + 1;
         }
-        _isLoading = false;
-        _isLoadingMore = false;
+        
+        _tabIsLoading[tabStatus] = false;
+        _tabIsLoadingMore[tabStatus] = false;
       });
 
     } catch (e) {
       setState(() {
-        _errorMessage = 'Ошибка загрузки: $e';
-        _isLoading = false;
-        _isLoadingMore = false;
+        _tabErrorMessages[tabStatus] = 'Ошибка загрузки: $e';
+        _tabIsLoading[tabStatus] = false;
+        _tabIsLoadingMore[tabStatus] = false;
       });
-      print("Error loading homeworks: $e");
+      print("Error loading homeworks for tab $tabStatus: $e");
     }
   }
 
@@ -112,36 +211,20 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
   }
 
   Future<void> _refreshData() async {
-    await _loadHomeworks();
     await _loadCounters();
+    await _loadHomeworksForTab(_currentFilterStatus);
   }
 
-  Future<void> _loadMoreData() async {
-    if (_isLoadingMore || !_hasMoreData) return;
-    await _loadHomeworks(loadMore: true);
+  Future<void> _loadMoreData(String tabStatus) async {
+    if (_tabIsLoadingMore[tabStatus]! || !_tabHasMoreData[tabStatus]!) return;
+    await _loadHomeworksForTab(tabStatus, loadMore: true);
   }
 
   int _getCounterByStatus(int status) {
     try {
-      if (status == HomeworkCounter.HOMEWORK_STATUS_ALL) {
-        final allCounter = _counters.firstWhere(
-          (c) => c.counterType == HomeworkCounter.HOMEWORK_STATUS_ALL,
-          orElse: () => HomeworkCounter(counterType: HomeworkCounter.HOMEWORK_STATUS_ALL, counter: 0),
-        );
-        
-        if (allCounter.counter > 0) {
-          return allCounter.counter;
-        }
-        
-        return _counters
-            .where((counter) => 
-                counter.counterType != HomeworkCounter.HOMEWORK_STATUS_DELETED &&
-                counter.counterType != HomeworkCounter.HOMEWORK_STATUS_ALL)
-            .fold(0, (sum, counter) => sum + counter.counter);
-      }
-      
       final counter = _counters.firstWhere(
         (c) => c.counterType == status,
+        orElse: () => HomeworkCounter(counterType: status, counter: 0),
       );
       return counter.counter;
     } catch (e) {
@@ -149,53 +232,43 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
     }
   }
 
-  int get _totalCounter {
-    return [
-      HomeworkCounter.HOMEWORK_STATUS_OPENED,
-      HomeworkCounter.HOMEWORK_STATUS_INSPECTION,
-      HomeworkCounter.HOMEWORK_STATUS_DONE,
-      HomeworkCounter.HOMEWORK_STATUS_EXPIRED,
-    ].fold(0, (sum, status) => sum + _getCounterByStatus(status));
-  }
-
   Color _getStatusColor(Homework homework) {
+    if (homework.isDeletedStatus) return Colors.grey.shade700;
     if (homework.isExpired) return Colors.red.shade700;
     if (homework.isDone) return Colors.green.shade700;
     if (homework.isInspection) return Colors.blue.shade700;
     if (homework.isOpened) return Colors.orange.shade700;
-    if (homework.isDeleted) return Colors.grey.shade700;
     return Colors.grey.shade700;
   }
 
   String _getStatusText(Homework homework) {
+    if (homework.isDeletedStatus) return 'Удалено';
     if (homework.isExpired) return 'Просрочено';
     if (homework.isDone) return 'Проверено';
     if (homework.isInspection) return 'На проверке';
     if (homework.isOpened) return 'Активно';
-    if (homework.isDeleted) return 'Удалено';
     return 'Неизвестно';
   }
 
   IconData _getStatusIcon(Homework homework) {
+    if (homework.isDeletedStatus) return Icons.delete_rounded;
     if (homework.isExpired) return Icons.warning_rounded;
     if (homework.isDone) return Icons.check_circle_rounded;
     if (homework.isInspection) return Icons.hourglass_top_rounded;
     if (homework.isOpened) return Icons.assignment_rounded;
-    if (homework.isDeleted) return Icons.delete_rounded;
     return Icons.help_rounded;
   }
 
   List<Homework> _filterHomeworks(List<Homework> homeworks) {
-    if (_filterStatus == 'all') {
-      return homeworks..sort((a, b) {
-        final priorityA = _getHomeworkPriority(a);
-        final priorityB = _getHomeworkPriority(b);
-        return priorityA.compareTo(priorityB);
-      });
-    }
+    final currentFilter = _currentFilterStatus;
     
-    return homeworks.where((hw) {
-      switch (_filterStatus) {
+    List<Homework> filtered;
+    
+    if (currentFilter == 'all') {
+      filtered = homeworks;
+    } else {
+      filtered = homeworks.where((hw) {
+      switch (currentFilter) {
         case 'expired':
           return hw.isExpired;
         case 'done':
@@ -205,19 +278,33 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
         case 'opened':
           return hw.isOpened;
         case 'deleted':
-          return hw.isDeleted;
+          return hw.isDeletedStatus;
         default:
           return true;
       }
     }).toList();
+    }
+    
+    filtered.sort((a, b) {
+      final priorityA = _getHomeworkPriority(a);
+      final priorityB = _getHomeworkPriority(b);
+      
+      if (priorityA != priorityB) {
+        return priorityA.compareTo(priorityB);
+      }
+      
+      return a.completionTime.compareTo(b.completionTime);
+    });
+    
+    return filtered;
   }
 
   int _getHomeworkPriority(Homework homework) {
-    if (homework.isExpired) return 0;
-    if (homework.isOpened) return 1;
-    if (homework.isInspection) return 2;
-    if (homework.isDone) return 3;
-    if (homework.isDeleted) return 4;
+    if (homework.isDeletedStatus) return 0;
+    if (homework.isExpired) return 1;
+    if (homework.isOpened) return 2;
+    if (homework.isInspection) return 3;
+    if (homework.isDone) return 4;
     return 5;
   }
 
@@ -243,6 +330,7 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
 
   /// Получает текст для кнопки скачивания в зависимости от статуса
   String _getDownloadButtonText(Homework homework) {
+    if (homework.isDeletedStatus) return 'Скачать задание (удалено)';
     if (homework.isDone) return 'Скачать задание (оценено)';
     if (homework.isInspection) return 'Скачать задание (на проверке)';
     if (homework.isExpired) return 'Скачать задание (просрочено)';
@@ -251,6 +339,7 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
 
   /// Получает текст для кнопки скачивания студенческой работы
   String _getStudentDownloadButtonText(Homework homework) {
+    if (homework.isDeletedStatus) return 'Скачать сданную работу (удалено)';
     if (homework.isDone) return 'Скачать сданную работу (оценено)';
     if (homework.isInspection) return 'Скачать сданную работу (на проверке)';
     if (homework.isExpired) return 'Скачать сданную работу (просрочено)';
@@ -398,7 +487,8 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
                           Icons.access_time,
                           isUrgent: homework.completionTime.isBefore(DateTime.now()) && 
                                     !homework.isDone && 
-                                    !homework.isInspection
+                                    !homework.isInspection &&
+                                    !homework.isDeletedStatus
                         ),
                         
                         if (homework.homeworkStud?.filename != null && homework.homeworkStud!.filename!.isNotEmpty)
@@ -421,6 +511,33 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
+                        if (homework.isDeletedStatus)
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.grey,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.delete, size: 12, color: Colors.grey),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Удалено',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        
                         if (homework.isExpired)
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -468,33 +585,6 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
                                   'Оценка: ${homework.homeworkStud!.mark!.toStringAsFixed(1)}',
                                   style: TextStyle(
                                     color: Colors.green,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        
-                        if (homework.canUpload && !homework.isDeleted)
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.blue,
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.upload, size: 12, color: Colors.blue),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Можно сдать',
-                                  style: TextStyle(
-                                    color: Colors.blue,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -640,15 +730,12 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
   );
 }
 
-  Widget _buildStatsCard(List<Homework> homeworks) {
-    final totalHomeworks = homeworks.length;
-    final activeHomeworks = homeworks.where((hw) => hw.isOpened).length;
-    final expiredHomeworks = homeworks.where((hw) => hw.isExpired).length;
-    final doneHomeworks = homeworks.where((hw) => hw.isDone).length;
-    final inspectionHomeworks = homeworks.where((hw) => hw.isInspection).length;
-    final submittedHomeworks = homeworks.where((hw) => hw.homeworkStud != null).length;
-    final deletedHomeworks = homeworks.where((hw) => hw.isDeleted).length;
-
+  Widget _buildStatsCard(List<Homework> homeworks, String tabStatus) {
+    final currentTab = _tabs.firstWhere((tab) => tab['status'] == tabStatus);
+    final totalCounter = tabStatus == 'deleted' 
+      ? _getCounterForDeletedTab()
+      : _getCounterByStatus(currentTab['counterType']);
+    
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
@@ -656,35 +743,39 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
         padding: EdgeInsets.all(16),
         child: Column(
           children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(currentTab['icon'], size: 20, color: Colors.blue),
+                SizedBox(width: 8),
             Text(
-              'Статистика заданий',
+              '${currentTab['label']} задания',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
+                ),
+              ],
             ),
             SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatItem('Всего', totalHomeworks.toString(), Icons.assignment, Colors.blue),
-                if (activeHomeworks > 0)
-                  _buildStatItem('Активные', activeHomeworks.toString(), Icons.assignment_turned_in, Colors.orange),
-                _buildStatItem('Проверенные', doneHomeworks.toString(), Icons.check_circle, Colors.green),
-                _buildStatItem('Сдано', submittedHomeworks.toString(), Icons.assignment_turned_in, Colors.teal),
+                _buildStatItem('Всего', totalCounter.toString(), Icons.assignment, Colors.blue),
+                _buildStatItem('Найдено', homeworks.length.toString(), Icons.search, Colors.green),
+                if (homeworks.isNotEmpty)
+                  _buildStatItem('Страница', '${_tabCurrentPages[tabStatus]!}', Icons.numbers, Colors.orange),
               ],
             ),
             SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                if (expiredHomeworks > 0)
-                  _buildStatItem('Просрочено', expiredHomeworks.toString(), Icons.warning, Colors.red),
-                if (inspectionHomeworks > 0)
-                  _buildStatItem('На проверке', inspectionHomeworks.toString(), Icons.hourglass_top, Colors.blue),
-                if (deletedHomeworks > 0)
-                  _buildStatItem('Удалено', deletedHomeworks.toString(), Icons.delete, Colors.grey),
-              ],
+            if (totalCounter > homeworks.length)
+              Text(
+                'Загружено ${homeworks.length} из $totalCounter работ',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
           ],
         ),
@@ -726,68 +817,126 @@ Future<void> _loadHomeworks({bool loadMore = false}) async {
     );
   }
 
-  Widget _buildFilterChips() {
-  final List<Map<String, dynamic>> filterOptions = [
-    {'value': 'all', 'label': 'Все', 'count': _totalCounter},
-    {'value': 'opened', 'label': 'Активные', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_OPENED)},
-    {'value': 'inspection', 'label': 'На проверке', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_INSPECTION)},
-    {'value': 'done', 'label': 'Проверенные', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_DONE)},
-    {'value': 'expired', 'label': 'Просроченные', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_EXPIRED)},
-    {'value': 'deleted', 'label': 'Удаленные', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_DELETED)},
-  ];
-
-  return Padding(
-    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    child: Wrap(
-      spacing: 8,
-      children: filterOptions.map((filter) {
-        final String filterValue = filter['value'] as String;
-        final String filterLabel = filter['label'] as String;
-        final int filterCount = filter['count'] as int;
-        final bool isSelected = _filterStatus == filterValue;
-        
-        return FilterChip(
-          label: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(filterLabel),
-              SizedBox(width: 4),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isSelected 
-                      ? Colors.white.withOpacity(0.3)
-                      : Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  filterCount.toString(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isSelected ? Colors.white : Colors.grey.shade700,
-                    fontWeight: FontWeight.bold,
+  Widget _buildLoadMoreIndicator(String tabStatus) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: _tabIsLoadingMore[tabStatus]! 
+            ? Column(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 8),
+                  Text('Загрузка следующих заданий...'),
+                ],
+              )
+            : _tabHasMoreData[tabStatus]!
+                ? TextButton(
+                    onPressed: () => _loadMoreData(tabStatus),
+                    child: Text('Загрузить еще'),
+                  )
+                : Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Все задания загружены',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ),
-                ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String tabStatus) {
+    final currentTab = _tabs.firstWhere((tab) => tab['status'] == tabStatus);
+    
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            currentTab['icon'],
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          SizedBox(height: 16),
+          Text(
+            '${currentTab['label']} отсутствуют',
+            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+          ),
+          SizedBox(height: 8),
+          Text(
+            _getEmptyStateDescription(currentTab['status']),
+            style: TextStyle(
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getEmptyStateDescription(String status) {
+    switch (status) {
+      case 'opened':
+        return 'У вас нет активных заданий';
+      case 'inspection':
+        return 'Нет работ на проверке';
+      case 'done':
+        return 'Проверенные работы отсутствуют';
+      case 'expired':
+        return 'Просроченных работ нет';
+      case 'deleted':
+        return 'Удаленные работы отсутствуют';
+      default:
+        return 'Задания не найдены';
+    }
+  }
+
+  Widget _buildContent(String tabStatus) {
+    final currentHomeworks = _tabHomeworks[tabStatus] ?? [];
+    final filteredHomeworks = _filterHomeworks(currentHomeworks);
+    
+    if (currentHomeworks.isEmpty && !_tabIsLoading[tabStatus]!) {
+      return _buildEmptyState(tabStatus);
+    }
+    
+    return Column(
+      children: [
+        _buildStatsCard(currentHomeworks, tabStatus),
+        
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshData,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (ScrollNotification scrollInfo) {
+                if (scrollInfo is ScrollUpdateNotification) {
+                  final metrics = scrollInfo.metrics;
+                  if (metrics.maxScrollExtent - metrics.pixels < 200 && 
+                      !_tabIsLoadingMore[tabStatus]! && 
+                      _tabHasMoreData[tabStatus]!) {
+                    _loadMoreData(tabStatus);
+                  }
+                }
+                return false;
+              },
+              child: ListView.builder(
+                itemCount: filteredHomeworks.length + (_tabHasMoreData[tabStatus]! ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == filteredHomeworks.length) {
+                    return _buildLoadMoreIndicator(tabStatus);
+                  }
+                  return _buildHomeworkCard(filteredHomeworks[index], index);
+                },
               ),
-            ],
+            ),
           ),
-          selected: isSelected,
-          onSelected: (selected) {
-            setState(() {
-              _filterStatus = filterValue;
-            });
-          },
-          backgroundColor: Colors.grey.shade200,
-          selectedColor: Colors.blue.shade100,
-          checkmarkColor: Colors.blue,
-          labelStyle: TextStyle(
-            color: isSelected ? Colors.blue.shade800 : Colors.grey.shade700,
-          ),
-        );
-      }).toList(),
-    ),
-  );
-}
+        ),
+      ],
+    );
+  }
 
 Future<void> _downloadHomeworkFile(Homework homework) async {
   try {
@@ -870,126 +1019,61 @@ void _showOpenFileDialog(File file, String fileName) {
   );
 }
 
-  void _toggleFilters() {
-    setState(() {
-      _showFilters = !_showFilters;
-    });
-  }
-
-  Widget _buildLoadMoreIndicator() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 16),
-      child: Center(
-        child: _isLoadingMore 
-            ? Column(
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 8),
-                  Text('Загрузка следующих заданий...'),
-                ],
-              )
-            : _hasMoreData
-                ? TextButton(
-                    onPressed: _loadMoreData,
-                    child: Text('Загрузить еще'),
-                  )
-                : Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Все задания загружены',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            widget.isLabWork ? Icons.science : Icons.assignment,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
-          SizedBox(height: 16),
-          Text(
-            widget.isLabWork 
-                ? 'Лабораторных работ нет'
-                : 'Домашних заданий нет',
-            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Здесь будут отображаться ваши учебные задания',
-            style: TextStyle(
-              color: Colors.grey.shade500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContent() {
-    final filteredHomeworks = _filterHomeworks(_allHomeworks);
+  Widget _buildTabContent(int tabIndex) {
+    String tabStatus = _tabs[tabIndex]['status'];
     
-    if (_allHomeworks.isEmpty && !_isLoading) {
-      return _buildEmptyState();
+    if (tabStatus == 'deleted' && 
+        _tabHomeworks[tabStatus]!.isEmpty && 
+        !_tabIsLoading[tabStatus]! &&
+        !_tabErrorMessages[tabStatus]!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadHomeworksForTab(tabStatus);
+      });
     }
-    
-    return Column(
-      children: [
-        _buildStatsCard(_allHomeworks),
-        
-        if (_showFilters) ...[
-          _buildFilterChips(),
-          SizedBox(height: 8),
-          Text(
-            'Найдено заданий: ${filteredHomeworks.length}',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 14,
-            ),
-          ),
-          SizedBox(height: 8),
-        ],
-        
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _refreshData,
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (ScrollNotification scrollInfo) {
-                if (scrollInfo is ScrollUpdateNotification) {
-                  final metrics = scrollInfo.metrics;
-                  if (metrics.maxScrollExtent - metrics.pixels < 200 && 
-                      !_isLoadingMore && 
-                      _hasMoreData) {
-                    _loadMoreData();
-                  }
-                }
-                return false;
-              },
-              child: ListView.builder(
-                itemCount: filteredHomeworks.length + (_hasMoreData ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == filteredHomeworks.length) {
-                    return _buildLoadMoreIndicator();
-                  }
-                  return _buildHomeworkCard(filteredHomeworks[index], index);
-                },
+    if (_tabIsLoading[tabStatus]! && _tabHomeworks[tabStatus]!.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Загрузка ${_tabs[tabIndex]['label'].toString().toLowerCase()}...'),
+            SizedBox(height: 8),
+            Text(
+              '${_getCounterByStatus(_tabs[tabIndex]['counterType'])} работ',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
               ),
             ),
-          ),
+          ],
         ),
-      ],
-    );
+      );
+    } else if (_tabErrorMessages[tabStatus]!.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red),
+            SizedBox(height: 16),
+            Text(
+              _tabErrorMessages[tabStatus]!,
+              style: TextStyle(fontSize: 16, color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _loadHomeworksForTab(tabStatus),
+              child: Text('Повторить'),
+            ),
+          ],
+        ),
+      );
+    } else if (_tabHomeworks[tabStatus]!.isEmpty) {
+      return _buildEmptyState(tabStatus);
+    } else {
+      return _buildContent(tabStatus);
+    }
   }
 
   @override
@@ -997,54 +1081,38 @@ void _showOpenFileDialog(File file, String fileName) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isLabWork ? 'Лабораторные работы' : 'Домашние задания'),
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabs: _tabs.map((tab) {
+            final counter = tab['status'] == 'deleted' 
+              ? _getCounterForDeletedTab() // Особый метод для удаленных
+              : _getCounterByStatus(tab['counterType']);
+            return Tab(
+              icon: Badge(
+                label: Text(counter.toString()),
+                isLabelVisible: counter > 0,
+                smallSize: 18,
+                child: Icon(tab['icon'], size: 20),
+              ),
+              text: tab['label'],
+            );
+          }).toList(),
+        ),
         actions: [
           IconButton(
-            icon: Icon(
-              _showFilters ? Icons.filter_alt : Icons.filter_alt_outlined,
-              color: _showFilters ? Colors.blue : null,
-            ),
-            onPressed: _toggleFilters,
-            tooltip: 'Фильтры',
-          ),
-          IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _refreshData,
+            onPressed: _tabIsLoading[_currentFilterStatus]! ? null : _refreshData,
             tooltip: 'Обновить',
           ),
         ],
       ),
-      body: _isLoading && _allHomeworks.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Загрузка заданий...'),
-                ],
-              ),
-            )
-          : _errorMessage.isNotEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, size: 64, color: Colors.red),
-                      SizedBox(height: 16),
-                      Text(
-                        _errorMessage,
-                        style: TextStyle(fontSize: 16, color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _refreshData,
-                        child: Text('Повторить'),
-                      ),
-                    ],
-                  ),
-                )
-              : _buildContent(),
+      body: TabBarView(
+        controller: _tabController,
+        children: _tabs.asMap().entries.map((entry) {
+          return _buildTabContent(entry.key);
+        }).toList(),
+      ),
     );
   }
 }
