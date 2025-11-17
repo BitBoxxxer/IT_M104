@@ -2,8 +2,6 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
-import 'package:http/http.dart' as http;
-import 'package:file_selector/file_selector.dart';
 
 class DownloadService {
   static final Dio _dio = Dio();
@@ -76,7 +74,7 @@ class DownloadService {
         try {
           Directory? externalDir = await getExternalStorageDirectory();
           if (externalDir != null) {
-            // Для Android создает папку Download
+            // Для Android создает папку Download - Ди
             Directory downloadDir = Directory('${externalDir.path}/Download');
             if (!await downloadDir.exists()) {
               await downloadDir.create(recursive: true);
@@ -99,7 +97,7 @@ class DownloadService {
         }
       }
       
-      // Fallback на documents directory
+      // Fallback на documents directory - Ди
       Directory documentsDir = await getApplicationDocumentsDirectory();
       Directory downloadDir = Directory('${documentsDir.path}/Download');
       if (!await downloadDir.exists()) {
@@ -109,7 +107,7 @@ class DownloadService {
       return downloadDir;
     } catch (e) {
       print('Error getting download directory: $e');
-      // Ultimate fallback
+      // Ultimate fallback - Ди
       Directory documentsDir = await getApplicationDocumentsDirectory();
       return documentsDir;
     }
@@ -220,7 +218,7 @@ static String _ensureFileExtension(String fileName, Response response) {
     return fileName;
   }
 
-  // Определяем расширение по Content-Type
+  // Определяем расширение по Content-Type (TO-DO: Посмотреть какие форматы еще могут быть отправлены.)
   String? contentType = response.headers.value('content-type');
   String extension = '.bin'; // дефолтное расширение.
 
@@ -249,75 +247,5 @@ static String _ensureFileExtension(String fileName, Response response) {
   }
 
   return '$fileName$extension';
-}
-
-/// Выбор файла для загрузки
-static Future<File?> pickFile() async {
-  try {
-    const XTypeGroup typeGroup = XTypeGroup(
-      label: 'Documents',
-      extensions: <String>[
-        'pdf', 'doc', 'docx', 'txt', 'rtf',
-        'jpg', 'jpeg', 'png', 'gif',
-        'zip', 'rar', '7z'
-      ],
-    );
-    
-    final XFile? file = await openFile(acceptedTypeGroups: <XTypeGroup>[typeGroup]);
-    
-    if (file != null) {
-      return File(file.path);
-    }
-    return null;
-  } catch (e) {
-    print('Ошибка выбора файла: $e');
-    return null;
-  }
-}
-
-/// Загрузка домашнего задания на сервер
-static Future<void> uploadHomeworkFile({
-  required int homeworkId,
-  required File file,
-  required String answerText,
-  required int spentTimeHour,
-  required int spentTimeMin,
-  required String token,
-}) async {
-  try {
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('https://msapi.top-academy.ru/api/v2/homework/operations/create'),
-    );
-
-    request.headers.addAll({
-      'Authorization': 'Bearer $token',
-    });
-
-    request.fields['id'] = homeworkId.toString();
-    request.fields['spentTimeHour'] = spentTimeHour.toString();
-    request.fields['spentTimeMin'] = spentTimeMin.toString();
-    
-    if (answerText.isNotEmpty) {
-      request.fields['answerText'] = answerText;
-    }
-
-    request.files.add(await http.MultipartFile.fromPath(
-      'file',
-      file.path,
-      filename: file.path.split('/').last,
-    ));
-
-    final response = await request.send();
-    
-    if (response.statusCode == 200) {
-      print('Файл успешно загружен');
-    } else {
-      throw Exception('Ошибка загрузки: ${response.statusCode}');
-    }
-  } catch (e) {
-    print('Ошибка загрузки файла: $e');
-    rethrow;
-  }
 }
 }

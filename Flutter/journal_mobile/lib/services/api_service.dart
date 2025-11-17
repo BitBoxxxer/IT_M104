@@ -606,54 +606,7 @@ Future<List<HomeworkCounter>> getHomeworkCounters(
   }
 }
 
-/// отправка домашнего задания [api]
-Future<Map<String, dynamic>> submitHomework(
-  String token, {
-  required int id,
-  required int spentTimeHour,
-  required int spentTimeMin,
-  String? answerText,
-  http.MultipartFile? file,
-}) async {
-  try {
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$_baseUrl/homework/operations/create'),
-    );
-
-    request.headers.addAll({
-      'Authorization': 'Bearer $token',
-      'Referer': 'https://journal.top-academy.ru',
-    });
-
-    request.fields['id'] = id.toString();
-    request.fields['spentTimeHour'] = spentTimeHour.toString();
-    request.fields['spentTimeMin'] = spentTimeMin.toString();
-    if (answerText != null && answerText.isNotEmpty) {
-      request.fields['answerText'] = answerText;
-    }
-
-    if (file != null) {
-      request.files.add(file);
-    } // TO-DO: Добавить исключения на тип файлов ? (Разобраться.)
-
-    var response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-
-    if (response.statusCode == 200) {
-      return jsonDecode(responseBody);
-    } else {
-      print("Homework submission failed: ${response.statusCode}");
-      print("Response body: $responseBody");
-      throw Exception('Homework submission failed: ${response.statusCode}');
-    }
-  } catch (e) {
-    print("Error submitting homework: $e");
-    throw Exception('Error submitting homework: $e');
-  }
-}
-
-/// удаление домашнего задания [api]
+/// удаление домашнего задания [api] // TO-DO: Допилить - Ди (Будущий func)
 Future<bool> deleteHomework(String token, int homeworkId) async {
   var response = await http.post(
     Uri.parse('$_baseUrl/homework/operations/delete'),

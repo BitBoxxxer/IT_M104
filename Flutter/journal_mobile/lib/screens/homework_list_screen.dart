@@ -6,7 +6,6 @@ import '../services/download_service.dart';
 
 import '../models/homework.dart';
 import '../models/homework_counter.dart';
-import '../models/dialog/homework_submit_dialog.dart';
 import '../models/widgets/error_snackBar.dart';
 
 class HomeworkListScreen extends StatefulWidget {
@@ -449,22 +448,6 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                                   ),
                                 ),
                               ),
-                            if (homework.filePath != null && homework.filePath!.isNotEmpty)
-                              SizedBox(width: 8),
-                            if (homework.canUpload)
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    _submitHomework(homework);
-                                  },
-                                  icon: Icon(Icons.upload, size: 16),
-                                  label: Text('Сдать работу'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: statusColor,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),
@@ -686,12 +669,17 @@ Future<void> _downloadHomeworkFile(Homework homework) async {
     );
     
     if (downloadedFile != null) {
+      // Получаем имя файла из скачанного файла, если homework.filename null
+      final String fileName = homework.filename ?? 
+          downloadedFile.path.split('/').last ??
+          'homework_${homework.id}';
+      
       ErrorSnackBar.showSuccessSnackBar(
         context, 
-        'Файл "${homework.filename}" скачан!'
+        'Файл "$fileName" скачан!'
       );
       
-      _showOpenFileDialog(downloadedFile, homework.filename ?? 'Файл');
+      _showOpenFileDialog(downloadedFile, fileName);
     }
   } catch (e) {
     String errorMessage = 'Ошибка скачивания: $e';
@@ -725,23 +713,6 @@ void _showOpenFileDialog(File file, String fileName) {
     ),
   );
 }
-
-Future<void> _submitHomework(Homework homework) async {
-    _showSubmitDialog(homework);
-  }
-
-  void _showSubmitDialog(Homework homework) {
-    showDialog(
-      context: context,
-      builder: (context) => HomeworkSubmitDialog(
-        homework: homework,
-        token: widget.token,
-        onSubmitted: () {
-          _refreshData();
-        },
-      ),
-    );
-  }
 
   void _toggleFilters() {
     setState(() {
