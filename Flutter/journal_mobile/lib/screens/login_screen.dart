@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
+import '../services/url_launcher_service.dart';
 import 'menu_screen.dart';
+import 'package:flutter/services.dart';
 
 class LoginScreen extends StatefulWidget {
   final String currentTheme;
@@ -22,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
   final _secureStorage = SecureStorageService();
+  final _urlLauncher = UrlLauncherService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
@@ -31,6 +34,46 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _checkAutoLogin();
+  }
+
+  /// Обработка открытия ссылок через сервис
+  Future<void> _launchURL(String url) async {
+    try {
+      await _urlLauncher.launchUrl(url);
+    } catch (e) {
+      print('Error launching URL: $e');
+      if (mounted) {
+        _showUrlDialog(url);
+      }
+    }
+  }
+
+  void _showUrlDialog(String url) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Ссылка'),
+          content: SelectableText(url),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Закрыть'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Clipboard.setData(ClipboardData(text: url));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Ссылка скопирована')),
+                );
+              },
+              child: Text('Копировать'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _checkAutoLogin() async {
@@ -273,6 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
+                Spacer(),
 
                 Expanded(
                   flex: 3,
@@ -361,6 +405,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
+                        Text(
+                          'Student Journal',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        Spacer(),
 
                         // вход
                         SizedBox(
@@ -369,7 +423,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _login,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color.fromARGB(255, 210, 31, 25),
                               foregroundColor: Colors.white,
                               elevation: 2,
                               shape: RoundedRectangleBorder(
@@ -395,13 +448,66 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-
-                        Text(
-                          'Student Journal',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                            fontSize: 12,
+                        
+                        Spacer(),
+                        
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Column(
+                            children: [
+                              Text(
+                                'Соц. сети разработчиков:',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Column(
+                                    children: [
+                                      IconButton(
+                                        onPressed: () => _launchURL('https://t.me/ImKaseyFuck'),
+                                        icon: Icon(Icons.telegram, size: 28),
+                                        color: Theme.of(context).colorScheme.primary,
+                                        tooltip: 'Telegram',
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Telegram',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 24),
+                                  
+                                  Column(
+                                    children: [
+                                      IconButton(
+                                        onPressed: () => _launchURL('https://github.com/BitBoxxxer/Journal_Mobile'),
+                                        icon: Icon(Icons.castle, size: 28),
+                                        color: Theme.of(context).colorScheme.primary,
+                                        tooltip: 'GitHub',
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'GitHub',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
