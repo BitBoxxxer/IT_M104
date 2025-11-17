@@ -496,6 +496,11 @@ Future<List<Homework>> getHomeworks(
   if (groupId != null) params['group_id'] = groupId.toString();
   if (specId != null) params['spec_id'] = specId.toString();
   
+  params['limit'] = '6';
+  if (page != null) {
+    params['offset'] = ((page - 1) * 6).toString();
+  }
+
   final url = uri.replace(queryParameters: params.isNotEmpty ? params : null);
   
   var response = await http.get(

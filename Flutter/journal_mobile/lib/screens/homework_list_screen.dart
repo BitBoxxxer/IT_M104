@@ -25,12 +25,17 @@ class HomeworkListScreen extends StatefulWidget {
 class _HomeworkListScreenState extends State<HomeworkListScreen> {
   final ApiService _apiService = ApiService();
 
-  late Future<List<Homework>> _homeworksFuture;
+  List<Homework> _allHomeworks = [];
   List<HomeworkCounter> _counters = [];
   String _filterStatus = 'all';
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   String _errorMessage = '';
   bool _showFilters = false;
+  
+  int _currentPage = 1;
+  bool _hasMoreData = true;
+  final int _pageSize = 20;
 
   @override
   void initState() {
@@ -39,29 +44,53 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     _loadCounters();
   }
 
-  Future<void> _loadHomeworks() async {
-    try {
+Future<void> _loadHomeworks({bool loadMore = false}) async {
+  try {
+    if (!loadMore) {
       setState(() {
         _isLoading = true;
         _errorMessage = '';
-      });
-      
-      // тип: 0 - домашние, 1 - лабораторные
+          _currentPage = 1;
+          _hasMoreData = true;
+          _allHomeworks = [];
+        });
+      } else {
+        setState(() {
+          _isLoadingMore = true;
+        });
+      }
       final type = widget.isLabWork ? 1 : 0;
-      
+
       final homeworks = await _apiService.getHomeworks(
         widget.token, 
-        type: type
+        type: type,
+        page: _currentPage,
       );
+
       setState(() {
-        _homeworksFuture = Future.value(homeworks);
+        if (!loadMore) {
+          _allHomeworks = homeworks;
+        } else {
+          final newHomeworks = homeworks.where((newHw) => 
+            !_allHomeworks.any((existingHw) => existingHw.id == newHw.id)
+          ).toList();
+          _allHomeworks.addAll(newHomeworks);
+        }
+        if (homeworks.isNotEmpty) {
+          _currentPage++;
+          _hasMoreData = homeworks.length >= 6;
+        } else {
+          _hasMoreData = false;
+        }
         _isLoading = false;
+        _isLoadingMore = false;
       });
 
     } catch (e) {
       setState(() {
         _errorMessage = 'Ошибка загрузки: $e';
         _isLoading = false;
+        _isLoadingMore = false;
       });
       print("Error loading homeworks: $e");
     }
@@ -85,6 +114,11 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
   Future<void> _refreshData() async {
     await _loadHomeworks();
     await _loadCounters();
+  }
+
+  Future<void> _loadMoreData() async {
+    if (_isLoadingMore || !_hasMoreData) return;
+    await _loadHomeworks(loadMore: true);
   }
 
   int _getCounterByStatus(int status) {
@@ -842,6 +876,122 @@ void _showOpenFileDialog(File file, String fileName) {
     });
   }
 
+  Widget _buildLoadMoreIndicator() {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: _isLoadingMore 
+            ? Column(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 8),
+                  Text('Загрузка следующих заданий...'),
+                ],
+              )
+            : _hasMoreData
+                ? TextButton(
+                    onPressed: _loadMoreData,
+                    child: Text('Загрузить еще'),
+                  )
+                : Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Все задания загружены',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            widget.isLabWork ? Icons.science : Icons.assignment,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          SizedBox(height: 16),
+          Text(
+            widget.isLabWork 
+                ? 'Лабораторных работ нет'
+                : 'Домашних заданий нет',
+            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Здесь будут отображаться ваши учебные задания',
+            style: TextStyle(
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    final filteredHomeworks = _filterHomeworks(_allHomeworks);
+    
+    if (_allHomeworks.isEmpty && !_isLoading) {
+      return _buildEmptyState();
+    }
+    
+    return Column(
+      children: [
+        _buildStatsCard(_allHomeworks),
+        
+        if (_showFilters) ...[
+          _buildFilterChips(),
+          SizedBox(height: 8),
+          Text(
+            'Найдено заданий: ${filteredHomeworks.length}',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 14,
+            ),
+          ),
+          SizedBox(height: 8),
+        ],
+        
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshData,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (ScrollNotification scrollInfo) {
+                if (scrollInfo is ScrollUpdateNotification) {
+                  final metrics = scrollInfo.metrics;
+                  if (metrics.maxScrollExtent - metrics.pixels < 200 && 
+                      !_isLoadingMore && 
+                      _hasMoreData) {
+                    _loadMoreData();
+                  }
+                }
+                return false;
+              },
+              child: ListView.builder(
+                itemCount: filteredHomeworks.length + (_hasMoreData ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == filteredHomeworks.length) {
+                    return _buildLoadMoreIndicator();
+                  }
+                  return _buildHomeworkCard(filteredHomeworks[index], index);
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -863,7 +1013,7 @@ void _showOpenFileDialog(File file, String fileName) {
           ),
         ],
       ),
-      body: _isLoading
+      body: _isLoading && _allHomeworks.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -894,94 +1044,7 @@ void _showOpenFileDialog(File file, String fileName) {
                     ],
                   ),
                 )
-              : FutureBuilder<List<Homework>>(
-                  future: _homeworksFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
-                    }
-                    
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: 64, color: Colors.red),
-                            SizedBox(height: 16),
-                            Text(
-                              'Ошибка загрузки данных',
-                              style: TextStyle(fontSize: 16, color: Colors.red),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    
-                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              widget.isLabWork ? Icons.science : Icons.assignment,
-                              size: 64,
-                              color: Colors.grey.shade400,
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              widget.isLabWork 
-                                  ? 'Лабораторных работ нет'
-                                  : 'Домашних заданий нет',
-                              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Здесь будут отображаться ваши учебные задания',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    
-                    final allHomeworks = snapshot.data!;
-                    final filteredHomeworks = _filterHomeworks(allHomeworks);
-                    
-                    return Column(
-                      children: [
-                        _buildStatsCard(allHomeworks),
-                        
-                        if (_showFilters) ...[
-                          _buildFilterChips(),
-                          SizedBox(height: 8),
-                          Text(
-                            'Найдено заданий: ${filteredHomeworks.length}',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                        ],
-                        
-                        Expanded(
-                          child: RefreshIndicator(
-                            onRefresh: _refreshData,
-                            child: ListView.builder(
-                              itemCount: filteredHomeworks.length,
-                              itemBuilder: (context, index) {
-                                return _buildHomeworkCard(filteredHomeworks[index], index);
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+              : _buildContent(),
     );
   }
 }
