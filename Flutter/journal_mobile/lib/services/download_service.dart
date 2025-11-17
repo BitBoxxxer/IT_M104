@@ -218,7 +218,7 @@ static String _ensureFileExtension(String fileName, Response response) {
     return fileName;
   }
 
-  // Определяем расширение по Content-Type (TO-DO: Посмотреть какие форматы еще могут быть отправлены.)
+  // Определяем расширение по Content-Type (TODO: Посмотреть какие форматы еще могут быть отправлены.)
   String? contentType = response.headers.value('content-type');
   String extension = '.bin'; // дефолтное расширение.
 

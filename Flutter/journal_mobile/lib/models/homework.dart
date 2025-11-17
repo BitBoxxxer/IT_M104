@@ -92,6 +92,15 @@ class Homework {
     }
   }
 
+String? get studentDownloadUrl {
+  if (homeworkStud?.filePath != null && homeworkStud!.filePath!.isNotEmpty) {
+    return _buildDownloadUrl(homeworkStud!.filePath!);
+  }
+  return null;
+}
+
+String? get studentFilename => homeworkStud?.filename;
+
   /// Определение реального статуса на основе всех доступных данных
   int _getRealStatus() {
     if (homeworkStud?.mark != null) {
@@ -100,6 +109,10 @@ class Homework {
     
     if (homeworkStud != null && homeworkStud?.mark == null) {
       return 2; // INSPECTION
+    }
+
+    if (status == 5 || commonStatus == 5) {
+      return 5; // DELETED
     }
     
     final now = DateTime.now();

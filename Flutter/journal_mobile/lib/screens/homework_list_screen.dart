@@ -147,6 +147,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     if (homework.isDone) return Icons.check_circle_rounded;
     if (homework.isInspection) return Icons.hourglass_top_rounded;
     if (homework.isOpened) return Icons.assignment_rounded;
+    if (homework.isDeleted) return Icons.delete_rounded;
     return Icons.help_rounded;
   }
 
@@ -190,8 +191,42 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
+  /// Проверяет, доступно ли задание для скачивания
+  bool _isDownloadAvailable(Homework homework) {
+    return homework.filePath != null && 
+           homework.filePath!.isNotEmpty &&
+           homework.downloadUrl != null &&
+           homework.downloadUrl!.isNotEmpty;
+  }
+
+  /// Проверяет, доступно ли сданное задание для скачивания
+  bool _isStudentDownloadAvailable(Homework homework) {
+    return homework.homeworkStud?.filePath != null && 
+           homework.homeworkStud!.filePath!.isNotEmpty &&
+           homework.studentDownloadUrl != null &&
+           homework.studentDownloadUrl!.isNotEmpty;
+  }
+
+  /// Получает текст для кнопки скачивания в зависимости от статуса
+  String _getDownloadButtonText(Homework homework) {
+    if (homework.isDone) return 'Скачать задание (оценено)';
+    if (homework.isInspection) return 'Скачать задание (на проверке)';
+    if (homework.isExpired) return 'Скачать задание (просрочено)';
+    return 'Скачать задание';
+  }
+
+  /// Получает текст для кнопки скачивания студенческой работы
+  String _getStudentDownloadButtonText(Homework homework) {
+    if (homework.isDone) return 'Скачать сданную работу (оценено)';
+    if (homework.isInspection) return 'Скачать сданную работу (на проверке)';
+    if (homework.isExpired) return 'Скачать сданную работу (просрочено)';
+    return 'Скачать сданную работу';
+  }
+
   Widget _buildHomeworkCard(Homework homework, int index) {
     final statusColor = _getStatusColor(homework);
+    final isDownloadAvailable = _isDownloadAvailable(homework);
+    final isStudentDownloadAvailable = _isStudentDownloadAvailable(homework);
     
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -332,11 +367,17 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                                     !homework.isInspection
                         ),
                         
+                        if (homework.homeworkStud?.filename != null && homework.homeworkStud!.filename!.isNotEmpty)
+                          _buildInfoRow('Сданный файл', homework.homeworkStud!.filename!, Icons.assignment_turned_in),
+                        
+                        if (homework.homeworkStud?.creationTime != null)
+                          _buildInfoRow('Сдано', _formatDate(homework.homeworkStud!.creationTime), Icons.schedule),
+                        
                         if (homework.homeworkStud?.mark != null)
                           _buildInfoRow('Оценка', homework.homeworkStud!.mark!.toStringAsFixed(1), Icons.grade),
                         
                         if (homework.filename != null && homework.filename!.isNotEmpty)
-                          _buildInfoRow('Файл', homework.filename!, Icons.attach_file),
+                          _buildInfoRow('Файл задания', homework.filename!, Icons.attach_file),
                       ],
                     ),
                     
@@ -426,29 +467,93 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
                               ],
                             ),
                           ),
+
+                        if (isDownloadAvailable)
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.purple,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.download, size: 12, color: Colors.purple),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Файл задания доступен',
+                                  style: TextStyle(
+                                    color: Colors.purple,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        if (isStudentDownloadAvailable)
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.teal,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.assignment_turned_in, size: 12, color: Colors.teal),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Работа сдана',
+                                  style: TextStyle(
+                                    color: Colors.teal,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                     
-                    if (homework.canUpload && !homework.isDeleted)
+                    if (isStudentDownloadAvailable)
                       Padding(
                         padding: EdgeInsets.only(top: 12),
-                        child: Row(
-                          children: [
-                            if (homework.filePath != null && homework.filePath!.isNotEmpty)
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    _downloadHomeworkFile(homework);
-                                  },
-                                  icon: Icon(Icons.download, size: 16),
-                                  label: Text('Скачать задание'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: statusColor,
-                                    side: BorderSide(color: statusColor),
-                                  ),
-                                ),
-                              ),
-                          ],
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            _downloadStudentHomeworkFile(homework);
+                          },
+                          icon: Icon(Icons.download_done, size: 16),
+                          label: Text(_getStudentDownloadButtonText(homework)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.teal,
+                            side: BorderSide(color: Colors.teal),
+                            backgroundColor: Colors.teal.withOpacity(0.05),
+                          ),
+                        ),
+                      ),
+                    
+                    if (isDownloadAvailable)
+                      Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            _downloadHomeworkFile(homework);
+                          },
+                          icon: Icon(Icons.download, size: 16),
+                          label: Text(_getDownloadButtonText(homework)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: statusColor,
+                            side: BorderSide(color: statusColor),
+                          ),
                         ),
                       ),
                   ],
@@ -507,6 +612,8 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     final expiredHomeworks = homeworks.where((hw) => hw.isExpired).length;
     final doneHomeworks = homeworks.where((hw) => hw.isDone).length;
     final inspectionHomeworks = homeworks.where((hw) => hw.isInspection).length;
+    final submittedHomeworks = homeworks.where((hw) => hw.homeworkStud != null).length;
+    final deletedHomeworks = homeworks.where((hw) => hw.isDeleted).length;
 
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -527,35 +634,23 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatItem('Всего', totalHomeworks.toString(), Icons.assignment, Colors.blue),
-                _buildStatItem('Активные', activeHomeworks.toString(), Icons.assignment_turned_in, Colors.orange),
+                if (activeHomeworks > 0)
+                  _buildStatItem('Активные', activeHomeworks.toString(), Icons.assignment_turned_in, Colors.orange),
                 _buildStatItem('Проверенные', doneHomeworks.toString(), Icons.check_circle, Colors.green),
-                _buildStatItem('Просрочено', expiredHomeworks.toString(), Icons.warning, Colors.red),
+                _buildStatItem('Сдано', submittedHomeworks.toString(), Icons.assignment_turned_in, Colors.teal),
               ],
             ),
-            if (inspectionHomeworks > 0)
-              Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.hourglass_top, size: 16, color: Colors.blue),
-                      SizedBox(width: 8),
-                      Text(
-                        'На проверке: $inspectionHomeworks',
-                        style: TextStyle(
-                          color: Colors.blue.shade800,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                if (expiredHomeworks > 0)
+                  _buildStatItem('Просрочено', expiredHomeworks.toString(), Icons.warning, Colors.red),
+                if (inspectionHomeworks > 0)
+                  _buildStatItem('На проверке', inspectionHomeworks.toString(), Icons.hourglass_top, Colors.blue),
+                if (deletedHomeworks > 0)
+                  _buildStatItem('Удалено', deletedHomeworks.toString(), Icons.delete, Colors.grey),
+              ],
               ),
           ],
         ),
@@ -604,6 +699,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
     {'value': 'inspection', 'label': 'На проверке', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_INSPECTION)},
     {'value': 'done', 'label': 'Проверенные', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_DONE)},
     {'value': 'expired', 'label': 'Просроченные', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_EXPIRED)},
+    {'value': 'deleted', 'label': 'Удаленные', 'count': _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_DELETED)},
   ];
 
   return Padding(
@@ -661,28 +757,26 @@ class _HomeworkListScreenState extends State<HomeworkListScreen> {
 
 Future<void> _downloadHomeworkFile(Homework homework) async {
   try {
-    ErrorSnackBar.showWarningSnackBar(context, 'Начинаем загрузку...');
-
+    ErrorSnackBar.showWarningSnackBar(context, 'Начинаем загрузку задания...');
     final downloadedFile = await _apiService.downloadHomeworkFile(
       widget.token, 
       homework
     );
     
     if (downloadedFile != null) {
-      // Получаем имя файла из скачанного файла, если homework.filename null
       final String fileName = homework.filename ?? 
           downloadedFile.path.split('/').last ??
           'homework_${homework.id}';
       
       ErrorSnackBar.showSuccessSnackBar(
         context, 
-        'Файл "$fileName" скачан!'
+        'Файл задания "$fileName" скачан!'
       );
       
       _showOpenFileDialog(downloadedFile, fileName);
     }
   } catch (e) {
-    String errorMessage = 'Ошибка скачивания: $e';
+    String errorMessage = 'Ошибка скачивания задания: $e';
     
     if (e.toString().contains('permission') || e.toString().contains('Permission')) {
       errorMessage = 'Проблема с доступом к хранилищу. Файл будет сохранен в папку Downloads.';
@@ -690,7 +784,35 @@ Future<void> _downloadHomeworkFile(Homework homework) async {
     ErrorSnackBar.showErrorSnackBar(context, errorMessage);
   }
 }
-
+Future<void> _downloadStudentHomeworkFile(Homework homework) async {
+  try {
+    ErrorSnackBar.showWarningSnackBar(context, 'Начинаем загрузку студенческой работы...');
+    final downloadedFile = await _apiService.downloadStudentHomeworkFile(
+      widget.token, 
+      homework
+    );
+    
+    if (downloadedFile != null) {
+      final String fileName = homework.studentFilename ?? 
+          downloadedFile.path.split('/').last ??
+          'student_homework_${homework.id}';
+      
+      ErrorSnackBar.showSuccessSnackBar(
+        context, 
+        'Сданная работа "$fileName" скачана!'
+      );
+      
+      _showOpenFileDialog(downloadedFile, fileName);
+    }
+  } catch (e) {
+    String errorMessage = 'Ошибка скачивания студенческой работы: $e';
+    
+    if (e.toString().contains('permission') || e.toString().contains('Permission')) {
+      errorMessage = 'Проблема с доступом к хранилищу. Файл будет сохранен в папку Downloads.';
+    }
+    ErrorSnackBar.showErrorSnackBar(context, errorMessage);
+  }
+}
 void _showOpenFileDialog(File file, String fileName) {
   showDialog(
     context: context,

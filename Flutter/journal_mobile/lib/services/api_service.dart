@@ -606,7 +606,7 @@ Future<List<HomeworkCounter>> getHomeworkCounters(
   }
 }
 
-/// удаление домашнего задания [api] // TO-DO: Допилить - Ди (Будущий func)
+/// удаление домашнего задания [api] // TODO: Допилить - Ди (Будущий func)
 Future<bool> deleteHomework(String token, int homeworkId) async {
   var response = await http.post(
     Uri.parse('$_baseUrl/homework/operations/delete'),
@@ -655,7 +655,7 @@ Future<File?> downloadHomeworkFile(String token, Homework homework) async {
       onProgress: (received, total) {
         if (total != -1) {
           double progress = (received / total * 100);
-          print('Download progress: ${progress.toStringAsFixed(2)}%');
+          print('Download progress: ${progress.toStringAsFixed(2)}%'); // TODO: допилить прогресс в UX - Ди.
         }
       },
     );
@@ -663,6 +663,37 @@ Future<File?> downloadHomeworkFile(String token, Homework homework) async {
     return file;
   } catch (e) {
     print('Ошибка при скачивании файла задания: $e');
+    rethrow;
+  }
+}
+
+/// загрузка файла сданного задания студента [api]
+Future<File?> downloadStudentHomeworkFile(String token, Homework homework) async {
+  try {
+    if (homework.studentDownloadUrl == null || homework.studentDownloadUrl!.isEmpty) {
+      throw Exception('URL файла студенческой работы недоступен');
+    }
+
+    final String fileName = homework.studentFilename ?? 
+        'student_homework_${homework.id}_${DateTime.now().millisecondsSinceEpoch}';
+
+    print('Downloading student homework file: $fileName');
+
+    final file = await DownloadService.downloadFile(
+      url: homework.studentDownloadUrl!,
+      fileName: fileName,
+      token: token,
+      onProgress: (received, total) {
+        if (total != -1) {
+          double progress = (received / total * 100);
+          print('Download progress: ${progress.toStringAsFixed(2)}%');
+        }
+      },
+    );
+
+    return file;
+  } catch (e) {
+    print('Ошибка при скачивании файла студенческой работы: $e');
     rethrow;
   }
 }
