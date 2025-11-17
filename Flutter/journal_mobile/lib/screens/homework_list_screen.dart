@@ -65,7 +65,15 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
 
     _tabController.addListener(_handleTabSelection);
     _loadCounters();
-    _loadHomeworksForTab(_tabs[_currentTabIndex]['status']);
+    String firstTabStatus = _tabs[_currentTabIndex]['status'];
+    _loadHomeworksForTab(firstTabStatus);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_tabHomeworks['deleted']!.isEmpty && 
+          !_tabIsLoading['deleted']! && 
+          _tabErrorMessages['deleted']!.isEmpty) {
+        _loadHomeworksForTab('deleted');
+      }
+    });
   }
 
   @override
@@ -112,14 +120,6 @@ int _getCounterForDeletedTab() {
 
   String get _currentFilterStatus {
     return _tabs[_currentTabIndex]['status'];
-  }
-
-  int get _currentCounterType {
-    return _tabs[_currentTabIndex]['counterType'];
-  }
-
-  int get _currentTabCounter {
-    return _getCounterByStatus(_currentCounterType);
   }
 
   Future<void> _loadHomeworksForTab(String tabStatus, {bool loadMore = false}) async {
@@ -1022,7 +1022,7 @@ void _showOpenFileDialog(File file, String fileName) {
   Widget _buildTabContent(int tabIndex) {
     String tabStatus = _tabs[tabIndex]['status'];
     
-    if (tabStatus == 'deleted' && 
+    /* if (tabStatus == 'deleted' && 
         _tabHomeworks[tabStatus]!.isEmpty && 
         !_tabIsLoading[tabStatus]! &&
         _tabErrorMessages[tabStatus]!.isEmpty) {
@@ -1031,7 +1031,7 @@ void _showOpenFileDialog(File file, String fileName) {
           _loadHomeworksForTab(tabStatus);
         }
       });
-    }
+    } */
     if (_tabIsLoading[tabStatus]! && _tabHomeworks[tabStatus]!.isEmpty) {
       return Center(
         child: Column(
