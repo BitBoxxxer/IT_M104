@@ -22,24 +22,64 @@ class UrlLauncherService {
         return;
       }
       
-      final Uri uri = Uri.parse(url);
-      
-      if (await _canLaunchUri(uri)) {
-        await url_launcher.launchUrl(
-          uri,
-          mode: url_launcher.LaunchMode.externalApplication,
-        );
-      } else {
+      if (Platform.isAndroid) {
+        await _launchUrlAndroid(url);
+      } else if (Platform.isIOS) {
+        await _launchUrlIOS(url);
+      } else if (Platform.isWindows) {
         await _launchUrlDesktop(url);
+      } else if (Platform.isLinux) {
+        await _launchUrlDesktop(url);
+      } else if (Platform.isMacOS) {
+        await _launchUrlDesktop(url);
+      } else {
+        await _launchUrlUniversal(url);
       }
       
       print('URL launched successfully');
     } catch (e) {
       print('Error launching URL: $e');
+      await _launchUrlUniversal(url);
+    }
+  }
+
+  /// Специфичный метод для Android [url_launcher_service]
+  Future<void> _launchUrlAndroid(String url) async {
+    try {
+      final Uri uri = Uri.parse(url);
+      
+      final bool launched = await url_launcher.launchUrl(
+        uri,
+        mode: url_launcher.LaunchMode.externalApplication,
+      );
+      
+      if (!launched) {
+        await url_launcher.launchUrl(
+          uri,
+          mode: url_launcher.LaunchMode.platformDefault,
+        );
+      }
+    } catch (e) {
+      print('Android URL launch failed: $e');
       rethrow;
     }
   }
 
+  /// Специфичный метод для iOS [url_launcher_service]
+  Future<void> _launchUrlIOS(String url) async {
+    try {
+      final Uri uri = Uri.parse(url);
+      await url_launcher.launchUrl(
+        uri,
+        mode: url_launcher.LaunchMode.externalApplication,
+      );
+    } catch (e) {
+      print('iOS URL launch failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Метод для десктопных платформ [url_launcher_service]
   Future<void> _launchUrlDesktop(String url) async {
     try {
       if (Platform.isWindows) {
@@ -53,6 +93,16 @@ class UrlLauncherService {
       }
     } catch (e) {
       throw Exception('Desktop URL launch failed: $e');
+    }
+  }
+
+  /// Универсальный метод как запасной вариант [url_launcher_service]
+  Future<void> _launchUrlUniversal(String url) async {
+    try {
+      final Uri uri = Uri.parse(url);
+      await url_launcher.launchUrl(uri);
+    } catch (e) {
+      print('Universal URL launch also failed: $e');
     }
   }
 
