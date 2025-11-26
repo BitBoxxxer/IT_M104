@@ -62,4 +62,20 @@ class ActivityRecord {
       lessonTheme: lessonTheme ?? this.lessonTheme,
     );
   }
+  Map<String, dynamic> toJson() {
+    return {
+      'date': date,
+      'action': action,
+      'current_point': currentPoint,
+      'point_types_id': pointTypesId,
+      'point_types_name': pointTypesName,
+      'achievements_id': achievementsId,
+      'achievements_name': achievementsName,
+      'achievements_type': achievementsType,
+      'badge': badge,
+      'old_competition': oldCompetition,
+      'lesson_subject': lessonSubject,
+      'lesson_theme': lessonTheme,
+    };
+  }
 }

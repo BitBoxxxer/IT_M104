@@ -25,9 +25,19 @@ class UserData {
       studentId: json['student_id'],
       fullName: json['full_name'],
       groupName: json['group_name'],
-      photoPath: json['photo'],
+      photoPath: json['photo'] ?? "",
       pointsInfo: pointsList,
       position: json['position'] ?? 0,
     );
+  }
+  Map<String, dynamic> toJson() {
+    return {
+      'student_id': studentId,
+      'full_name': fullName,
+      'group_name': groupName,
+      'photo': photoPath,
+      'position': position,
+      'gaming_points': pointsInfo,
+    };
   }
 }

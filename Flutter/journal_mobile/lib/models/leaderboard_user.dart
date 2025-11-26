@@ -29,4 +29,16 @@ class LeaderboardUser {
       totalPoints: json['total_points'] ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': studentId,
+      'full_name': fullName,
+      'group_name': groupName,
+      'photo': photoPath,
+      'position': position,
+      'amount': points,
+      'total_points': totalPoints,
+    };
+  }
 }

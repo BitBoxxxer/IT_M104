@@ -31,6 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
   bool _checkingAutoLogin = true;
+  bool _isOfflineMode = false; // Добавляем флаг офлайн режима
 
   @override
   void initState() {
@@ -94,10 +95,19 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // ПРОСТО ПЫТАЕТСЯ АВТОМАТИЧЕСКИ ВОЙТИ БЕЗ ПРОВЕРОК - Ди
+      // Получаем сохраненные учетные данные
       final credentials = await _secureStorage.getCredentials();
       if (credentials['username'] != null && credentials['password'] != null) {
-        await _autoLogin(credentials['username']!, credentials['password']!);
+        // Пытаемся получить сохраненный токен
+        final token = await _secureStorage.getToken();
+        
+        if (token != null && token.isNotEmpty) {
+          // Есть сохраненный токен - пробуем офлайн вход
+          await _offlineAutoLogin(token, credentials['username']!);
+        } else {
+          // Нет токена, пробуем онлайн вход
+          await _onlineAutoLogin(credentials['username']!, credentials['password']!);
+        }
       } else {
         if (mounted) {
           setState(() {
@@ -115,26 +125,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _autoLogin(String username, String password) async {
+  Future<void> _onlineAutoLogin(String username, String password) async {
     try {
-      print("Attempting auto-login for user: $username");
+      print("Attempting online auto-login for user: $username");
       
       final token = await _apiService.login(username, password);
       
       if (token != null && mounted) {
-        print("Auto-login successful!");
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => MainMenuScreen(
-              token: token,
-              currentTheme: widget.currentTheme,
-              onThemeChanged: widget.onThemeChanged,
-            ),
-          ),
-          (Route<dynamic> route) => false,
-        );
+        print("Online auto-login successful!");
+        _navigateToMainMenu(token, isOffline: false);
       } else {
-        print("Auto-login failed: token is null");
+        print("Online auto-login failed: token is null");
         if (mounted) {
           setState(() {
             _checkingAutoLogin = false;
@@ -142,23 +143,60 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      print("Auto-login exception: $e");
+      print("Online auto-login exception: $e");
+      
+      // Если онлайн не удалось, пробуем офлайн с сохраненным токеном
+      final savedToken = await _secureStorage.getToken();
+      if (savedToken != null && savedToken.isNotEmpty) {
+        print("Trying offline auto-login with saved token");
+        await _offlineAutoLogin(savedToken, username);
+      } else {
+        if (mounted) {
+          setState(() {
+            _checkingAutoLogin = false;
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _offlineAutoLogin(String token, String username) async {
+    try {
+      print("Attempting offline auto-login for user: $username");
+      
+      // В офлайн режиме просто используем сохраненный токен
+      if (mounted) {
+        setState(() {
+          _isOfflineMode = true;
+        });
+        
+        _navigateToMainMenu(token, isOffline: true);
+      }
+    } catch (e) {
+      print("Offline auto-login exception: $e");
       if (mounted) {
         setState(() {
           _checkingAutoLogin = false;
         });
-        
-        // Показывает ошибку только если это не сетевые проблемы - Ди
-        if (!e.toString().contains('Network') && !e.toString().contains('Socket')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Автовход не удался: $e'),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
       }
+    }
+  }
+
+  void _navigateToMainMenu(String token, {bool isOffline = false}) {
+    if (mounted) {
+      // Добавляем метку офлайн режима к токену для передачи в MainMenuScreen
+      final tokenWithOfflineFlag = isOffline ? '$token?offline=true' : token;
+      
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => MainMenuScreen(
+            token: tokenWithOfflineFlag,
+            currentTheme: widget.currentTheme,
+            onThemeChanged: widget.onThemeChanged,
+          ),
+        ),
+        (Route<dynamic> route) => false,
+      );
     }
   }
 
@@ -178,16 +216,39 @@ class _LoginScreenState extends State<LoginScreen> {
       final token = await _apiService.login(username, password);
 
       if (token != null && mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => MainMenuScreen(
-              token: token,
-              currentTheme: widget.currentTheme,
-              onThemeChanged: widget.onThemeChanged,
-            ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Синхронизация данных для офлайн режима...'),
+            backgroundColor: Colors.blue,
+            behavior: SnackBarBehavior.floating,
           ),
-          (Route<dynamic> route) => false,
         );
+
+      _apiService.syncAllData(token).then((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Все данные сохранены для офлайн использования ✅'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }).catchError((e) {
+        print('Ошибка синхронизации: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Синхронизация завершена с ошибками ⚠️'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      });
+
+        _navigateToMainMenu(token, isOffline: false);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -201,14 +262,30 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       print("Manual login error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка сети: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      
+      if (e.toString().contains('SocketException') || 
+          e.toString().contains('Network') ||
+          e.toString().contains('host lookup')) {
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Проблемы с интернетом. Проверьте подключение.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ошибка входа: $e'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -252,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen> {
               CircularProgressIndicator(),
               SizedBox(height: 16),
               Text(
-                'Автоматический вход...',
+                _isOfflineMode ? 'Офлайн вход...' : 'Автоматический вход...',
                 style: TextStyle(
                   fontSize: 16,
                   color: Theme.of(context).colorScheme.onSurface,
@@ -260,12 +337,39 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 8),
               Text(
-                'Проверка сохраненных данных',
+                _isOfflineMode 
+                  ? 'Используются сохраненные данные'
+                  : 'Проверка сохраненных данных',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
+              if (_isOfflineMode) ...[
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off, size: 16, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text(
+                        'Офлайн режим',
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

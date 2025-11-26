@@ -25,4 +25,11 @@ class HomeworkCounter {
   static const int HOMEWORK_STATUS_COMMON_OPENED = 4;
   static const int HOMEWORK_STATUS_ALL = 5;
   static const int HOMEWORK_STATUS_DELETED = 6;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'counter_type': counterType,
+      'counter': counter,
+    };
+  }
 }

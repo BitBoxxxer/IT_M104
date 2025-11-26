@@ -105,50 +105,39 @@ String? get studentDownloadUrl {
 String? get studentFilename => homeworkStud?.filename;
 
   int getRealStatus() {
-    // 1. САМЫЙ ПРИОРИТЕТНЫЙ: проверяем явное поле isDeleted
     if (isDeleted == true) {
       return 5; // DELETED
     }
     
-    // 2. Проверяем старые способы определения удаления
     if (status == 5 || commonStatus == 5) {
-      return 5; // DELETED
+      return 5;
     }
     
-    // 3. Если работа помечена как удаленная в теме или описании
     if (theme.toLowerCase().contains('удален') || 
         (description?.toLowerCase().contains('удален') == true)) {
-      return 5; // DELETED
+      return 5;
     }
     
-    // 4. ОСТАЛЬНАЯ ЛОГИКА СТАТУСОВ для НЕудаленных работ
-    
-    // Если работа сдана и есть оценка - проверено
     if (homeworkStud?.mark != null) {
-      return 1; // DONE
+      return 1;
     }
     
-    // Если работа сдана, но нет оценки - на проверке
     if (homeworkStud != null) {
-      return 2; // INSPECTION
+      return 2;
     }
     
-    // Если срок сдачи прошел - просрочено
     final now = DateTime.now();
     if (now.isAfter(completionTime)) {
-      return 0; // EXPIRED
+      return 0;
     }
     
-    // Во всех остальных случаях - активно
-    return 3; // OPENED
+    return 3;
   }
   
-  // Добавим метод для получения "чистого" статуса без удаления
   int getDisplayStatus() {
     final realStatus = getRealStatus();
-    // Если работа удалена, возвращаем специальный статус
     if (realStatus == 5) {
-      return 5; // DELETED
+      return 5;
     }
     return realStatus;
   }
@@ -165,6 +154,29 @@ String? get studentFilename => homeworkStud?.filename;
   }
 
   bool get canUpload => (isOpened || isExpired) && !isDeletedStatus;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'teacher': teacherWorkId,
+      'name_spec': subjectName,
+      'theme': theme,
+      'comment': description,
+      'creation_time': creationTime.toIso8601String(),
+      'completion_time': completionTime.toIso8601String(),
+      'overdue_time': overdueTime?.toIso8601String(),
+      'filename': filename,
+      'file_path': filePath,
+      'status': status,
+      'common_status': commonStatus,
+      'homework_stud': homeworkStud?.toJson(),
+      'homework_comment': homeworkComment?.toJson(),
+      'cover_image': coverImage,
+      'fio_teach': teacherName,
+      'material_type': materialType,
+      'is_deleted': isDeleted,
+    };
+  }
 }
 
 class HomeworkStud {
@@ -200,6 +212,19 @@ class HomeworkStud {
       creationTime: DateTime.parse(json['creation_time'] ?? DateTime.now().toString()),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'filename': filename,
+      'stud_answer': answerText,
+      'file_path': filePath,
+      'tmp_file': tmpfile,
+      'mark': mark,
+      'auto_mark': autoMark,
+      'creation_time': creationTime.toIso8601String(),
+    };
+  }
 }
 
 class HomeworkComment {
@@ -222,5 +247,14 @@ class HomeworkComment {
       attachmentPath: json['attachment_path']?.toString(),
       dateUpdated: DateTime.parse(json['date_updated'] ?? DateTime.now().toString()),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'text_comment': textComment,
+      'attachment': attachment,
+      'attachment_path': attachmentPath,
+      'date_updated': dateUpdated.toIso8601String(),
+    };
   }
 }

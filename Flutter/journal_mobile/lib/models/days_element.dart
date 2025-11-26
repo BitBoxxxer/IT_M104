@@ -28,4 +28,16 @@ class ScheduleElement {
       teacherName: json['teacher_name'] as String,
     );
   }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'date': date,
+      'started_at': startedAt,
+      'finished_at': finishedAt,
+      'lesson': lesson,
+      'room_name': roomName,
+      'subject_name': subjectName,
+      'teacher_name': teacherName,
+    };
+  }
 }

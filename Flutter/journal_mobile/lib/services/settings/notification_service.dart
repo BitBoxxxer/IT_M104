@@ -1,18 +1,26 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:journal_mobile/models/mark.dart';
-import '../api_service.dart';
-import 'package:journal_mobile/services/secure_storage_service.dart';
-import 'package:app_settings/app_settings.dart';
-import 'package:journal_mobile/models/notification_item.dart';
+import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app_settings/app_settings.dart';
+import 'package:flutter/services.dart';
+import 'package:journal_mobile/services/settings/notification_state_service.dart';
+
+import '../api_service.dart';
+import '../secure_storage_service.dart';
+import '../time_manager.dart';
+
+import 'package:journal_mobile/models/notification_item.dart';
+import 'package:journal_mobile/models/mark.dart';
 
 class NotificationService {
   final ApiService _apiService = ApiService();
   final SecureStorageService _secureStorage = SecureStorageService();
   final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
+  final NotificationStateService _stateService = NotificationStateService();
   bool _isInitialized = false;
 
   final StreamController<List<NotificationItem>> _notificationsController = 
@@ -28,6 +36,14 @@ class NotificationService {
   static const String _lastAttendanceHashKey = 'last_attendance_hash';
   static const String _pollingEnabledKey = 'polling_enabled';
   static const String _lastSuccessfulCheckKey = 'last_successful_check';
+
+  Timer? _pollingTimer;
+  bool _pollingActive = false;
+
+  void dispose() {
+    _notificationsController.close();
+    _pollingTimer?.cancel();
+  }
 
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -66,9 +82,7 @@ class NotificationService {
     }
   }
 
-  void dispose() {
-    _notificationsController.close();
-  }
+  
 
   void _emitNotificationsUpdate() {
     if (!_notificationsController.isClosed) {
@@ -284,31 +298,49 @@ class NotificationService {
   }
 
   // Умный Polling с адаптивным интервалом - Ди
-  Future<void> startSmartPolling(String token) async {
-    if (!await isPollingEnabled()) return;
+  void startSmartPolling(String token) {
+    if (_pollingActive) {
+      print('⏭️ Polling уже активен');
+      return;
+    }
+    
+    _pollingActive = true;
     _startPollingLoop(token);
+    
+    print('🔔 Фоновый polling уведомлений запущен');
+  }
+  void stopSmartPolling() {
+    _pollingActive = false;
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+    
+    print('🔕 Фоновый polling уведомлений остановлен');
   }
 
   void _startPollingLoop(String token) {
-    Future.delayed(Duration(minutes: 15), () async {
-      if (await _shouldCheckNow() && await isPollingEnabled()) {
-        await _checkForUpdates(token);
+    if (!_pollingActive) return;
+    
+    _pollingTimer = Timer(const Duration(minutes: 15), () async {
+      if (await _shouldCheckNow() && await isPollingEnabled() && _pollingActive) {
+        await checkForUpdates(token);
       }
-      _startPollingLoop(token);
+      
+      if (_pollingActive) {
+        _startPollingLoop(token);
+      }
     });
   }
 
   Future<bool> _shouldCheckNow() async {
-    final prefs = await SharedPreferences.getInstance();
-    final lastCheck = prefs.getInt(_lastSuccessfulCheckKey) ?? 0;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    
-    return (now - lastCheck) > 5 * 60 * 1000;
+    return await TimeManager.shouldCheckNotifications();
   }
 
-  Future<void> _checkForUpdates(String token) async {
+
+  Future<void> checkForUpdates(String token) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      
+      await _ensureInitialState(token, prefs);
       
       await _checkMarks(token, prefs);
       await _checkAttendance(token, prefs);
@@ -321,74 +353,168 @@ class NotificationService {
     }
   }
 
-  Future<void> _checkMarks(String token, SharedPreferences prefs) async {
-    try {
-      final lastMarksHash = prefs.getString(_lastMarksHashKey) ?? '';
-      final currentMarks = await _apiService.getMarks(token);
-      final currentHash = _calculateMarksHash(currentMarks);
+  Future<void> _ensureInitialState(String token, SharedPreferences prefs) async {
+  try {
+    // Проверяем, есть ли уже сохраненное состояние
+    final lastMarks = await _stateService.getLastMarksState();
+    
+    if (lastMarks.isEmpty) {
+      // Первая инициализация - загружаем и сохраняем текущее состояние
+      final marks = await _apiService.getMarks(token);
+      await _stateService.saveNotificationState(marks);
       
-      if (lastMarksHash != currentHash && lastMarksHash.isNotEmpty) {
-        final newMarksCount = _countNewMarks(currentMarks, lastMarksHash);
-        await showNewMarksNotification(newMarksCount);
-      }
-      
-      await prefs.setString(_lastMarksHashKey, currentHash);
+      print('✅ Initial notification state saved: ${marks.length} marks');
+    }
     } catch (e) {
-      print('Error checking marks: $e');
+      print('❌ Error ensuring initial state: $e');
+    }
+  }
+
+  Future<void> _checkMarks(String token, SharedPreferences prefs) async {
+  try {
+    print('🔍 Checking for new marks...');
+    
+    // Получаем последнее сохраненное состояние для уведомлений
+    final lastMarks = await _stateService.getLastMarksState();
+    print('📊 Last marks for notifications: ${lastMarks.length}');
+  
+    // Получаем текущие данные
+    final currentMarks = await _apiService.getMarks(token);
+    print('📊 Current marks from API: ${currentMarks.length}');
+    
+    // Сравниваем с сохраненным состоянием уведомлений
+    final newMarks = _findNewMarks(currentMarks, lastMarks);
+    print('🆕 New marks found: ${newMarks.length}');
+    
+    if (newMarks.isNotEmpty) {
+      await showNewMarksNotification(newMarks.length);
+      
+      // Обновляем сохраненное состояние уведомлений
+      await _stateService.saveNotificationState(currentMarks);
+      
+      print('✅ New marks notification sent: ${newMarks.length} marks');
+    } else {
+      print('📭 No new marks found');
+    }
+    } catch (e) {
+      print('❌ Error checking marks: $e');
     }
   }
 
   Future<void> _checkAttendance(String token, SharedPreferences prefs) async {
+  try {
+    print('🔍 Checking for attendance changes...');
+    
+    final lastAttendance = await _stateService.getLastAttendanceState();
+    final currentMarks = await _apiService.getMarks(token);
+    final currentAttendance = _extractAttendanceData(currentMarks);
+    
+    final attendanceChanges = _findAttendanceChanges(currentAttendance, lastAttendance);
+    print('📊 Attendance changes: ${attendanceChanges}');
+    
+    if (attendanceChanges['absences']! > 0 || attendanceChanges['lates']! > 0) {
+      await showAttendanceNotification(attendanceChanges);
+      await _stateService.saveNotificationState(currentMarks);
+      
+      print('✅ Attendance notification sent');
+    } else {
+      print('📭 No attendance changes found');
+    }
+  } catch (e) {
+    print('❌ Error checking attendance: $e');
+  }
+}
+
+  Future<bool> openNotificationSettings() async {
+  try {
+    if (Platform.isAndroid) {
+      const platform = MethodChannel('notification_settings_channel');
+      final result = await platform.invokeMethod<bool>('openNotificationSettings');
+      return result ?? false;
+    } else if (Platform.isIOS) {
+      await AppSettings.openAppSettings();
+      return true;
+    }
+    return false;
+  } catch (e) {
+    print('Ошибка открытия настроек уведомлений: $e');
+    
+    // Fallback для всех платформ
     try {
-      final lastAttendanceHash = prefs.getString(_lastAttendanceHashKey) ?? '';
-      final currentMarks = await _apiService.getMarks(token);
-      final currentHash = _calculateAttendanceHash(currentMarks);
-      
-      if (lastAttendanceHash != currentHash && lastAttendanceHash.isNotEmpty) {
-        final attendanceChanges = _analyzeAttendanceChanges(currentMarks, lastAttendanceHash);
-        await showAttendanceNotification(attendanceChanges);
-      }
-      
-      await prefs.setString(_lastAttendanceHashKey, currentHash);
-    } catch (e) {
-      print('Error checking attendance: $e');
+      await AppSettings.openAppSettings();
+      return true;
+    } catch (fallbackError) {
+      print('Fallback также не сработал: $fallbackError');
+      return false;
     }
   }
+}
 
-  String _calculateMarksHash(List<Mark> marks) {
-    final marksString = marks.map((m) => 
-      '${m.dateVisit}-${m.homeWorkMark}-${m.controlWorkMark}-${m.labWorkMark}-${m.classWorkMark}'
-    ).join('|');
+  List<Map<String, dynamic>> _extractAttendanceData(List<Mark> marks) {
+    return marks.map((mark) => {
+      'dateVisit': mark.dateVisit,
+      'specName': mark.specName,
+      'statusWas': mark.statusWas,
+      'lessonTheme': mark.lessonTheme,
+    }).toList();
+  }
+
+  List<Mark> _findNewMarks(List<Mark> currentMarks, List<Mark> lastMarks) {
+    final newMarks = <Mark>[];
     
-    return marksString.hashCode.toString();
-  }
-
-  String _calculateAttendanceHash(List<Mark> marks) {
-    final attendanceString = marks.map((m) => 
-      '${m.dateVisit}-${m.statusWas}-${m.specName}'
-    ).join('|');
+    for (final currentMark in currentMarks) {
+      final existingMark = lastMarks.firstWhere(
+        (lastMark) => 
+          lastMark.dateVisit == currentMark.dateVisit &&
+          lastMark.specName == currentMark.specName,
+        orElse: () => Mark(
+          specName: '',
+          lessonTheme: '',
+          dateVisit: '',
+        ),
+      );
+      
+      final hasNewMark = 
+          (currentMark.homeWorkMark != null && existingMark.homeWorkMark == null) ||
+          (currentMark.controlWorkMark != null && existingMark.controlWorkMark == null) ||
+          (currentMark.labWorkMark != null && existingMark.labWorkMark == null) ||
+          (currentMark.classWorkMark != null && existingMark.classWorkMark == null) ||
+          (currentMark.practicalWorkMark != null && existingMark.practicalWorkMark == null);
+      
+      if (hasNewMark) {
+        newMarks.add(currentMark);
+      }
+    }
     
-    return attendanceString.hashCode.toString();
+    return newMarks;
   }
 
-  int _countNewMarks(List<Mark> currentMarks, String lastHash) {
-    return currentMarks.where((mark) =>
-      mark.homeWorkMark != null || 
-      mark.controlWorkMark != null || 
-      mark.labWorkMark != null || 
-      mark.classWorkMark != null
-    ).length;
-  }
-
-  Map<String, int> _analyzeAttendanceChanges(List<Mark> currentMarks, String lastHash) {
+  Map<String, int> _findAttendanceChanges(
+    List<Map<String, dynamic>> currentAttendance, 
+    List<Map<String, dynamic>> lastAttendance
+  ) {
     int newAbsences = 0;
     int newLates = 0;
     
-    for (var mark in currentMarks) {
-      if (mark.statusWas == 0) {
-        newAbsences++;
-      } else if (mark.statusWas == 2) {
-        newLates++;
+    for (final current in currentAttendance) {
+      final existing = lastAttendance.firstWhere(
+        (last) => 
+          last['dateVisit'] == current['dateVisit'] &&
+          last['specName'] == current['specName'],
+        orElse: () => {},
+      );
+      
+      if (existing.isEmpty) {
+        if (current['statusWas'] == 0) newAbsences++;
+        if (current['statusWas'] == 2) newLates++;
+      } else {
+        final lastStatus = existing['statusWas'];
+        final currentStatus = current['statusWas'];
+        
+        if (lastStatus != currentStatus) {
+          if (currentStatus == 0) newAbsences++;
+          if (currentStatus == 2) newLates++;
+        }
       }
     }
     
@@ -397,6 +523,7 @@ class NotificationService {
       'lates': newLates,
     };
   }
+
 
   Future<void> showNewMarksNotification(int newMarksCount) async {
     final notification = NotificationItem(
@@ -495,12 +622,12 @@ class NotificationService {
 
   Future<void> manualCheck(String token) async {
     if (await isPollingEnabled()) {
-      await _checkForUpdates(token);
+      await checkForUpdates(token);
     }
   }
 
   Future<void> manualCheckWithNotification(String token) async {
-    if (await isPollingEnabled()) {
+    try {
       final notification = NotificationItem(
         id: DateTime.now().millisecondsSinceEpoch,
         title: '🔄 Проверка обновлений',
@@ -510,7 +637,31 @@ class NotificationService {
       );
       
       await saveNotificationToHistory(notification);
-      await _checkForUpdates(token);
+    if (await isPollingEnabled()) {
+      await checkForUpdates(token);
+      
+      final resultNotification = NotificationItem(
+        id: DateTime.now().millisecondsSinceEpoch + 1,
+        title: '✅ Проверка завершена',
+        message: 'Система проверила наличие новых оценок и изменений посещаемости',
+        timestamp: DateTime.now(),
+        type: NotificationType.system,
+      );
+      
+      await saveNotificationToHistory(resultNotification);
+    }
+  } catch (e) {
+    print('Error in manual check: $e');
+    
+    final errorNotification = NotificationItem(
+      id: DateTime.now().millisecondsSinceEpoch,
+      title: '❌ Ошибка проверки',
+      message: 'Не удалось проверить обновления: $e',
+      timestamp: DateTime.now(),
+      type: NotificationType.system,
+    );
+    
+    await saveNotificationToHistory(errorNotification);
     }
   }
 

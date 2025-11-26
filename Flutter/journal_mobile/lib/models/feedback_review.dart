@@ -29,4 +29,12 @@ class FeedbackReview {
       date: date,
     );
   }
+  Map<String, dynamic> toJson() {
+    return {
+      'teacher': teacherName,
+      'spec': subject,
+      'message': feedbackText,
+      'date': date,
+    };
+  }
 }

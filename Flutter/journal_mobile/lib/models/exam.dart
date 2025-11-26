@@ -1,6 +1,5 @@
 class Exam {
   final String subjectName;
-  final String specName;
   final dynamic grade;
   final dynamic value;
   final String date;
@@ -8,7 +7,6 @@ class Exam {
 
   Exam({
     required this.subjectName,
-    required this.specName,
     required this.grade,
     this.value,
     required this.date,
@@ -16,13 +14,22 @@ class Exam {
   });
 
   factory Exam.fromJson(Map<String, dynamic> json) {
+    print('🔍 Parsing Exam JSON: $json');
     return Exam(
-      subjectName: json['spec']?.toString() ?? json['subject_name']?.toString() ?? 'Неизвестный предмет',
-      specName: json['spec_name']?.toString() ?? json['subject_name']?.toString() ?? 'Неизвестный предмет',
-      grade: json['grade'] ?? json['value'] ?? json['mark'],
+      subjectName: json['spec']?.toString() ?? 'Неизвестный предмет',
+      grade: json['mark'],
       date: json['date']?.toString() ?? '',
       teacherName: json['teacher']?.toString(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'spec': subjectName,
+      'mark': grade,
+      'date': date,
+      'teacher': teacherName,
+    };
   }
 
   bool get isTwelvePointSystem {

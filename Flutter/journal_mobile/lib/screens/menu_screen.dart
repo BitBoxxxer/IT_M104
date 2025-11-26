@@ -34,25 +34,122 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final NotificationService _notificationService = NotificationService();
   late Future<Map<String, dynamic>> _dataFuture;
   late Stream<List<NotificationItem>> _notificationsStream;
+  bool _isDisposed = false;
+  bool _isOffline = false;
 
   @override
   void initState() {
     super.initState();
-    _dataFuture = _loadData();
+    
+    final cleanToken = widget.token.replaceAll('?offline=true', '');
+    
+    _dataFuture = _loadData(cleanToken);
     _notificationsStream = _notificationService.notificationsStream;
   }
 
-  Future<Map<String, dynamic>> _loadData() async {
-    final List<dynamic> results = await Future.wait([
-      _apiService.getUser(widget.token),
-      _apiService.getMarks(widget.token),
-    ]);
-    
-    return {
-      'user': results[0] as UserData,
-      'marks': results[1] as List<Mark>,
-    };
+  Future<Map<String, dynamic>> _loadData(String token) async {
+    try {
+      final List<dynamic> results = await Future.wait([
+        _apiService.getUser(token),
+        _apiService.getMarks(token),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _isOffline = false;
+        });
+      }
+      
+      return {
+        'user': results[0] as UserData,
+        'marks': results[1] as List<Mark>,
+      };
+    } catch (e) {
+      print('❌ Ошибка загрузки данных: $e');
+      
+      if (e.toString().contains('Нет подключения') || 
+          e.toString().contains('SocketException') ||
+          e.toString().contains('Network') ||
+          e.toString().contains('офлайн')) {
+        
+        if (mounted) {
+          setState(() {
+            _isOffline = true;
+          });
+        }
+        
+        return {
+          'user': UserData(
+            studentId: 0,
+            fullName: 'Офлайн режим',
+            groupName: 'Нет данных',
+            photoPath: '',
+            pointsInfo: [],
+            position: 0,
+          ),
+          'marks': [],
+        };
+      }
+      rethrow;
+    }
   }
+  
+Future<void> _syncAllData() async {
+  try {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Синхронизация'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Синхронизация данных...'),
+          ],
+        ),
+      ),
+    );
+
+    await _apiService.syncAllData(widget.token);
+    
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Все данные синхронизированы для офлайн использования! ✅'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 3),
+      ),
+    );
+    
+    _refreshData();
+    
+  } catch (e) {
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Ошибка синхронизации: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+  Future<void> _refreshData() async {
+      final cleanToken = widget.token.replaceAll('?offline=true', '');
+      setState(() {
+        _dataFuture = _loadData(cleanToken);
+      });
+    }
+
 
   Map<String, double> _calculateAverages(List<Mark> marks) {
     double totalHomeWorkMarks = 0;
@@ -312,6 +409,15 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       appBar: AppBar(
         title: const Text('Главное меню'),
         actions: <Widget>[
+          if (_isOffline)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: Icon(
+                Icons.wifi_off,
+                color: Colors.orange,
+                size: 20,
+              ),
+            ),
           _buildNotificationIcon(),
           IconButton(
             icon: const Icon(Icons.settings),
@@ -326,9 +432,41 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               );
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+            tooltip: 'Обновить данные',
+          ),
         ],
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
+      body: Column(children: [
+        if (_isOffline)
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(8),
+              color: Colors.orange,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.wifi_off, size: 16, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Офлайн режим', style: TextStyle(color: Colors.white)),
+                  SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: _refreshData,
+                    child: Row(
+                      children: [
+                        Icon(Icons.refresh, size: 16, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text('Обновить', style: TextStyle(color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      Expanded(child: 
+        FutureBuilder<Map<String, dynamic>>(
         future: _dataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -689,7 +827,20 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           ),
                         ),
                       ),
-                      
+                      SizedBox(
+                        width: 250,
+                        child: ElevatedButton.icon(
+                          icon: Icon(Icons.sync),
+                          label: Text('Синхронизировать все'),
+                          onPressed: _isOffline ? null : () {
+                            _syncAllData();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -698,6 +849,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           );
         },
       ),
+      )
+    ],)
     );
   }
 }

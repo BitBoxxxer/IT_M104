@@ -21,6 +21,7 @@ dependencies:
   open_file: ^3.5.10
   url_launcher: ^6.3.2
   universal_html: ^2.3.0
+  workmanager: ^0.9.0
 
 dev_dependencies:
   flutter_test:
