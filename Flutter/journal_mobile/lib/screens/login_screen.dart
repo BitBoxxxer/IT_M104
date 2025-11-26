@@ -31,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
   bool _checkingAutoLogin = true;
-  bool _isOfflineMode = false; // Добавляем флаг офлайн режима
+  bool _isOfflineMode = false;
 
   @override
   void initState() {
@@ -95,17 +95,13 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // Получаем сохраненные учетные данные
       final credentials = await _secureStorage.getCredentials();
       if (credentials['username'] != null && credentials['password'] != null) {
-        // Пытаемся получить сохраненный токен
         final token = await _secureStorage.getToken();
         
         if (token != null && token.isNotEmpty) {
-          // Есть сохраненный токен - пробуем офлайн вход
           await _offlineAutoLogin(token, credentials['username']!);
         } else {
-          // Нет токена, пробуем онлайн вход
           await _onlineAutoLogin(credentials['username']!, credentials['password']!);
         }
       } else {
@@ -145,7 +141,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       print("Online auto-login exception: $e");
       
-      // Если онлайн не удалось, пробуем офлайн с сохраненным токеном
       final savedToken = await _secureStorage.getToken();
       if (savedToken != null && savedToken.isNotEmpty) {
         print("Trying offline auto-login with saved token");
@@ -164,7 +159,6 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       print("Attempting offline auto-login for user: $username");
       
-      // В офлайн режиме просто используем сохраненный токен
       if (mounted) {
         setState(() {
           _isOfflineMode = true;
@@ -184,7 +178,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _navigateToMainMenu(String token, {bool isOffline = false}) {
     if (mounted) {
-      // Добавляем метку офлайн режима к токену для передачи в MainMenuScreen
       final tokenWithOfflineFlag = isOffline ? '$token?offline=true' : token;
       
       Navigator.of(context).pushAndRemoveUntil(

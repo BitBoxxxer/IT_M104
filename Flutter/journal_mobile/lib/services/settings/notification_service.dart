@@ -355,11 +355,9 @@ class NotificationService {
 
   Future<void> _ensureInitialState(String token, SharedPreferences prefs) async {
   try {
-    // Проверяем, есть ли уже сохраненное состояние
     final lastMarks = await _stateService.getLastMarksState();
     
     if (lastMarks.isEmpty) {
-      // Первая инициализация - загружаем и сохраняем текущее состояние
       final marks = await _apiService.getMarks(token);
       await _stateService.saveNotificationState(marks);
       
@@ -374,22 +372,18 @@ class NotificationService {
   try {
     print('🔍 Checking for new marks...');
     
-    // Получаем последнее сохраненное состояние для уведомлений
     final lastMarks = await _stateService.getLastMarksState();
     print('📊 Last marks for notifications: ${lastMarks.length}');
   
-    // Получаем текущие данные
     final currentMarks = await _apiService.getMarks(token);
     print('📊 Current marks from API: ${currentMarks.length}');
     
-    // Сравниваем с сохраненным состоянием уведомлений
     final newMarks = _findNewMarks(currentMarks, lastMarks);
     print('🆕 New marks found: ${newMarks.length}');
     
     if (newMarks.isNotEmpty) {
       await showNewMarksNotification(newMarks.length);
       
-      // Обновляем сохраненное состояние уведомлений
       await _stateService.saveNotificationState(currentMarks);
       
       print('✅ New marks notification sent: ${newMarks.length} marks');
@@ -439,7 +433,6 @@ class NotificationService {
   } catch (e) {
     print('Ошибка открытия настроек уведомлений: $e');
     
-    // Fallback для всех платформ
     try {
       await AppSettings.openAppSettings();
       return true;

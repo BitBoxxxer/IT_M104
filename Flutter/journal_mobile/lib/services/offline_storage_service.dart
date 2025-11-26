@@ -39,13 +39,11 @@ class OfflineStorageService {
   static const int _maxHomeworks = 500;
   static const int _maxLeaders = 100;
 
-  // В OfflineStorageService
 Future<void> cleanupOldData() async {
   try {
     final stats = await getOfflineDataStats();
     print('🧹 Начинаем очистку устаревших данных...');
     
-    // Очищаем данные, которые превышают лимиты
     await _cleanupIfExceedsLimit(_marksKey, _maxMarks, getMarks, saveMarks);
     await _cleanupIfExceedsLimit(_scheduleKey, _maxSchedule, getSchedule, saveSchedule);
     await _cleanupIfExceedsLimit(_activityKey, _maxActivities, getActivityRecords, saveActivityRecords);
@@ -74,7 +72,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
   }
 }
 
-  // Методы для оценок
   Future<void> saveMarks(List<Mark> marks) async {
     try {
       final marksToSave = marks.length > _maxMarks 
@@ -104,7 +101,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для пользователя
   Future<void> saveUserData(UserData user) async {
     try {
       await _storage.write(key: _userKey, value: jsonEncode(user.toJson()));
@@ -129,7 +125,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для расписания
   Future<void> saveSchedule(List<ScheduleElement> schedule) async {
     try {
       final scheduleToSave = schedule.length > _maxSchedule 
@@ -159,7 +154,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для активности
   Future<void> saveActivityRecords(List<ActivityRecord> activities) async {
     try {
       final activitiesToSave = activities.length > _maxActivities 
@@ -189,7 +183,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для экзаменов
   Future<void> saveExams(List<Exam> exams) async {
     try {
       final examsToSave = exams.length > _maxExams 
@@ -219,7 +212,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для отзывов
   Future<void> saveFeedbackReviews(List<FeedbackReview> feedbacks) async {
     try {
       final feedbacksToSave = feedbacks.length > _maxFeedbacks 
@@ -249,7 +241,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для домашних заданий
   Future<void> saveHomeworks(List<Homework> homeworks) async {
     try {
       final homeworksToSave = homeworks.length > _maxHomeworks 
@@ -279,7 +270,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для лидеров группы
   Future<void> saveGroupLeaders(List<LeaderboardUser> leaders) async {
     try {
       final leadersToSave = leaders.length > _maxLeaders 
@@ -309,7 +299,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для лидеров потока
   Future<void> saveStreamLeaders(List<LeaderboardUser> leaders) async {
     try {
       final leadersToSave = leaders.length > _maxLeaders 
@@ -339,7 +328,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Методы для счетчиков домашних заданий
   Future<void> saveHomeworkCounters(List<HomeworkCounter> counters) async {
     try {
       final countersJson = counters.map((counter) => counter.toJson()).toList();
@@ -365,7 +353,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Метод для очистки всех офлайн данных
+  /// Метод для очистки всех офлайн данных
   Future<void> clearAllOfflineData() async {
     try {
       await _storage.delete(key: _marksKey);
@@ -385,7 +373,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  // Метод для получения статистики офлайн данных
   Future<Map<String, int>> getOfflineDataStats() async {
     final stats = <String, int>{};
     

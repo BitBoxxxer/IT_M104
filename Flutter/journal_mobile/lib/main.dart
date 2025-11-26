@@ -119,7 +119,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         if (hasCredentials) {
           print('🌐 Ошибка онлайн проверки, но есть офлайн данные: $e');
           return {
-            'isValid': true, // Разрешаем доступ в офлайн режиме
+            'isValid': true,
             'token': token, 
             'isOffline': true
           };

@@ -42,7 +42,6 @@ class ApiService {
   final SecureStorageService _secureStorage = SecureStorageService();
   final OfflineStorageService _offlineStorage = OfflineStorageService();
   
-  // Ограничитель параллельных запросов
   static int _activeRequests = 0;
   static const int _maxConcurrentRequests = 3;
   static const Duration _timeOut = Duration(seconds: 15);
@@ -51,14 +50,11 @@ class ApiService {
   bool _isDisposed = false;
   final Map<String, Completer<dynamic>> _pendingRequests = {};
 
-  // Кэш для быстрого доступа к данным
   final Map<String, dynamic> _memoryCache = {};
-  static const Duration _cacheDuration = Duration(minutes: 5);
 
   Future<T> _executeWithLimit<T>(String requestKey, Future<T> Function() request) async {
     if (_isDisposed) throw Exception('ApiService disposed');
     
-    // Дедупликация запросов
     if (_pendingRequests.containsKey(requestKey)) {
       return await _pendingRequests[requestKey]!.future as T;
     }
@@ -66,7 +62,6 @@ class ApiService {
     final completer = Completer<T>();
     _pendingRequests[requestKey] = completer;
     
-    // Ожидаем, если слишком много активных запросов
     while (_activeRequests >= _maxConcurrentRequests && !_isDisposed) {
       await Future.delayed(Duration(milliseconds: 50));
     }
@@ -188,7 +183,6 @@ class ApiService {
             throw Exception('Failed to load marks');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки оценок онлайн, пробуем оффлайн: $e');
           final offlineMarks = await _offlineStorage.getMarks();
           if (offlineMarks.isNotEmpty) {
@@ -234,7 +228,6 @@ class ApiService {
             final data = jsonDecode(response.body);
             final user = UserData.fromJson(data);
             
-            // Автоматически сохраняем в оффлайн хранилище
             await _offlineStorage.saveUserData(user);
             print('✅ Данные пользователя загружены и сохранены оффлайн');
             
@@ -244,7 +237,6 @@ class ApiService {
             throw Exception('Failed to load user data');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки пользователя онлайн, пробуем оффлайн: $e');
           final offlineUser = await _offlineStorage.getUserData();
           if (offlineUser != null) {
@@ -292,7 +284,6 @@ class ApiService {
                 .map((json) => ScheduleElement.fromJson(json as Map<String, dynamic>))
                 .toList();
             
-            // Автоматически сохраняем в оффлайн хранилище
             await _offlineStorage.saveSchedule(schedule);
             print('✅ Расписание загружено и сохранено оффлайн: ${schedule.length} шт');
             
@@ -302,7 +293,6 @@ class ApiService {
             throw Exception('Failed to load schedule');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки расписания онлайн, пробуем оффлайн: $e');
           final offlineSchedule = await _offlineStorage.getSchedule();
           if (offlineSchedule.isNotEmpty) {
@@ -349,7 +339,6 @@ class ApiService {
               final List<dynamic> leadersData = jsonDecode(response.body);
               final leaders = leadersData.map((json) => LeaderboardUser.fromJson(json)).toList();
               
-              // Автоматически сохраняем в оффлайн хранилище
               await _offlineStorage.saveGroupLeaders(leaders);
               print('✅ Лидеры группы загружены и сохранены оффлайн: ${leaders.length} шт');
               
@@ -374,7 +363,6 @@ class ApiService {
             throw Exception('Failed to load group leaders: ${response.statusCode}');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки лидеров группы онлайн, пробуем оффлайн: $e');
           final offlineLeaders = await _offlineStorage.getGroupLeaders();
           if (offlineLeaders.isNotEmpty) {
@@ -421,7 +409,6 @@ class ApiService {
               final List<dynamic> leadersData = jsonDecode(response.body);
               final leaders = leadersData.map((json) => LeaderboardUser.fromJson(json)).toList();
               
-              // Автоматически сохраняем в оффлайн хранилище
               await _offlineStorage.saveStreamLeaders(leaders);
               print('✅ Лидеры потока загружены и сохранены оффлайн: ${leaders.length} шт');
               
@@ -446,7 +433,6 @@ class ApiService {
             throw Exception('Failed to load stream leaders: ${response.statusCode}');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки лидеров потока онлайн, пробуем оффлайн: $e');
           final offlineLeaders = await _offlineStorage.getStreamLeaders();
           if (offlineLeaders.isNotEmpty) {
@@ -505,7 +491,6 @@ class ApiService {
               
               final feedbacks = feedbackData.map((json) => FeedbackReview.fromJson(json)).toList();
               
-              // Автоматически сохраняем в оффлайн хранилище
               await _offlineStorage.saveFeedbackReviews(feedbacks);
               print('✅ Отзывы загружены и сохранены оффлайн: ${feedbacks.length} шт');
               
@@ -519,7 +504,6 @@ class ApiService {
             throw Exception('Failed to load feedback: ${response.statusCode}');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки отзывов онлайн, пробуем оффлайн: $e');
           final offlineFeedbacks = await _offlineStorage.getFeedbackReviews();
           if (offlineFeedbacks.isNotEmpty) {
@@ -580,7 +564,6 @@ class ApiService {
               
               final exams = examsData.map((json) => Exam.fromJson(json)).toList();
               
-              // Автоматически сохраняем в оффлайн хранилище
               await _offlineStorage.saveExams(exams);
               print('✅ Экзамены загружены и сохранены оффлайн: ${exams.length} шт');
               
@@ -594,7 +577,6 @@ class ApiService {
             throw Exception('Failed to load exams: ${response.statusCode}');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки экзаменов онлайн, пробуем оффлайн: $e');
           final offlineExams = await _offlineStorage.getExams();
           if (offlineExams.isNotEmpty) {
@@ -641,7 +623,6 @@ class ApiService {
               final List<dynamic> futureExamsData = jsonDecode(response.body);
               final exams = futureExamsData.map((json) => Exam.fromJson(json)).toList();
               
-              // Сохраняем в общее хранилище экзаменов
               await _offlineStorage.saveExams(exams);
               print('✅ Предстоящие экзамены загружены и сохранены оффлайн: ${exams.length} шт');
               
@@ -655,7 +636,6 @@ class ApiService {
             throw Exception('Failed to load future exams: ${response.statusCode}');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки предстоящих экзаменов онлайн, пробуем оффлайн: $e');
           final offlineExams = await _offlineStorage.getExams();
           if (offlineExams.isNotEmpty) {
@@ -724,7 +704,6 @@ class ApiService {
               final List<dynamic> activityData = jsonDecode(response.body);
               final activities = activityData.map((json) => ActivityRecord.fromJson(json)).toList();
               
-              // Автоматически сохраняем в оффлайн хранилище
               await _offlineStorage.saveActivityRecords(activities);
               print('✅ Активности загружены и сохранены оффлайн: ${activities.length} шт');
               
@@ -738,7 +717,6 @@ class ApiService {
             throw Exception('Failed to load activity data: ${response.statusCode}');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки активностей онлайн, пробуем оффлайн: $e');
           final offlineActivities = await _offlineStorage.getActivityRecords();
           if (offlineActivities.isNotEmpty) {
@@ -824,7 +802,6 @@ class ApiService {
               
               final homeworks = homeworkData.map((json) => Homework.fromJson(json)).toList();
               
-              // Автоматически сохраняем в оффлайн хранилище
               await _offlineStorage.saveHomeworks(homeworks);
               print('✅ Домашние задания загружены и сохранены оффлайн: ${homeworks.length} шт');
               
@@ -838,7 +815,6 @@ class ApiService {
             throw Exception('Failed to load homeworks: ${response.statusCode}');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки домашних заданий онлайн, пробуем оффлайн: $e');
           final offlineHomeworks = await _offlineStorage.getHomeworks();
           if (offlineHomeworks.isNotEmpty) {
@@ -901,7 +877,6 @@ class ApiService {
               final List<dynamic> counterData = jsonDecode(response.body);
               final counters = counterData.map((json) => HomeworkCounter.fromJson(json)).toList();
               
-              // Автоматически сохраняем в оффлайн хранилище
               await _offlineStorage.saveHomeworkCounters(counters);
               print('✅ Счетчики ДЗ загружены и сохранены оффлайн: ${counters.length} шт');
               
@@ -915,7 +890,6 @@ class ApiService {
             throw Exception('Failed to load homework counters: ${response.statusCode}');
           }
         } catch (e) {
-          // При ошибке сети пробуем загрузить из оффлайн хранилища
           print('🌐 Ошибка загрузки счетчиков ДЗ онлайн, пробуем оффлайн: $e');
           final offlineCounters = await _offlineStorage.getHomeworkCounters();
           if (offlineCounters.isNotEmpty) {
@@ -1027,7 +1001,6 @@ Future<File?> downloadStudentHomeworkFile(String token, Homework homework) async
     print('🔄 Синхронизация критических данных...');
     
     try {
-      // Только самое важное для работы приложения
       await Future.wait([
         _syncUserData(token),
         _syncMarks(token),
@@ -1054,7 +1027,6 @@ Future<File?> downloadStudentHomeworkFile(String token, Homework homework) async
       await _syncSchedule(token);
       await Future.delayed(Duration(milliseconds: 200));
       
-      // Дополнительные данные (если нужно)
       await _syncAdditionalData(token);
       
       print('✅ Все данные синхронизированы');
@@ -1110,10 +1082,9 @@ Future<File?> downloadStudentHomeworkFile(String token, Homework homework) async
     try {
       print('🚀 Быстрая загрузка критических данных...');
       
-      // Параллельно загружаем пользователя и оценки
       final results = await Future.wait([
-        getUser(token),  // Сама решит онлайн/оффлайн
-        getMarks(token), // Сама решит онлайн/оффлайн
+        getUser(token),
+        getMarks(token),
       ], eagerError: false);
       
       return {

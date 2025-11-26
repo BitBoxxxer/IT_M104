@@ -20,10 +20,8 @@ class ServiceCoordinator {
     print('🚀 Запуск оптимизированных фоновых сервисов...');
     
     try {
-      // Быстрая синхронизация только критических данных при запуске
       await _apiService.syncCriticalDataOnly(token);
       
-      // Запускаем фоновую синхронизацию
       _startBackgroundSync(token);
       
       print('✅ Фоновые сервисы запущены');
@@ -36,7 +34,6 @@ class ServiceCoordinator {
   void _startBackgroundSync(String token) {
     _syncTimer?.cancel();
     
-    // Оптимизированный таймер - синхронизация каждые 30 минут
     _syncTimer = Timer.periodic(Duration(minutes: 30), (timer) async {
       if (!_servicesRunning) return;
       
@@ -44,7 +41,6 @@ class ServiceCoordinator {
         print('📱 Фоновая синхронизация...');
         await _apiService.syncCriticalDataOnly(token);
         
-        // Проверка уведомлений раз в 2 синхронизации (каждый час)
         if (timer.tick % 2 == 0) {
           await _notificationService.checkForUpdates(token);
         }
@@ -80,13 +76,11 @@ class ServiceCoordinator {
   
   Future<void> onAppPaused() async {
     print('⏸️ Приложение ушло в фон');
-    // Не останавливаем сервисы полностью, только уменьшаем активность
   }
   
   Future<void> onAppResumed() async {
     print('▶️ Приложение вернулось');
     if (_currentToken != null && _servicesRunning) {
-      // Быстрая синхронизация при возвращении в приложение
       _apiService.syncCriticalDataOnly(_currentToken!);
     }
   }

@@ -90,7 +90,6 @@ class BackgroundWorker {
       
       final notificationService = NotificationService();
       
-      // Проверяем настройки уведомлений
       if (await notificationService.isPollingEnabled()) {
         print('🔔 Фоновая проверка уведомлений...');
         await notificationService.checkForUpdates(token);
@@ -106,7 +105,6 @@ class BackgroundWorker {
   static int _getBackgroundSyncInterval() {
     final hour = DateTime.now().hour;
     
-    // В фоне делаем более редкие проверки для экономии батареи
     if (hour >= 0 && hour < 6) { // Ночь
       return 2 * 60 * 60 * 1000; // 2 часа
     } else if (hour >= 6 && hour < 12) { // Утро
@@ -125,7 +123,6 @@ class BackgroundWorker {
     }
     
     try {
-      // Синхронизация данных
       await Workmanager().registerPeriodicTask(
         "sync_1",
         syncTask,
@@ -136,7 +133,6 @@ class BackgroundWorker {
         ),
       );
       
-      // Проверка уведомлений
       await Workmanager().registerPeriodicTask(
         "notifications_1", 
         notificationTask,
