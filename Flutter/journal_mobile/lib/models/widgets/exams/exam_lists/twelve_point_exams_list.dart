@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../animation/slide_in_card.dart';
-import '../animation/fade_in_animation.dart';
-import '../animation/scale_animation.dart';
-import '../animation/fade_in_row.dart';
+import '../../animation/slide_in_card.dart';
+import '../../animation/fade_in_animation.dart';
+import '../../animation/scale_animation.dart';
+import '../../animation/fade_in_row.dart';
 import 'package:journal_mobile/models/exam.dart';
 
 class TwelvePointExamsList extends StatefulWidget {

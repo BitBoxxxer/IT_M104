@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+
+import 'package:journal_mobile/models/notification_item.dart';
+import 'package:journal_mobile/models/rabbits/notification_time.dart';
+import 'package:journal_mobile/models/widgets/notifications/empty_notifications.dart';
+import 'package:journal_mobile/models/widgets/notifications/error_notifications.dart';
+import 'package:journal_mobile/models/widgets/notifications/notification_list.dart';
+
 import 'package:journal_mobile/services/settings/notification_service.dart';
 import 'package:journal_mobile/services/secure_storage_service.dart';
-import 'package:journal_mobile/models/notification_item.dart';
 
 class UserNotificationScreen extends StatefulWidget {
   const UserNotificationScreen({super.key});
@@ -43,24 +49,12 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
   void _scheduleNextRefresh() {
     _autoRefreshTimer?.cancel();
     
-    final interval = _getCurrentPollingInterval();
+    final interval = NotificationTime.getCurrentPollingInterval();
     
     _autoRefreshTimer = Timer(interval, () {
       _refreshNotifications();
       _scheduleNextRefresh();
     });
-  }
-
-  Duration _getCurrentPollingInterval() {
-    final hour = DateTime.now().hour;
-    
-    if (hour >= 23 || hour <= 6) {
-      return Duration(minutes: 60);
-    } else if (hour >= 8 && hour <= 18) {
-      return Duration(minutes: 10);
-    } else {
-      return Duration(minutes: 30);
-    }
   }
 
   Future<void> _markAllAsRead() async {
@@ -73,7 +67,6 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
 
   void _refreshNotifications() {
     _notificationService.getNotificationsHistory().then((_) {
-      // Поток автоматически обновится через механизм в NotificationService
     });
   }
 
@@ -145,71 +138,10 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
     );
   }
 
-  Widget _buildNotificationIcon(NotificationType type) {
-    switch (type) {
-      case NotificationType.newMarks:
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.school, color: Colors.green, size: 20),
-        );
-      case NotificationType.attendance:
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.orange.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.access_time, color: Colors.orange, size: 20),
-        );
-      case NotificationType.schedule:
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.calendar_today, color: Colors.blue, size: 20),
-        );
-      case NotificationType.achievement:
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.purple.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.emoji_events, color: Colors.purple, size: 20),
-        );
-      case NotificationType.system:
-      default:
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.grey.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.info, color: Colors.grey, size: 20),
-        );
-    }
-  }
-
-  String _formatTimeAgo(DateTime timestamp) {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inMinutes < 1) {
-      return 'Только что';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} мин. назад';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} ч. назад';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} д. назад';
-    } else {
-      return '${timestamp.day}.${timestamp.month}.${timestamp.year}';
+  Future<void> _onNotificationTap(NotificationItem notification) async {
+    if (!notification.isRead) {
+      await _notificationService.markAsRead(notification.id);
+      _refreshNotifications();
     }
   }
 
@@ -233,7 +165,41 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
       ),
       body: Column(
         children: [
-          Card(
+          _buildControlCard(),
+          Expanded(
+            child: StreamBuilder<List<NotificationItem>>(
+              stream: _notificationsStream,
+              initialData: const [],
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return ErrorNotifications(onRetry: _refreshNotifications);
+                }
+
+                final notifications = snapshot.data ?? [];
+
+                if (notifications.isEmpty) {
+                  return const EmptyNotifications();
+                }
+
+                return NotificationList(
+                  notifications: notifications,
+                  onNotificationTap: _onNotificationTap,
+                  onNotificationDelete: _deleteNotification,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+        Widget _buildControlCard() {
+          return Card(
             margin: const EdgeInsets.all(16),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -254,7 +220,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
                         Text(
                           _isLoading 
                             ? 'Выполняется проверка...' 
-                            : 'Автообновление каждые ${_getCurrentPollingInterval().inMinutes} мин.',
+                            : 'Автообновление каждые ${NotificationTime.getCurrentPollingInterval().inMinutes} мин.',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -273,159 +239,6 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
                         ),
                 ],
               ),
-            ),
-          ),
-
-          Expanded(
-            child: StreamBuilder<List<NotificationItem>>(
-              stream: _notificationsStream,
-              initialData: const [],
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.grey),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Ошибка загрузки уведомлений',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: _refreshNotifications,
-                          child: const Text('Попробовать снова'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final notifications = snapshot.data ?? [];
-
-                if (notifications.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.notifications_off, size: 64, color: Colors.grey),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Уведомлений пока нет',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Новые оценки и изменения посещаемости\nпоявятся здесь автоматически',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: notifications.length,
-                  itemBuilder: (context, index) {
-                    final notification = notifications[index];
-                    
-                    return Dismissible(
-                      key: Key(notification.id.toString()),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        color: Colors.red,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      confirmDismiss: (direction) async {
-                        final shouldDelete = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Удалить уведомление?'),
-                            content: Text('Удалить "${notification.title}"?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Отмена'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text('Удалить', style: TextStyle(color: Colors.red)),
-                              ),
-                            ],
-                          ),
-                        );
-                        return shouldDelete ?? false;
-                      },
-                      onDismissed: (direction) async {
-                        await _deleteNotification(notification);
-                      },
-                      child: Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        color: notification.isRead 
-                            ? Theme.of(context).cardTheme.color
-                            : Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                        elevation: 1,
-                        child: ListTile(
-                          leading: _buildNotificationIcon(notification.type),
-                          title: Text(
-                            notification.title,
-                            style: TextStyle(
-                              fontWeight: notification.isRead 
-                                  ? FontWeight.normal 
-                                  : FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(notification.message),
-                              const SizedBox(height: 4),
-                              Text(
-                                _formatTimeAgo(notification.timestamp),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: notification.isRead 
-                              ? null
-                              : Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.blue,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                          onTap: () async {
-                            if (!notification.isRead) {
-                              await _notificationService.markAsRead(notification.id);
-                              _refreshNotifications();
-                            }
-                          },
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }

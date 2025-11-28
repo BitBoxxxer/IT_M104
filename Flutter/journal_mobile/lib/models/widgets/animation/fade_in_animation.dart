@@ -9,7 +9,7 @@ class FadeInAnimation extends StatefulWidget {
     Key? key,
     required this.child,
     this.delay = Duration.zero,
-    this.duration = const Duration(milliseconds: 400),
+    this.duration = const Duration(milliseconds: 100),
   }) : super(key: key);
 
   @override

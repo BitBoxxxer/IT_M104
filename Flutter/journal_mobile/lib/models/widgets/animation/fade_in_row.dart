@@ -9,7 +9,7 @@ class FadeInRow extends StatefulWidget {
     Key? key,
     required this.child,
     this.delay = Duration.zero,
-    this.duration = const Duration(milliseconds: 500),
+    this.duration = const Duration(milliseconds: 100),
   }) : super(key: key);
 
   @override

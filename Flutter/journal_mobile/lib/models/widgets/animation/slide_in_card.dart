@@ -25,7 +25,7 @@ class _SlideInCardState extends State<SlideInCard>
     super.initState();
     
     _controller = AnimationController(
-      duration: Duration(milliseconds: 500),
+      duration: Duration(milliseconds: 100),
       vsync: this,
     );
 

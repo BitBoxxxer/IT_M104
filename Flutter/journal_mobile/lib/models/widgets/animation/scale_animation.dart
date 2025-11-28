@@ -9,7 +9,7 @@ class ScaleAnimation extends StatefulWidget {
     Key? key,
     required this.child,
     this.delay = Duration.zero,
-    this.duration = const Duration(milliseconds: 300),
+    this.duration = const Duration(milliseconds: 100),
   }) : super(key: key);
 
   @override
