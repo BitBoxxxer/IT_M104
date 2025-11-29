@@ -10,6 +10,8 @@ import '../services/secure_storage_service.dart';
 import '../models/exam.dart';
 
 class ExamScreen extends StatefulWidget {
+  const ExamScreen({super.key});
+
   @override
   State<ExamScreen> createState() => _ExamScreenState();
 }
@@ -22,8 +24,8 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
   bool _isLoading = true;
   String _errorMessage = '';
   String _debugInfo = '';
-  List<Widget> _tabs = [];
-  List<Widget> _tabViews = [];
+  final List<Widget> _tabs = [];
+  final List<Widget> _tabViews = [];
 
   final GlobalKey<TwelvePointExamsListState> _twelvePointListKey = GlobalKey();
 
@@ -159,8 +161,8 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: _loadExams,
-        child: const Icon(Icons.refresh),
         tooltip: 'Обновить',
+        child: const Icon(Icons.refresh),
       ),
     );
   }

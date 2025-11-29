@@ -12,6 +12,8 @@ import '../models/widgets/awards/stats_card.dart';
 import '../models/activity_record.dart';
 
 class HistoryOfAwardsScreen extends StatefulWidget {
+  const HistoryOfAwardsScreen({super.key});
+
   @override
   State<HistoryOfAwardsScreen> createState() => _HistoryOfAwardsScreenState();
 }

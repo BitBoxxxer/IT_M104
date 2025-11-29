@@ -5,10 +5,10 @@ class SlideInCard extends StatefulWidget {
   final Duration delay;
 
   const SlideInCard({
-    Key? key,
+    super.key,
     required this.child,
     this.delay = Duration.zero,
-  }) : super(key: key);
+  });
 
   @override
   _SlideInCardState createState() => _SlideInCardState();

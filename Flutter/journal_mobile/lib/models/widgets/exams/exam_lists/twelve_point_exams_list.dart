@@ -11,11 +11,11 @@ class TwelvePointExamsList extends StatefulWidget {
   final Future<void> Function() onRefresh;
 
   const TwelvePointExamsList({
-    Key? key,
+    super.key,
     required this.exams,
     required this.emptyMessage,
     required this.onRefresh,
-  }) : super(key: key);
+  });
 
   @override
   TwelvePointExamsListState createState() => TwelvePointExamsListState();

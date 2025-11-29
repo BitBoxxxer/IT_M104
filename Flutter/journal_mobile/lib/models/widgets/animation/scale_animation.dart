@@ -6,11 +6,11 @@ class ScaleAnimation extends StatefulWidget {
   final Duration duration;
 
   const ScaleAnimation({
-    Key? key,
+    super.key,
     required this.child,
     this.delay = Duration.zero,
     this.duration = const Duration(milliseconds: 100),
-  }) : super(key: key);
+  });
 
   @override
   _ScaleAnimationState createState() => _ScaleAnimationState();

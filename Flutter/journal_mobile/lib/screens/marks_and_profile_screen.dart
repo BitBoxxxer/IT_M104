@@ -23,7 +23,7 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
   bool _showOnlyWithAbsence = false;
   bool _showOnlyWithLateness = false;
   int? _selectedMarkFilter;
-  Set<String> _selectedSubjects = Set<String>();
+  final Set<String> _selectedSubjects = <String>{};
 
   @override
   void initState() {
@@ -140,14 +140,14 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
       future: _marksFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
+          return SizedBox(
             height: MediaQuery.of(context).size.height * 0.8,
             child: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
-          return Container(
+          return SizedBox(
             height: MediaQuery.of(context).size.height * 0.8,
             child: Center(child: Text('Ошибка загрузки данных')),
           );
@@ -282,14 +282,14 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
       future: _marksFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
+          return SizedBox(
             height: MediaQuery.of(context).size.height * 0.8,
             child: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
-          return Container(
+          return SizedBox(
             height: MediaQuery.of(context).size.height * 0.8,
             child: Center(child: Text('Ошибка загрузки данных')),
           );

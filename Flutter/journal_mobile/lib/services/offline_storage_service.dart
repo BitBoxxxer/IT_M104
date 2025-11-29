@@ -41,7 +41,7 @@ class OfflineStorageService {
 
 Future<void> cleanupOldData() async {
   try {
-    final stats = await getOfflineDataStats();
+    await getOfflineDataStats();
     print('🧹 Начинаем очистку устаревших данных...');
     
     await _cleanupIfExceedsLimit(_marksKey, _maxMarks, getMarks, saveMarks);

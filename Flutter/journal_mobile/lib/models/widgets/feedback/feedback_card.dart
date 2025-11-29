@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../feedback_review.dart';
-import '../../rabbits/feedbackRewiew_utilits.dart';
+import '../../rabbits/feedbac_rewiew_utilits.dart';
 
 class FeedbackCard extends StatelessWidget {
   final FeedbackReview feedback;

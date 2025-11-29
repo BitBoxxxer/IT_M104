@@ -6,7 +6,7 @@ import '../services/download_service.dart';
 
 import '../models/homework.dart';
 import '../models/homework_counter.dart';
-import '../models/widgets/error_snackBar.dart';
+import '../models/widgets/error_snack_bar.dart';
 
 class HomeworkListScreen extends StatefulWidget {
   final String token;
@@ -26,12 +26,12 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
 
-  Map<String, List<Homework>> _tabHomeworks = {};
-  Map<String, int> _tabCurrentPages = {};
-  Map<String, bool> _tabHasMoreData = {};
-  Map<String, bool> _tabIsLoading = {};
-  Map<String, bool> _tabIsLoadingMore = {};
-  Map<String, String> _tabErrorMessages = {};
+  final Map<String, List<Homework>> _tabHomeworks = {};
+  final Map<String, int> _tabCurrentPages = {};
+  final Map<String, bool> _tabHasMoreData = {};
+  final Map<String, bool> _tabIsLoading = {};
+  final Map<String, bool> _tabIsLoadingMore = {};
+  final Map<String, String> _tabErrorMessages = {};
 
   List<HomeworkCounter> _counters = [];
   
@@ -948,8 +948,7 @@ Future<void> _downloadHomeworkFile(Homework homework) async {
     
     if (downloadedFile != null) {
       final String fileName = homework.filename ?? 
-          downloadedFile.path.split('/').last ??
-          'homework_${homework.id}';
+          downloadedFile.path.split('/').last;
       
       ErrorSnackBar.showSuccessSnackBar(
         context, 
@@ -977,8 +976,7 @@ Future<void> _downloadStudentHomeworkFile(Homework homework) async {
     
     if (downloadedFile != null) {
       final String fileName = homework.studentFilename ?? 
-          downloadedFile.path.split('/').last ??
-          'student_homework_${homework.id}';
+          downloadedFile.path.split('/').last;
       
       ErrorSnackBar.showSuccessSnackBar(
         context, 

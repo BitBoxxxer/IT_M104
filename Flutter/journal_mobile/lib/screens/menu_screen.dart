@@ -14,7 +14,7 @@ import 'leaderboard_screen.dart';
 import 'feedback_review.dart';
 import 'test_develop_area.dart';
 import 'settings_screen.dart';
-import 'usersPersonal_screen/UserNotification_screen.dart';
+import 'usersPersonal_screen/user_notification_screen.dart';
 import 'exam_screen.dart';
 import 'history_of_awards.dart';
 import 'homework_list_screen.dart';
@@ -34,7 +34,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final NotificationService _notificationService = NotificationService();
   late Future<Map<String, dynamic>> _dataFuture;
   late Stream<List<NotificationItem>> _notificationsStream;
-  bool _isDisposed = false;
   bool _isOffline = false;
 
   @override

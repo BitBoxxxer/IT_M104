@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'api_service.dart';
 import 'settings/notification_service.dart';
-import 'background/background_worker.dart';
 
 class ServiceCoordinator {
   final NotificationService _notificationService = NotificationService();
