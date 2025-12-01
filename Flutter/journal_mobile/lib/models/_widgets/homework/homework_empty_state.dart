@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../rabbits/homework_utilitss.dart';
+import '../../_rabbits/homework_utilitss.dart';
 
 class HomeworkEmptyState extends StatelessWidget {
   final String tabStatus;

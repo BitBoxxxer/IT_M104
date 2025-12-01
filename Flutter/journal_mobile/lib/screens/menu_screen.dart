@@ -5,7 +5,7 @@ import '../models/mark.dart';
 import '../models/notification_item.dart';
 import '../services/secure_storage_service.dart';
 import '../services/api_service.dart';
-import '../services/settings/notification_service.dart';
+import '../services/_settings/notification_service.dart';
 
 import 'marks_and_profile_screen.dart';
 import 'schedule_screen.dart';
@@ -14,7 +14,7 @@ import 'leaderboard_screen.dart';
 import 'feedback_review.dart';
 import 'test_develop_area.dart';
 import 'settings_screen.dart';
-import 'usersPersonal_screen/user_notification_screen.dart';
+import 'user_notification_screen.dart';
 import 'exam_screen.dart';
 import 'history_of_awards.dart';
 import 'homework_list_screen.dart';
@@ -693,6 +693,7 @@ Future<void> _syncAllData() async {
                               MaterialPageRoute(
                                 builder: (_) => FeedbackReviewScreen(token: widget.token),
                               ),
+                              
                             );
                           },
                         ),

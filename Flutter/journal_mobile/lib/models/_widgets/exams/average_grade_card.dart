@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:journal_mobile/models/rabbits/exam_sort.dart';
+import 'package:journal_mobile/models/_rabbits/exam_sort.dart';
 
 class AverageGradeCard extends StatelessWidget {
   final String averageGrade;

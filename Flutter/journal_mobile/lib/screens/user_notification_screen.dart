@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:journal_mobile/models/notification_item.dart';
-import 'package:journal_mobile/models/rabbits/notification_time.dart';
-import 'package:journal_mobile/models/widgets/notifications/empty_notifications.dart';
-import 'package:journal_mobile/models/widgets/notifications/error_notifications.dart';
-import 'package:journal_mobile/models/widgets/notifications/notification_list.dart';
+import 'package:journal_mobile/models/_rabbits/notification_time.dart';
+import 'package:journal_mobile/models/_widgets/notifications/empty_notifications.dart';
+import 'package:journal_mobile/models/_widgets/notifications/error_notifications.dart';
+import 'package:journal_mobile/models/_widgets/notifications/notification_list.dart';
 
-import 'package:journal_mobile/services/settings/notification_service.dart';
+import 'package:journal_mobile/services/_settings/notification_service.dart';
 import 'package:journal_mobile/services/secure_storage_service.dart';
 
 class UserNotificationScreen extends StatefulWidget {

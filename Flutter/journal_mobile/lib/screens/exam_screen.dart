@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:journal_mobile/models/widgets/exams/error_exams.dart';
-import 'package:journal_mobile/models/widgets/exams/loading_exams.dart';
-import '../models/widgets/exams/exam_lists/five_point_exams_list.dart';
-import '../models/widgets/exams/exam_lists/future_exams_list.dart';
-import '../models/widgets/exams/exam_lists/twelve_point_exams_list.dart';
-import '../models/widgets/exams/exam_tab_bar.dart';
+import 'package:journal_mobile/models/_widgets/exams/error_exams.dart';
+import 'package:journal_mobile/models/_widgets/exams/loading_exams.dart';
+import '../models/_widgets/exams/exam_lists/five_point_exams_list.dart';
+import '../models/_widgets/exams/exam_lists/future_exams_list.dart';
+import '../models/_widgets/exams/exam_lists/twelve_point_exams_list.dart';
+import '../models/_widgets/exams/exam_tab_bar.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
 import '../models/exam.dart';

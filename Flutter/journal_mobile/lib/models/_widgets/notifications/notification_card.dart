@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:journal_mobile/models/notification_item.dart';
-import 'package:journal_mobile/models/rabbits/notification_time.dart';
-import '../notifications/notification_icon.dart';
+import 'package:journal_mobile/models/_rabbits/notification_time.dart';
+import 'notification_icon.dart';
 
 class NotificationCard extends StatelessWidget {
   final NotificationItem notification;

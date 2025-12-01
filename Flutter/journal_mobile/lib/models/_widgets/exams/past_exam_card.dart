@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../exam.dart';
-import '../../rabbits/exam_sort.dart';
+import '../../_rabbits/exam_sort.dart';
 import '../animation/slide_in_card.dart';
 
 class PastExamCard extends StatelessWidget {

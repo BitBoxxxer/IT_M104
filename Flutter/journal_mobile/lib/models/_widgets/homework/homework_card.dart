@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../rabbits/homework_utilitss.dart';
+import '../../_rabbits/homework_utilitss.dart';
 import '../../homework.dart';
 
 class HomeworkCard extends StatelessWidget {

@@ -3,13 +3,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'services/api_service.dart';
-import 'services/background/background_worker.dart';
+import 'services/_background/background_worker.dart';
 import 'services/theme_service.dart';
 import 'services/secure_storage_service.dart';
 import 'services/main_service_coordinator.dart';
-import 'services/settings/notification_service.dart';
+import 'services/_settings/notification_service.dart';
 
-import 'models/system/blue_theme.dart';
+import 'models/_system/blue_theme.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/menu_screen.dart';

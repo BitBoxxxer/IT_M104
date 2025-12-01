@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 
-import '../models/widgets/homework/homework_content.dart';
-import '../models/widgets/homework/homework_tab_bar.dart';
+import '../models/_widgets/homework/homework_content.dart';
+import '../models/_widgets/homework/homework_tab_bar.dart';
 import '../models/homework.dart';
 import '../models/homework_counter.dart';
 

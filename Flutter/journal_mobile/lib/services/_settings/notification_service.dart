@@ -7,7 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/services.dart';
-import 'package:journal_mobile/services/settings/notification_state_service.dart';
+import 'package:journal_mobile/services/_settings/notification_state_service.dart';
 
 import '../api_service.dart';
 import '../secure_storage_service.dart';

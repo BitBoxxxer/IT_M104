@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 
-import '../models/widgets/feedback/empty_feedback.dart';
-import '../models/widgets/feedback/error_feedback.dart';
-import '../models/widgets/feedback/feedback_card.dart';
-import '../models/widgets/feedback/loading_feedback.dart';
+import '../models/_widgets/feedback/empty_feedback.dart';
+import '../models/_widgets/feedback/error_feedback.dart';
+import '../models/_widgets/feedback/feedback_card.dart';
+import '../models/_widgets/feedback/loading_feedback.dart';
 import '../models/feedback_review.dart';
 
 class FeedbackReviewScreen extends StatefulWidget {

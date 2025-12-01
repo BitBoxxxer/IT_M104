@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../activity_record.dart';
-import '../../rabbits/award_utilits.dart';
+import '../../_rabbits/award_utilits.dart';
+
 
 class AwardCard extends StatelessWidget {
   final ActivityRecord award;

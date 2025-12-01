@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
 
-import '../models/widgets/awards/award_card.dart';
-import '../models/widgets/awards/empty_awards.dart';
-import '../models/widgets/awards/error_awards.dart';
-import '../models/widgets/awards/filter_chips.dart';
-import '../models/widgets/awards/loading_awards.dart';
-import '../models/widgets/awards/stats_card.dart';
+import '../models/_widgets/awards/award_card.dart';
+import '../models/_widgets/awards/empty_awards.dart';
+import '../models/_widgets/awards/error_awards.dart';
+import '../models/_widgets/awards/filter_chips.dart';
+import '../models/_widgets/awards/loading_awards.dart';
+import '../models/_widgets/awards/stats_card.dart';
 import '../models/activity_record.dart';
 
 class HistoryOfAwardsScreen extends StatefulWidget {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/theme_service.dart';
-import '../services/settings/notification_service.dart';
+import '../services/_settings/notification_service.dart';
 import '../services/offline_storage_service.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
