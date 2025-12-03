@@ -7,10 +7,11 @@
   </a>
   -->
 
-  <h3 align="center">It Top Bohr</h3>
+  <h3 align="center">It Top M104</h3>
 
   <p align="center">
 	Кроссплатформенный студенческий журнал, написанный на Flutter - dart.
+	  [M104 - Галактика вида Собреро]
 	<br />
 	<a href="https://github.com/BitBoxxxer/ocean-with-stars"><strong>Изучите документацию »</strong></a>
 	<br />
