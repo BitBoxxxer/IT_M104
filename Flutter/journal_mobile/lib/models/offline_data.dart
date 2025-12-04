@@ -5,8 +5,8 @@ import './days_element.dart';
 import './activity_record.dart';
 import './exam.dart';
 import './feedback_review.dart';
-import './homework.dart';
-import './homework_counter.dart';
+import '_widgets/homework/homework.dart';
+import '_widgets/homework/homework_counter.dart';
 import './leaderboard_user.dart';
 
 class OfflineData {

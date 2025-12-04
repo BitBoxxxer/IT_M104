@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../homework.dart';
+import 'homework.dart';
 import 'homework_stat_item.dart';
 
 class HomeworkStatsCard extends StatelessWidget {

@@ -8,8 +8,8 @@ import '../models/leaderboard_user.dart';
 import '../models/feedback_review.dart';
 import '../models/exam.dart';
 import '../models/activity_record.dart';
-import '../models/homework.dart';
-import '../models/homework_counter.dart';
+import '../models/_widgets/homework/homework.dart';
+import '../models/_widgets/homework/homework_counter.dart';
 
 class OfflineStorageService {
   static final OfflineStorageService _instance = OfflineStorageService._internal();

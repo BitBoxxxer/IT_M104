@@ -4,8 +4,8 @@ import '../services/api_service.dart';
 
 import '../models/_widgets/homework/homework_content.dart';
 import '../models/_widgets/homework/homework_tab_bar.dart';
-import '../models/homework.dart';
-import '../models/homework_counter.dart';
+import '../models/_widgets/homework/homework.dart';
+import '../models/_widgets/homework/homework_counter.dart';
 
 class HomeworkListScreen extends StatefulWidget {
   final String token;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../homework.dart';
+import 'homework.dart';
 import 'homework_loading_state.dart'; // Добавить этот импорт
 import 'homework_error_state.dart';   // Добавить этот импорт  
 import 'homework_empty_state.dart';   // Добавить этот импорт

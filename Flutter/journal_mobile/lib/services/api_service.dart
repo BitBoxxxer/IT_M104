@@ -15,8 +15,8 @@ import '../models/leader_position_model.dart';
 import '../models/feedback_review.dart';
 import '../models/exam.dart';
 import '../models/activity_record.dart';
-import '../models/homework.dart';
-import '../models/homework_counter.dart';
+import '../models/_widgets/homework/homework.dart';
+import '../models/_widgets/homework/homework_counter.dart';
 
 DateTime getMonday(DateTime date) {
   final d = DateTime(date.year, date.month, date.day);

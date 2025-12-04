@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/api_service.dart';
-import '../../homework.dart';
-import '../../homework_counter.dart';
+import 'homework.dart';
+import 'homework_counter.dart';
 
 import 'homework_content.dart';
 import 'homework_tab_bar.dart';
