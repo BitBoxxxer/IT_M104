@@ -13,7 +13,7 @@ import '../models/days_element.dart';
 import '../models/leaderboard_user.dart';
 import '../models/leader_position_model.dart';
 import '../models/feedback_review.dart';
-import '../models/exam.dart';
+import '../models/_widgets/exams/exam.dart';
 import '../models/activity_record.dart';
 import '../models/_widgets/homework/homework.dart';
 import '../models/_widgets/homework/homework_counter.dart';

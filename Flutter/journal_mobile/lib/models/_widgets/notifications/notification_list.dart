@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:journal_mobile/models/notification_item.dart';
+import 'package:journal_mobile/models/_widgets/notifications/notification_item.dart';
 import 'package:journal_mobile/models/_widgets/notifications/notification_card.dart';
 
 class NotificationList extends StatelessWidget {

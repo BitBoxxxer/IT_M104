@@ -7,7 +7,7 @@ import '../models/_widgets/exams/exam_lists/twelve_point_exams_list.dart';
 import '../models/_widgets/exams/exam_tab_bar.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
-import '../models/exam.dart';
+import '../models/_widgets/exams/exam.dart';
 
 class ExamScreen extends StatefulWidget {
   const ExamScreen({super.key});

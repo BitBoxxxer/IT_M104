@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../empty_exams.dart';
 import '../future_exam_card.dart';
-import '../../../exam.dart';
+import '../exam.dart';
 
 class FutureExamsList extends StatelessWidget {
   final List<Exam> exams;

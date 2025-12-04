@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
-import 'package:journal_mobile/models/notification_item.dart';
+import 'package:journal_mobile/models/_widgets/notifications/notification_item.dart';
 import 'package:journal_mobile/models/_rabbits/notification_time.dart';
 import 'package:journal_mobile/models/_widgets/notifications/empty_notifications.dart';
 import 'package:journal_mobile/models/_widgets/notifications/error_notifications.dart';

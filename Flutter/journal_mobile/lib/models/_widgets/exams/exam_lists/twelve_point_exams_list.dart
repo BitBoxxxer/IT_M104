@@ -3,7 +3,7 @@ import '../../animation/slide_in_card.dart';
 import '../../animation/fade_in_animation.dart';
 import '../../animation/scale_animation.dart';
 import '../../animation/fade_in_row.dart';
-import 'package:journal_mobile/models/exam.dart';
+import 'package:journal_mobile/models/_widgets/exams/exam.dart';
 
 class TwelvePointExamsList extends StatefulWidget {
   final List<Exam> exams;

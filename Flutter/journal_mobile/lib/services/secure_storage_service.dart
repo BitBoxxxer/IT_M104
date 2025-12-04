@@ -1,6 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
-import 'package:journal_mobile/models/notification_item.dart';
+import 'package:journal_mobile/models/_widgets/notifications/notification_item.dart';
 
 class SecureStorageService {
   static final SecureStorageService _instance = SecureStorageService._internal();

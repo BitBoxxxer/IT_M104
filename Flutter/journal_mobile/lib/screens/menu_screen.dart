@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/user_data.dart';
 import '../models/mark.dart';
-import '../models/notification_item.dart';
+import '../models/_widgets/notifications/notification_item.dart';
 import '../services/secure_storage_service.dart';
 import '../services/api_service.dart';
 import '../services/_settings/notification_service.dart';

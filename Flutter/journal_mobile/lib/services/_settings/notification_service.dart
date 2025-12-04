@@ -13,7 +13,7 @@ import '../api_service.dart';
 import '../secure_storage_service.dart';
 import '../time_manager.dart';
 
-import 'package:journal_mobile/models/notification_item.dart';
+import 'package:journal_mobile/models/_widgets/notifications/notification_item.dart';
 import 'package:journal_mobile/models/mark.dart';
 
 class NotificationService {

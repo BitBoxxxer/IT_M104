@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../exam.dart';
+import '../exam.dart';
 import '../../../_rabbits/exam_sort.dart';
 import '../empty_exams.dart';
 import '../past_exam_card.dart';

@@ -3,7 +3,7 @@ import './mark.dart';
 import './user_data.dart';
 import './days_element.dart';
 import './activity_record.dart';
-import './exam.dart';
+import '_widgets/exams/exam.dart';
 import './feedback_review.dart';
 import '_widgets/homework/homework.dart';
 import '_widgets/homework/homework_counter.dart';

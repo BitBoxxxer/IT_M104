@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:journal_mobile/models/exam.dart';
+import 'package:journal_mobile/models/_widgets/exams/exam.dart';
 
 class ExamUtils {
   static String formatDate(String dateString) {
