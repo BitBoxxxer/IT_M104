@@ -1,5 +1,11 @@
 /// (Ди - Кейси: все записывать в одну модель homework - ужасно... по сути,
 ///  поэтому это - существует!) [по факту для читаблеьности.])
+/// 06.12.25: Почему оно не работает ? Перестало. Я не могу найти ошибки. Просто продолжаю пытаться, уже раз 10 ?
+/// 
+/// while (has_error == true)
+/// {
+///   return remove_error;
+/// }
 class HomeworkCounter {
   static const int HOMEWORK_TYPE_HOMEWORK = 0;
   static const int HOMEWORK_TYPE_LABORATORY = 1;
