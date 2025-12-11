@@ -84,9 +84,25 @@ class _LoginScreenState extends State<LoginScreen> {
       // Небольшую задержку для лучшего UX - Ди
       await Future.delayed(Duration(milliseconds: 500));
       
-      final hasCredentials = await _secureStorage.hasSavedCredentials();
+      String? username;
+      String? password;
+      String? token;
       
-      if (!hasCredentials) {
+      try {
+        final credentialsResult = await _secureStorage.getCredentials();
+        username = credentialsResult['username'];
+        password = credentialsResult['password'];
+        token = await _secureStorage.getToken();
+      } catch (e) {
+        print("❌ Ошибка чтения сохраненных данных: $e");
+      }
+      
+      final hasCredentials = username != null && password != null;
+      final hasToken = token != null && token.isNotEmpty;
+      
+      print("Auto-login check: hasCredentials=$hasCredentials, hasToken=$hasToken");
+      
+      if (!hasCredentials && !hasToken) {
         if (mounted) {
           setState(() {
             _checkingAutoLogin = false;
@@ -94,22 +110,11 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         return;
       }
-
-      final credentials = await _secureStorage.getCredentials();
-      if (credentials['username'] != null && credentials['password'] != null) {
-        final token = await _secureStorage.getToken();
-        
-        if (token != null && token.isNotEmpty) {
-          await _offlineAutoLogin(token, credentials['username']!);
-        } else {
-          await _onlineAutoLogin(credentials['username']!, credentials['password']!);
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _checkingAutoLogin = false;
-          });
-        }
+      if (hasCredentials) {
+        await _onlineAutoLogin(username, password);
+      } 
+      else if (hasToken) {
+        await _offlineAutoLogin(token, username ?? 'unknown');
       }
     } catch (e) {
       print("Auto-login error: $e");
@@ -131,27 +136,11 @@ class _LoginScreenState extends State<LoginScreen> {
         print("Online auto-login successful!");
         _navigateToMainMenu(token, isOffline: false);
       } else {
-        print("Online auto-login failed: token is null");
-        if (mounted) {
-          setState(() {
-            _checkingAutoLogin = false;
-          });
-        }
+        _fallbackToOffline(username);
       }
     } catch (e) {
       print("Online auto-login exception: $e");
-      
-      final savedToken = await _secureStorage.getToken();
-      if (savedToken != null && savedToken.isNotEmpty) {
-        print("Trying offline auto-login with saved token");
-        await _offlineAutoLogin(savedToken, username);
-      } else {
-        if (mounted) {
-          setState(() {
-            _checkingAutoLogin = false;
-          });
-        }
-      }
+      _fallbackToOffline(username);
     }
   }
 
@@ -168,6 +157,35 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       print("Offline auto-login exception: $e");
+      if (mounted) {
+        setState(() {
+          _checkingAutoLogin = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fallbackToOffline(String username) async {
+    try {
+      final savedToken = await _secureStorage.getToken();
+      if (savedToken != null && savedToken.isNotEmpty) {
+        print("Trying offline auto-login with saved token");
+        if (mounted) {
+          setState(() {
+            _isOfflineMode = true;
+          });
+          await Future.delayed(Duration(milliseconds: 500));
+          _navigateToMainMenu(savedToken, isOffline: true);
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _checkingAutoLogin = false;
+          });
+        }
+      }
+    } catch (e) {
+      print("Offline fallback error: $e");
       if (mounted) {
         setState(() {
           _checkingAutoLogin = false;

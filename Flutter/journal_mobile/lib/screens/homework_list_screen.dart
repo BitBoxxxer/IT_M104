@@ -33,7 +33,6 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
   final Map<String, String> _tabErrorMessages = {};
 
   List<HomeworkCounter> _counters = [];
-  final int _pageSize = 6;
 
   late TabController _tabController;
   int _currentTabIndex = 0;
@@ -53,7 +52,9 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     _initializeTabStates();
     _tabController.addListener(_handleTabSelection);
     _loadCounters();
-    _loadHomeworksForTab(_tabs[_currentTabIndex]['status']);
+    
+    String initialStatus = _tabs[_currentTabIndex]['status'];
+    _loadHomeworksForTab(initialStatus);
   }
 
   @override
@@ -81,10 +82,12 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
       });
       
       String newTabStatus = _tabs[_currentTabIndex]['status'];
-      
+      _loadCounters();
+
       if (newTabStatus == 'deleted') {
         _loadCounters();
       }
+      _loadCounters();
       
       if (_tabHomeworks[newTabStatus]!.isEmpty && 
           !_tabIsLoading[newTabStatus]! && 
@@ -122,20 +125,66 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     try {
       final type = widget.isLabWork ? 1 : 0;
       final counters = await _apiService.getHomeworkCounters(widget.token, type: type);
-      setState(() => _counters = counters);
+      setState(() {
+        _counters = counters;
+        
+        final currentTabStatus = _tabs[_currentTabIndex]['status'];
+        final currentLoaded = _tabHomeworks[currentTabStatus]?.length ?? 0;
+        final totalCount = _getTotalCountByStatus(currentTabStatus);
+        
+        _tabHasMoreData[currentTabStatus] = currentLoaded < totalCount;
+        
+        print('📊 Счетчики обновлены: $currentTabStatus - загружено $currentLoaded из $totalCount, hasMore: ${_tabHasMoreData[currentTabStatus]}');
+      });
     } catch (e) {
       print("Error loading counters: $e");
+      setState(() {
+        _counters = [];
+      });
     }
   }
 
   Future<void> _refreshData() async {
     await _loadCounters();
+
+    setState(() {
+      _tabCurrentPages[_currentFilterStatus] = 1;
+    });
+
     await _loadHomeworksForTab(_currentFilterStatus);
   }
 
   Future<void> _loadMoreData(String tabStatus) async {
-    if (_tabIsLoadingMore[tabStatus]! || !_tabHasMoreData[tabStatus]!) return;
-    await _loadHomeworksForTab(tabStatus, loadMore: true);
+    print('🔄 loadMoreData для $tabStatus, currentPage: ${_tabCurrentPages[tabStatus]}, hasMore: ${_tabHasMoreData[tabStatus]}, isLoadingMore: ${_tabIsLoadingMore[tabStatus]}');
+    
+    final currentTotal = _tabHomeworks[tabStatus]?.length ?? 0;
+    final totalCountByStatus = _getTotalCountByStatus(tabStatus);
+    
+    if (_tabIsLoadingMore[tabStatus]! || 
+        _tabIsLoading[tabStatus]! ||
+        !_tabHasMoreData[tabStatus]! ||
+        currentTotal >= totalCountByStatus) {
+      print('❌ Загрузка не требуется: currentTotal=$currentTotal, totalCount=$totalCountByStatus, hasMore=${_tabHasMoreData[tabStatus]}, isLoadingMore=${_tabIsLoadingMore[tabStatus]}');
+      return;
+    }
+    
+    setState(() {
+      _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! + 1;
+      _tabIsLoadingMore[tabStatus] = true;
+    });
+    
+    print('📊 Увеличен номер страницы перед запросом: ${_tabCurrentPages[tabStatus]}');
+    
+    try {
+      await _loadHomeworksForTab(tabStatus, loadMore: true);
+    } catch (e) {
+      setState(() {
+        _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! - 1;
+        _tabIsLoadingMore[tabStatus] = false;
+        _tabErrorMessages[tabStatus] = 'Ошибка загрузки: $e';
+      });
+      print('❌ Ошибка при загрузке данных: $e');
+    }
   }
 
   int _getCounterByStatus(int status) {
@@ -168,7 +217,6 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
       if (!loadMore) {
         _tabIsLoading[tabStatus] = true;
         _tabErrorMessages[tabStatus] = '';
-        _tabCurrentPages[tabStatus] = 1;
         _tabHasMoreData[tabStatus] = true;
       } else {
         _tabIsLoadingMore[tabStatus] = true;
@@ -178,19 +226,43 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
 
   void _updateHomeworksState(String tabStatus, List<Homework> homeworks, bool loadMore) {
     setState(() {
+      final totalCountByStatus = _getTotalCountByStatus(tabStatus);
+      
       if (!loadMore) {
         _tabHomeworks[tabStatus] = homeworks;
+        _tabCurrentPages[tabStatus] = 1;
+        
+        final loadedCount = homeworks.length;
+        final totalCount = totalCountByStatus;
+        
+        _tabHasMoreData[tabStatus] = loadedCount < totalCount;
+        print('📊 Первая загрузка $tabStatus: $loadedCount из $totalCount заданий, hasMore: ${_tabHasMoreData[tabStatus]} (loaded < total: $loadedCount < $totalCount)');
       } else {
-        _tabHomeworks[tabStatus]!.addAll(homeworks);
-      }
-      
-      _tabHasMoreData[tabStatus] = homeworks.isNotEmpty && homeworks.length >= _pageSize;
-      if (_tabHasMoreData[tabStatus]! && loadMore) {
-        _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! + 1;
+        final existingIds = _tabHomeworks[tabStatus]!.map((h) => h.id).toSet();
+        final uniqueNewHomeworks = homeworks.where((h) => !existingIds.contains(h.id)).toList();
+        
+        if (uniqueNewHomeworks.isNotEmpty) {
+          _tabHomeworks[tabStatus]!.addAll(uniqueNewHomeworks);
+          print('📊 Добавлено ${uniqueNewHomeworks.length} уникальных заданий');
+        }
+        
+        final totalLoaded = _tabHomeworks[tabStatus]!.length;
+        final totalCount = totalCountByStatus;
+        
+        _tabHasMoreData[tabStatus] = totalLoaded < totalCount;
+        
+        if (_tabHasMoreData[tabStatus]!) {
+          _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! + 1;
+          print('📊 Увеличена страница на 1, теперь: ${_tabCurrentPages[tabStatus]}');
+        } else {
+          print('📊 Все задания загружены: $totalLoaded из $totalCount, пагинация не нужна');
+        }
       }
       
       _tabIsLoading[tabStatus] = false;
       _tabIsLoadingMore[tabStatus] = false;
+      
+      print('📊 Итог $tabStatus: всего ${_tabHomeworks[tabStatus]!.length} заданий, hasMore: ${_tabHasMoreData[tabStatus]}, page: ${_tabCurrentPages[tabStatus]}');
     });
   }
 
@@ -210,6 +282,23 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
       case 'opened': return 3;
       case 'deleted': return 5;
       default: return null;
+    }
+  }
+
+  int _getTotalCountByStatus(String tabStatus) {
+    switch (tabStatus) {
+      case 'opened':
+        return _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_OPENED);
+      case 'inspection':
+        return _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_INSPECTION);
+      case 'done':
+        return _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_DONE);
+      case 'expired':
+        return _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_EXPIRED);
+      case 'deleted':
+        return _getCounterForDeletedTab();
+      default:
+        return 0;
     }
   }
 
