@@ -7,7 +7,7 @@ import 'services/_background/background_worker.dart';
 import 'services/theme_service.dart';
 import 'services/secure_storage_service.dart';
 import 'services/main_service_coordinator.dart';
-import 'services/_settings/notification_service.dart';
+import 'services/_notification/notification_service.dart';
 
 import 'models/_system/blue_theme.dart';
 

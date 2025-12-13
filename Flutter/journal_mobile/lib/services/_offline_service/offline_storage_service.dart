@@ -1,15 +1,15 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 
-import '../models/mark.dart';
-import '../models/user_data.dart';
-import '../models/days_element.dart';
-import '../models/leaderboard_user.dart';
-import '../models/feedback_review.dart';
-import '../models/_widgets/exams/exam.dart';
-import '../models/activity_record.dart';
-import '../models/_widgets/homework/homework.dart';
-import '../models/_widgets/homework/homework_counter.dart';
+import '../../models/mark.dart';
+import '../../models/user_data.dart';
+import '../../models/days_element.dart';
+import '../../models/leaderboard_user.dart';
+import '../../models/feedback_review.dart';
+import '../../models/_widgets/exams/exam.dart';
+import '../../models/activity_record.dart';
+import '../../models/_widgets/homework/homework.dart';
+import '../../models/_widgets/homework/homework_counter.dart';
 
 class OfflineStorageService {
   static final OfflineStorageService _instance = OfflineStorageService._internal();
@@ -29,6 +29,12 @@ class OfflineStorageService {
   static const String _groupLeadersKey = 'offline_group_leaders';
   static const String _streamLeadersKey = 'offline_stream_leaders';
   static const String _homeworkCountersKey = 'offline_homework_counters';
+
+  static const String _homeworksType0Key = 'offline_homeworks_type_0';
+  static const String _homeworksType1Key = 'offline_homeworks_type_1';
+  static const String _homeworkCountersType0Key = 'offline_homework_counters_type_0';
+  static const String _homeworkCountersType1Key = 'offline_homework_counters_type_1';
+
 
   // Ограничения кэша
   static const int _maxMarks = 2000;
@@ -241,32 +247,94 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  Future<void> saveHomeworks(List<Homework> homeworks) async {
+  Future<void> saveHomeworks(List<Homework> homeworks, {int? type}) async {
     try {
-      final homeworksToSave = homeworks.length > _maxHomeworks 
-          ? homeworks.sublist(0, _maxHomeworks)
-          : homeworks;
+      final key = type == 1 ? _homeworksType1Key : _homeworksType0Key;
+      final description = type == 1 ? 'лабораторные' : 'домашние';
+      final existingHomeworks = await getHomeworks(type: type);
+      final existingIds = existingHomeworks.map((h) => h.id).toSet();
+      final newHomeworks = homeworks.where((h) => !existingIds.contains(h.id)).toList();
+      final allHomeworks = [...existingHomeworks, ...newHomeworks];
+      
+      final homeworksToSave = allHomeworks.length > _maxHomeworks 
+          ? allHomeworks.sublist(allHomeworks.length - _maxHomeworks)
+          : allHomeworks;
           
       final homeworksJson = homeworksToSave.map((homework) => homework.toJson()).toList();
-      await _storage.write(key: _homeworksKey, value: jsonEncode(homeworksJson));
-      print('💾 Домашние задания сохранены офлайн: ${homeworksToSave.length} шт (лимит: $_maxHomeworks)');
+      await _storage.write(key: key, value: jsonEncode(homeworksJson));
+      
+      print('💾 $description задания сохранены офлайн: ${homeworksToSave.length} шт (+${newHomeworks.length} новых)');
+      
+      final typeStats = <int, int>{};
+      for (var hw in homeworksToSave) {
+        final materialType = hw.materialType ?? 0;
+        typeStats[materialType] = (typeStats[materialType] ?? 0) + 1;
+      }
+      print('📊 Статистика materialType:');
+      typeStats.forEach((mt, count) {
+        print('   - materialType=$mt: $count заданий');
+      });
+      
     } catch (e) {
       print('❌ Ошибка сохранения домашних заданий: $e');
     }
   }
 
-  Future<List<Homework>> getHomeworks() async {
+  Future<List<Homework>> getHomeworks({int? type}) async {
     try {
-      final jsonString = await _storage.read(key: _homeworksKey);
+      final key = type == 1 ? _homeworksType1Key : _homeworksType0Key;
+      final jsonString = await _storage.read(key: key);
+      
       if (jsonString == null || jsonString.isEmpty) {
         return [];
       }
       
       final List<dynamic> homeworksList = jsonDecode(jsonString);
       return homeworksList.map((json) => Homework.fromJson(json)).toList();
+      
     } catch (e) {
       print('❌ Ошибка загрузки офлайн домашних заданий: $e');
       return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> getHomeworksStats() async {
+  try {
+    final homeworksType0 = await getHomeworks(type: 0);
+    final homeworksType1 = await getHomeworks(type: 1);
+    
+    final statsType0 = <int, int>{};
+    final statsType1 = <int, int>{};
+    
+    for (var hw in homeworksType0) {
+      final status = hw.getDisplayStatus();
+      statsType0[status] = (statsType0[status] ?? 0) + 1;
+    }
+    
+    for (var hw in homeworksType1) {
+      final status = hw.getDisplayStatus();
+      statsType1[status] = (statsType1[status] ?? 0) + 1;
+    }
+    
+    print('📊 Статистика оффлайн заданий:');
+    print('   Домашние (type=0): ${homeworksType0.length} заданий');
+    statsType0.forEach((status, count) {
+      print('     - Статус $status: $count заданий');
+    });
+    print('   Лабораторные (type=1): ${homeworksType1.length} заданий');
+    statsType1.forEach((status, count) {
+      print('     - Статус $status: $count заданий');
+    });
+    
+    return {
+      'type0_count': homeworksType0.length,
+      'type1_count': homeworksType1.length,
+      'type0_stats': statsType0,
+      'type1_stats': statsType1,
+    };
+  } catch (e) {
+    print('❌ Ошибка получения статистики заданий: $e');
+    return {};
     }
   }
 
@@ -328,21 +396,32 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
-  Future<void> saveHomeworkCounters(List<HomeworkCounter> counters) async {
+  Future<void> saveHomeworkCounters(List<HomeworkCounter> counters, {int? type}) async {
     try {
+      final key = type == 1 ? _homeworkCountersType1Key : _homeworkCountersType0Key;
+      final description = type == 1 ? 'лабораторные' : 'домашние';
+      
       final countersJson = counters.map((counter) => counter.toJson()).toList();
-      await _storage.write(key: _homeworkCountersKey, value: jsonEncode(countersJson));
-      print('💾 Счетчики ДЗ сохранены офлайн: ${counters.length} шт');
+      await _storage.write(key: key, value: jsonEncode(countersJson));
+      print('💾 Счетчики $description заданий сохранены офлайн: ${counters.length} шт');
     } catch (e) {
       print('❌ Ошибка сохранения счетчиков ДЗ: $e');
     }
   }
 
-  Future<List<HomeworkCounter>> getHomeworkCounters() async {
+  Future<List<HomeworkCounter>> getHomeworkCounters({int? type}) async {
     try {
-      final jsonString = await _storage.read(key: _homeworkCountersKey);
+      final key = type == 1 ? _homeworkCountersType1Key : _homeworkCountersType0Key;
+      final jsonString = await _storage.read(key: key);
+      
       if (jsonString == null || jsonString.isEmpty) {
-        return [];
+        final oldJsonString = await _storage.read(key: _homeworkCountersKey);
+        if (oldJsonString == null || oldJsonString.isEmpty) {
+          return [];
+        }
+        
+        final List<dynamic> countersList = jsonDecode(oldJsonString);
+        return countersList.map((json) => HomeworkCounter.fromJson(json)).toList();
       }
       
       final List<dynamic> countersList = jsonDecode(jsonString);
@@ -366,6 +445,8 @@ Future<void> _cleanupIfExceedsLimit<T>(
       await _storage.delete(key: _groupLeadersKey);
       await _storage.delete(key: _streamLeadersKey);
       await _storage.delete(key: _homeworkCountersKey);
+      await _storage.delete(key: _homeworkCountersType0Key);
+      await _storage.delete(key: _homeworkCountersType1Key);
       
       print('🗑️ Все офлайн данные очищены');
     } catch (e) {
@@ -412,5 +493,156 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
     
     return stats;
+  }
+
+  // TODO Вынести позже в отдельную директиву по архитектуре проекта. - Ди 13.12.25
+  /// Фильтрация по статусу HomeWork (Домашние / Лабораторные)
+  Future<List<Homework>> getHomeworksByStatus(int? status, {int? type}) async {
+    try {
+      final homeworks = await getHomeworks(type: type);
+      
+      if (status != null) {
+        return homeworks.where((hw) => hw.getDisplayStatus() == status).toList();
+      }
+      
+      return homeworks;
+    } catch (e) {
+      print('❌ Ошибка загрузки офлайн домашних заданий: $e');
+      return [];
+    }
+  }
+
+  /// Получить статистику по статусам домашних заданий в оффлайн кэше
+  Future<Map<String, int>> getHomeworkStatusStats() async {
+    try {
+      final homeworks = await getHomeworks();
+      final stats = <String, int>{
+        'expired': 0,
+        'done': 0,
+        'inspection': 0,
+        'opened': 0,
+        'deleted': 0,
+      };
+      
+      for (var hw in homeworks) {
+        final status = hw.getRealStatus();
+        final statusString = hw.statusString;
+        
+        print('📝 Задание ${hw.id} "${hw.theme}": realStatus=$status, statusString=$statusString');
+        
+        switch (status) {
+          case 0: stats['expired'] = stats['expired']! + 1; break;
+          case 1: stats['done'] = stats['done']! + 1; break;
+          case 2: stats['inspection'] = stats['inspection']! + 1; break;
+          case 3: stats['opened'] = stats['opened']! + 1; break;
+          case 5: stats['deleted'] = stats['deleted']! + 1; break;
+        }
+      }
+      
+      print('📊 Статистика статусов в оффлайн кэше:');
+      stats.forEach((status, count) {
+        print('  - $status: $count заданий');
+      });
+      
+      return stats;
+    } catch (e) {
+      print('❌ Ошибка получения статистики: $e');
+      return {};
+    }
+  }
+
+  Future<void> debugHomeworkTypes() async {
+    try {
+      print('🔍 Диагностика типов заданий в оффлайн хранилище:');
+      
+      // Получаем все задания
+      final allHomeworks = await getHomeworks();
+      print('Всего заданий: ${allHomeworks.length}');
+      
+      // Группируем по materialType
+      final byType = <int, List<Homework>>{};
+      for (var hw in allHomeworks) {
+        final type = hw.materialType ?? 0;
+        if (!byType.containsKey(type)) {
+          byType[type] = [];
+        }
+        byType[type]!.add(hw);
+      }
+      
+      byType.forEach((type, homeworks) {
+        print('Тип $type (${type == 1 ? 'Лабораторные' : 'Домашние'}): ${homeworks.length} заданий');
+        
+        final examples = homeworks.take(3).map((hw) => 'ID ${hw.id}: "${hw.theme}"').toList();
+        print('   Примеры: ${examples.join(", ")}');
+      });
+      
+      final type0Homeworks = await getHomeworks(type: 0);
+      final type1Homeworks = await getHomeworks(type: 1);
+      
+      print('Разделенное хранение:');
+      print('   type=0: ${type0Homeworks.length} заданий');
+      print('   type=1: ${type1Homeworks.length} заданий');
+      
+    } catch (e) {
+      print('❌ Ошибка диагностики: $e');
+    }
+  }
+
+  /// Исправление старых данных в хранилище
+  Future<void> fixHomeworkStorageData() async {
+    try {
+      print('🛠️ Начинаем исправление данных в хранилище...');
+      
+      await _storage.delete(key: _homeworksKey);
+      await _storage.delete(key: _homeworksType0Key);
+      await _storage.delete(key: _homeworksType1Key);
+      
+      print('✅ Данные в хранилище очищены');
+      
+      await _storage.write(key: _homeworksType0Key, value: jsonEncode([]));
+      await _storage.write(key: _homeworksType1Key, value: jsonEncode([]));
+      
+      print('✅ Хранилища инициализированы заново');
+      
+    } catch (e) {
+      print('❌ Ошибка исправления данных: $e');
+    }
+  }
+
+  /// Диагностика хранилища
+  Future<void> diagnoseHomeworkStorage() async {
+    try {
+      print('🔍 Диагностика хранилища заданий:');
+      
+      final keys = [_homeworksKey, _homeworksType0Key, _homeworksType1Key];
+      
+      for (var key in keys) {
+        final data = await _storage.read(key: key);
+        final count = data != null && data.isNotEmpty 
+            ? jsonDecode(data).length 
+            : 0;
+        print('   $key: $count записей');
+      }
+      
+    } catch (e) {
+      print('❌ Ошибка диагностики: $e');
+    }
+  }
+
+  Future<void> fixHomeworkCounters() async {
+    try {
+      print('🛠️ Исправляем счетчики заданий...');
+      
+      await _storage.delete(key: _homeworkCountersKey);
+      await _storage.delete(key: _homeworkCountersType0Key);
+      await _storage.delete(key: _homeworkCountersType1Key);
+      
+      await _storage.write(key: _homeworkCountersType0Key, value: jsonEncode([]));
+      await _storage.write(key: _homeworkCountersType1Key, value: jsonEncode([]));
+      
+      print('✅ Счетчики исправлены - готовы для новой синхронизации');
+    } catch (e) {
+      print('❌ Ошибка исправления счетчиков: $e');
+    }
   }
 }

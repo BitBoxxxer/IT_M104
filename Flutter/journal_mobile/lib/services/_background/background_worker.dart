@@ -1,7 +1,7 @@
 import 'package:workmanager/workmanager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api_service.dart';
-import '../_settings/notification_service.dart';
+import '../_notification/notification_service.dart';
 
 class BackgroundWorker {
   static const String syncTask = "backgroundSyncTask";

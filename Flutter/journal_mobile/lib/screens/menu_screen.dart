@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../models/user_data.dart';
 import '../models/mark.dart';
 import '../models/_widgets/notifications/notification_item.dart';
+import '../services/_offline_service/offline_storage_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/api_service.dart';
-import '../services/_settings/notification_service.dart';
+import '../services/_notification/notification_service.dart';
 
 import 'marks_and_profile_screen.dart';
 import 'schedule_screen.dart';
@@ -790,7 +791,44 @@ Future<void> _syncAllData() async {
                               },
                             ),
                           ),
-                      const SizedBox(height: 80),
+                          const SizedBox(height: 80),
+                          // TODO: Перенести в экран настроек - ДИ
+                          ElevatedButton(
+                            onPressed: () async {
+                              final offlineStorage = OfflineStorageService();
+                              await offlineStorage.fixHomeworkStorageData();
+                              
+                              await _refreshData();
+                              
+                              if (mounted) {
+                                setState(() {});
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Хранилище очищено, загружаем заново...'))
+                                );
+                              }
+                            },
+                            child: Text('Исправить кэш заданий (DEBUG)'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 50),
+                          SizedBox(
+                            width: 250,
+                            child: ElevatedButton.icon(
+                              icon: Icon(Icons.sync),
+                              label: Text('Синхронизировать все'),
+                              onPressed: _isOffline ? null : () {
+                                _syncAllData();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.purple,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                      const SizedBox(height: 50),
                       SizedBox(
                         width: 250,
                         child: FloatingActionButton(
@@ -806,7 +844,7 @@ Future<void> _syncAllData() async {
                           child: Icon(Icons.bug_report, color: Colors.white),
                         ),
                       ),
-                      const SizedBox(height: 20), /*без него выглядит дерьмово*/
+                      const SizedBox(height: 80),
 
                       Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -824,20 +862,6 @@ Future<void> _syncAllData() async {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 250,
-                        child: ElevatedButton.icon(
-                          icon: Icon(Icons.sync),
-                          label: Text('Синхронизировать все'),
-                          onPressed: _isOffline ? null : () {
-                            _syncAllData();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
-                            foregroundColor: Colors.white,
                           ),
                         ),
                       ),

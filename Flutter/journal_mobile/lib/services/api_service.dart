@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'secure_storage_service.dart';
-import 'offline_storage_service.dart';
+import '_offline_service/offline_storage_service.dart';
 import 'download_service.dart';
 
 import '../models/mark.dart';
@@ -802,8 +802,10 @@ class ApiService {
               
               final homeworks = homeworkData.map((json) => Homework.fromJson(json)).toList();
               
-              await _offlineStorage.saveHomeworks(homeworks);
-              print('✅ Домашние задания загружены и сохранены оффлайн: ${homeworks.length} шт');
+              // ИСПРАВЛЕНИЕ: Сохраняем с указанием типа (0=домашние, 1=лабораторные)
+              final homeworkType = type ?? 0;
+              await _offlineStorage.saveHomeworks(homeworks, type: homeworkType);
+              print('✅ ${homeworkType == 1 ? 'Лабораторные' : 'Домашние'} задания загружены и сохранены оффлайн: ${homeworks.length} шт');
               
               return homeworks;
             } catch (e) {
@@ -815,17 +817,68 @@ class ApiService {
             throw Exception('Failed to load homeworks: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки домашних заданий онлайн, пробуем оффлайн: $e');
-          final offlineHomeworks = await _offlineStorage.getHomeworks();
-          if (offlineHomeworks.isNotEmpty) {
-            print('📱 Используем оффлайн домашние задания: ${offlineHomeworks.length} шт');
-            return offlineHomeworks;
+          final homeworkType = type ?? 0;
+          final typeName = homeworkType == 1 ? 'лабораторные' : 'домашние';
+          print('📱 Используем оффлайн $typeName задания (type=$homeworkType) - БЕЗ ФИЛЬТРАЦИИ ПО materialType!');
+          
+          final offlineHomeworks = await _offlineStorage.getHomeworks(type: homeworkType);
+          
+          print('📱 Все оффлайн $typeName задания: ${offlineHomeworks.length}');
+          
+          List<Homework> filteredHomeworks;
+          if (status != null) {
+            filteredHomeworks = offlineHomeworks.where((hw) {
+              final displayStatus = hw.getDisplayStatus();
+              return displayStatus == status;
+            }).toList();
+            print('📱 Отфильтровано по статусу $status: ${filteredHomeworks.length} из ${offlineHomeworks.length}');
+          } else {
+            filteredHomeworks = offlineHomeworks;
           }
-          rethrow;
+          
+          final currentPage = page ?? 1;
+          final limit = 6;
+          final start = (currentPage - 1) * limit;
+          final end = start + limit;
+          
+          if (start >= filteredHomeworks.length) {
+            print('📱 Пагинация: страница $currentPage пуста (всего: ${filteredHomeworks.length})');
+            return [];
+          }
+          
+          final result = filteredHomeworks.sublist(
+            start,
+            end < filteredHomeworks.length ? end : filteredHomeworks.length,
+          );
+          
+          print('📱 Пагинация оффлайн: страница $currentPage, показано ${result.length} из ${filteredHomeworks.length}');
+          return result;
         }
       },
     );
   }
+
+  /// Улучшенная синхронизация с принудительной очисткой старых данных
+  Future<void> syncLabWorks(String token) async {
+    try {
+      print('🔄 Принудительная синхронизация лабораторных работ...');
+      
+      final labWorks = await getHomeworks(token, type: 1);
+      
+      await _offlineStorage.saveHomeworks(labWorks, type: 1);
+      
+      print('✅ Лабораторные работы синхронизированы: ${labWorks.length} шт');
+      
+      final homeWorks = await getHomeworks(token, type: 0);
+      await _offlineStorage.saveHomeworks(homeWorks, type: 0);
+      
+      print('✅ Домашние задания также синхронизированы: ${homeWorks.length} шт');
+      
+    } catch (e) {
+      print('❌ Ошибка синхронизации лабораторных работ: $e');
+    }
+  }
+
 
   /// получение счетчиков домашних заданий [api] - с автоматическим оффлайн сохранением
   Future<List<HomeworkCounter>> getHomeworkCounters(
@@ -862,7 +915,7 @@ class ApiService {
             final newToken = await _reauthenticate();
             if (newToken != null) {
               response = await http.get(
-                Uri.parse('$_baseUrl/count/homework'),
+                url,
                 headers: {
                   'Content-Type': 'application/json',
                   'Authorization': 'Bearer $newToken',
@@ -877,8 +930,8 @@ class ApiService {
               final List<dynamic> counterData = jsonDecode(response.body);
               final counters = counterData.map((json) => HomeworkCounter.fromJson(json)).toList();
               
-              await _offlineStorage.saveHomeworkCounters(counters);
-              print('✅ Счетчики ДЗ загружены и сохранены оффлайн: ${counters.length} шт');
+              await _offlineStorage.saveHomeworkCounters(counters, type: type);
+              print('✅ Счетчики ${type == 1 ? 'лабораторных' : 'домашних'} заданий загружены и сохранены оффлайн: ${counters.length} шт');
               
               return counters;
             } catch (e) {
@@ -891,12 +944,16 @@ class ApiService {
           }
         } catch (e) {
           print('🌐 Ошибка загрузки счетчиков ДЗ онлайн, пробуем оффлайн: $e');
-          final offlineCounters = await _offlineStorage.getHomeworkCounters();
+          
+          final offlineCounters = await _offlineStorage.getHomeworkCounters(type: type);
           if (offlineCounters.isNotEmpty) {
-            print('📱 Используем оффлайн счетчики ДЗ: ${offlineCounters.length} шт');
+            print('📱 Используем оффлайн счетчики ${type == 1 ? 'лабораторных' : 'домашних'} заданий: ${offlineCounters.length} шт');
             return offlineCounters;
           }
-          rethrow;
+          
+          final oldCounters = await _offlineStorage.getHomeworkCounters();
+          print('📱 Используем общие оффлайн счетчики (обратная совместимость): ${oldCounters.length} шт');
+          return oldCounters;
         }
       },
     );

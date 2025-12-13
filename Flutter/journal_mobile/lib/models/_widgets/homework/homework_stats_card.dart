@@ -65,7 +65,7 @@ class HomeworkStatsCard extends StatelessWidget {
                 ),
                 if (homeworks.isNotEmpty)
                   HomeworkStatItem(
-                    title: 'Страница',
+                    title: 'Страница (Debug)', // TODO Убрать в релизной версии 13.12.25 Ди
                     value: '$currentPage',
                     icon: Icons.numbers,
                     color: Colors.orange,
