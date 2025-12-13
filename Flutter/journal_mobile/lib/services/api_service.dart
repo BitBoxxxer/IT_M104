@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:journal_mobile/services/_account/account_manager_service.dart';
 
+import '../models/_system/account_model.dart';
 import 'secure_storage_service.dart';
 import '_offline_service/offline_storage_service.dart';
 import 'download_service.dart';
@@ -138,6 +140,48 @@ class ApiService {
         }
       },
     );
+  }
+
+  /// авторизация... [api]
+  Future<Account> loginAndCreateAccount(String username, String password) async {
+    final token = await login(username, password);
+    
+    if (token == null) {
+      throw Exception('Ошибка авторизации');
+    }
+    
+    final userData = await getUser(token);
+    
+    final account = Account(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      username: username,
+      fullName: userData.fullName,
+      groupName: userData.groupName,
+      photoPath: userData.photoPath,
+      token: token,
+      lastLogin: DateTime.now(),
+      isActive: true,
+      studentId: userData.studentId,
+    );
+    
+    final accountManager = AccountManagerService();
+    await accountManager.addAccount(account);
+    
+    await _secureStorage.saveCredentials(username, password);
+    
+    return account;
+  }
+
+  /// Получить данные с учетом текущего аккаунта [api]
+  Future<List<Mark>> getMarksForCurrentAccount() async {
+    final accountManager = AccountManagerService();
+    final currentAccount = await accountManager.getCurrentAccount();
+    
+    if (currentAccount == null) {
+      throw Exception('Нет активного аккаунта');
+    }
+    
+    return await getMarks(currentAccount.token);
   }
 
   /// получение оценок студента [api] - с автоматическим оффлайн сохранением

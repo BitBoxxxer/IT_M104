@@ -1,6 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import '../models/_system/account_model.dart';
+import '../services/_account/account_manager_service.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/url_launcher_service.dart';
@@ -10,11 +12,13 @@ import 'package:flutter/services.dart';
 class LoginScreen extends StatefulWidget {
   final String currentTheme;
   final Function(String) onThemeChanged;
+  final bool skipAutoLogin;
 
   const LoginScreen({
     super.key,
     required this.currentTheme,
     required this.onThemeChanged,
+    this.skipAutoLogin = false,
   });
 
   @override
@@ -36,7 +40,11 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAutoLogin();
+    if (!widget.skipAutoLogin) {
+      _checkAutoLogin();
+    } else {
+      _checkingAutoLogin = false;
+    }
   }
 
   /// Обработка открытия ссылок через сервис
@@ -227,6 +235,29 @@ class _LoginScreenState extends State<LoginScreen> {
       final token = await _apiService.login(username, password);
 
       if (token != null && mounted) {
+        final userData = await _apiService.getUser(token);
+        
+        final accountManager = AccountManagerService();
+        
+        final accountId = DateTime.now().millisecondsSinceEpoch.toString();
+        
+        final account = Account(
+          id: accountId,
+          username: username,
+          fullName: userData.fullName,
+          groupName: userData.groupName,
+          photoPath: userData.photoPath,
+          token: token,
+          lastLogin: DateTime.now(),
+          isActive: true,
+          studentId: userData.studentId,
+        );
+        
+        await accountManager.addAccount(account);
+        
+        await accountManager.saveAccountCredentials(accountId, username, password);
+        
+        print('✅ Аккаунт сохранен с учетными данными');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Синхронизация данных для офлайн режима...'),

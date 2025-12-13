@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../models/user_data.dart';
-import '../models/mark.dart';
-import '../models/_widgets/notifications/notification_item.dart';
 import '../services/_offline_service/offline_storage_service.dart';
+import '../services/_account/account_manager_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/api_service.dart';
 import '../services/_notification/notification_service.dart';
 
+import '../models/_system/account_model.dart';
+import '../models/user_data.dart';
+import '../models/mark.dart';
+import '../models/_widgets/notifications/notification_item.dart';
+
+import '_account/account_selection_screen.dart';
 import 'marks_and_profile_screen.dart';
 import 'schedule_screen.dart';
 import 'login_screen.dart';
@@ -433,11 +437,101 @@ Future<void> _syncAllData() async {
             },
           ),
           IconButton(
+            icon: Icon(Icons.switch_account),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AccountSelectionScreen(
+                    currentTheme: widget.currentTheme,
+                    onThemeChanged: widget.onThemeChanged,
+                  ),
+                ),
+              );
+            },
+            tooltip: 'Сменить аккаунт',
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refreshData,
             tooltip: 'Обновить данные',
           ),
         ],
+      ),
+      drawer: Drawer(
+        child: FutureBuilder<List<Account>>(
+          future: AccountManagerService().getAllAccounts(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Center(child: CircularProgressIndicator());
+            }
+            
+            final accounts = snapshot.data!;
+            
+            return ListView(
+              children: [
+                DrawerHeader(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Аккаунты',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        '${accounts.length} аккаунтов',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                ...accounts.map((account) => ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: account.photoPath.isNotEmpty
+                        ? NetworkImage(account.photoPath)
+                        : null,
+                    child: account.photoPath.isEmpty
+                        ? Icon(Icons.person)
+                        : null,
+                  ),
+                  title: Text(account.fullName),
+                  subtitle: Text(account.groupName),
+                  trailing: account.isActive
+                      ? Icon(Icons.check_circle, color: Colors.green)
+                      : null,
+                  onTap: account.isActive
+                      ? null
+                      : () {
+                          AccountManagerService().switchAccount(account.id).then((_) {
+                            Navigator.pop(context);
+                            _refreshData();
+                          });
+                        },
+                )),
+                Divider(),
+                ListTile(
+                  leading: Icon(Icons.add),
+                  title: Text('Добавить аккаунт'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => LoginScreen(
+                          currentTheme: widget.currentTheme,
+                          onThemeChanged: widget.onThemeChanged,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        ),
       ),
       body: Column(children: [
         if (_isOffline)

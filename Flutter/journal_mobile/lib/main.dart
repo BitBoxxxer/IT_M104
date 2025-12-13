@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'screens/_account/account_selection_screen.dart';
+import 'services/_account/account_manager_service.dart';
 import 'services/api_service.dart';
 import 'services/_background/background_worker.dart';
 import 'services/theme_service.dart';
@@ -99,28 +101,31 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Future<Map<String, dynamic>> _getToken() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+      final accountManager = AccountManagerService();
+
+      await accountManager.fixMultipleActiveAccounts();
+      await accountManager.debugAccounts();
+
+      final currentAccount = await accountManager.getCurrentAccount();
       
-      if (token == null || token.isEmpty) {
+      if (currentAccount == null) {
         return {'isValid': false, 'token': null, 'isOffline': false};
       }
       
       final hasCredentials = await _secureStorage.hasSavedCredentials();
       
       try {
-        final isValid = await _apiService.validateToken(token);
+        final isValid = await _apiService.validateToken(currentAccount.token);
         return {
           'isValid': isValid, 
-          'token': isValid ? token : null, 
+          'token': currentAccount.token, 
           'isOffline': false
         };
       } catch (e) {
         if (hasCredentials) {
-          print('🌐 Ошибка онлайн проверки, но есть офлайн данные: $e');
           return {
             'isValid': true,
-            'token': token, 
+            'token': currentAccount.token, 
             'isOffline': true
           };
         } else {
@@ -170,7 +175,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               onThemeChanged: _changeTheme,
             );
           }
-          return LoginScreen(
+          return AccountSelectionScreen(
             currentTheme: _currentTheme,
             onThemeChanged: _changeTheme,
           );

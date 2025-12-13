@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:journal_mobile/models/_widgets/notifications/notification_item.dart';
 
+import '../models/_system/account_model.dart';
+
 class SecureStorageService {
   static final SecureStorageService _instance = SecureStorageService._internal();
   factory SecureStorageService() => _instance;
@@ -249,6 +251,52 @@ class SecureStorageService {
         print('❌ Ошибка массового чтения: $e');
         return {};
       }
+    });
+  }
+
+  Future<void> saveAccountData(Account account) async {
+    await _readWriteLock.synchronized(() async {
+      try {
+        await _storage.write(
+          key: 'token_${account.id}',
+          value: account.token,
+        );
+        
+        await _storage.write(
+          key: 'username_${account.id}',
+          value: account.username,
+        );
+        
+        final passwordKey = 'password_${account.id}';
+        await _storage.write(
+          key: passwordKey,
+          value: account.username,
+        );
+        
+        print('✅ Данные аккаунта сохранены: ${account.username}');
+      } catch (e) {
+        print('❌ Ошибка сохранения данных аккаунта: $e');
+        throw e;
+      }
+    });
+  }
+
+  Future<Map<String, String?>> getAccountCredentials(String accountId) async {
+    return await _readWriteLock.synchronized<Map<String, String?>>(() async {
+      try {
+        final username = await _storage.read(key: 'username_$accountId');
+        final password = await _storage.read(key: 'password_$accountId');
+        return {'username': username, 'password': password};
+      } catch (e) {
+        print('❌ Ошибка получения учетных данных: $e');
+        return {'username': null, 'password': null};
+      }
+    });
+  }
+
+  Future<String?> getAccountToken(String accountId) async {
+    return await _readWriteLock.synchronized<String?>(() async {
+      return await _storage.read(key: 'token_$accountId');
     });
   }
 }
