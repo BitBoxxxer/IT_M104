@@ -412,6 +412,18 @@ Future<void> _syncAllData() async {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Главное меню'),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/menu_user_background.jpg'),
+              fit: BoxFit.cover,
+              colorFilter: ColorFilter.mode(
+                Colors.black.withOpacity(0.5),
+                BlendMode.darken,
+              ),
+            ),
+          ),
+        ),
         actions: <Widget>[
           if (_isOffline)
             Padding(
@@ -424,21 +436,21 @@ Future<void> _syncAllData() async {
             ),
           _buildNotificationIcon(),
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => SettingsScreen(
-                    currentTheme: widget.currentTheme,
-                    onThemeChanged: widget.onThemeChanged,
-                  ),
-                ),
-              );
-            },
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+            tooltip: 'Обновить данные',
           ),
-          IconButton(
-            icon: Icon(Icons.switch_account),
-            onPressed: () {
+        ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            ListTile(
+              leading: Icon(Icons.switch_account),
+              title: Text('Сменить аккаунт'),
+              onTap: () {
+                Navigator.of(context).pop();
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => AccountSelectionScreen(
@@ -448,79 +460,15 @@ Future<void> _syncAllData() async {
                 ),
               );
             },
-            tooltip: 'Сменить аккаунт',
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshData,
-            tooltip: 'Обновить данные',
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        child: FutureBuilder<List<Account>>(
-          future: AccountManagerService().getAllAccounts(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return Center(child: CircularProgressIndicator());
-            }
-            
-            final accounts = snapshot.data!;
-            
-            return ListView(
-              children: [
-                DrawerHeader(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Аккаунты',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '${accounts.length} аккаунтов',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-                ...accounts.map((account) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: account.photoPath.isNotEmpty
-                        ? NetworkImage(account.photoPath)
-                        : null,
-                    child: account.photoPath.isEmpty
-                        ? Icon(Icons.person)
-                        : null,
-                  ),
-                  title: Text(account.fullName),
-                  subtitle: Text(account.groupName),
-                  trailing: account.isActive
-                      ? Icon(Icons.check_circle, color: Colors.green)
-                      : null,
-                  onTap: account.isActive
-                      ? null
-                      : () {
-                          AccountManagerService().switchAccount(account.id).then((_) {
-                            Navigator.pop(context);
-                            _refreshData();
-                          });
-                        },
-                )),
-                Divider(),
                 ListTile(
-                  leading: Icon(Icons.add),
-                  title: Text('Добавить аккаунт'),
+                  leading: Icon(Icons.settings),
+                  title: Text('Настройки'),
                   onTap: () {
-                    Navigator.pop(context);
+                    Navigator.of(context).pop();
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => LoginScreen(
+                        builder: (_) => SettingsScreen(
                           currentTheme: widget.currentTheme,
                           onThemeChanged: widget.onThemeChanged,
                         ),
@@ -528,9 +476,16 @@ Future<void> _syncAllData() async {
                     );
                   },
                 ),
-              ],
-            );
-          },
+            Divider(),
+            ListTile(
+              leading: Icon(Icons.logout, color: Colors.red),
+              title: Text('Выйти'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _logout();
+              },
+            ),
+          ],
         ),
       ),
       body: Column(children: [
