@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../services/_offline_service/offline_storage_service.dart';
-import '../services/_account/account_manager_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/api_service.dart';
 import '../services/_notification/notification_service.dart';
+import '../services/_network/network_service.dart';
 
-import '../models/_system/account_model.dart';
 import '../models/user_data.dart';
 import '../models/mark.dart';
 import '../models/_widgets/notifications/notification_item.dart';
@@ -37,6 +36,8 @@ class MainMenuScreen extends StatefulWidget {
 class _MainMenuScreenState extends State<MainMenuScreen> {
   final ApiService _apiService = ApiService();
   final NotificationService _notificationService = NotificationService();
+  final NetworkService _networkService = NetworkService();
+
   late Future<Map<String, dynamic>> _dataFuture;
   late Stream<List<NotificationItem>> _notificationsStream;
   bool _isOffline = false;
@@ -49,6 +50,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     
     _dataFuture = _loadData(cleanToken);
     _notificationsStream = _notificationService.notificationsStream;
+    _networkService.initialize();
+  }
+
+  @override
+  void dispose() {
+    _networkService.dispose();
+    super.dispose();
   }
 
   Future<Map<String, dynamic>> _loadData(String token) async {
@@ -443,49 +451,82 @@ Future<void> _syncAllData() async {
         ],
       ),
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            ListTile(
-              leading: Icon(Icons.switch_account),
-              title: Text('Сменить аккаунт'),
-              onTap: () {
-                Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => AccountSelectionScreen(
-                    currentTheme: widget.currentTheme,
-                    onThemeChanged: widget.onThemeChanged,
-                  ),
-                ),
-              );
-            },
-          ),
-                ListTile(
-                  leading: Icon(Icons.settings),
-                  title: Text('Настройки'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SettingsScreen(
-                          currentTheme: widget.currentTheme,
-                          onThemeChanged: widget.onThemeChanged,
+        child: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (!_networkService.isConnected)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(12),
+                  color: Colors.black,
+                  child: Row(
+                    children: [
+                      Icon(Icons.wifi_off, size: 16, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Офлайн режим',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
-            Divider(),
-            ListTile(
-              leading: Icon(Icons.logout, color: Colors.red),
-              title: Text('Выйти'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _logout();
-              },
-            ),
-          ],
+              
+              Column(
+                children: [
+                  ListTile(
+                    leading: Icon(Icons.switch_account),
+                    title: Text('Сменить аккаунт'),
+                    enabled: _networkService.isConnected,
+                    onTap: _networkService.isConnected ? () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AccountSelectionScreen(
+                            currentTheme: widget.currentTheme,
+                            onThemeChanged: widget.onThemeChanged,
+                          ),
+                        ),
+                      );
+                    } : null,
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.settings),
+                    title: Text('Настройки'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SettingsScreen(
+                            currentTheme: widget.currentTheme,
+                            onThemeChanged: widget.onThemeChanged,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: ListTile(
+                      tileColor: Colors.red.withOpacity(0.1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      leading: Icon(Icons.logout, color: Colors.red),
+                      title: Text('Выйти', style: TextStyle(color: Colors.red)),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _logout();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       body: Column(children: [
