@@ -7,34 +7,28 @@ class NetworkService {
   NetworkService._internal();
 
   final Connectivity _connectivity = Connectivity();
-  StreamSubscription<List<ConnectivityResult>>? _subscription; // Изменяем тип
+  StreamSubscription<List<ConnectivityResult>>? _subscription;
+
+  final StreamController<bool> _connectionController = StreamController<bool>.broadcast();
+  Stream<bool> get connectionStream => _connectionController.stream;
+
   bool _isConnected = true;
   
-  /// Инициализация мониторинга сети
   Future<void> initialize() async {
     try {
-      // Получаем начальное состояние
       final initialResult = await _connectivity.checkConnectivity();
       _isConnected = initialResult != ConnectivityResult.none;
       
-      // Начинаем слушать изменения
       _subscription = _connectivity.onConnectivityChanged.listen((results) {
-        // results - это список ConnectivityResult
-        // Проверяем, есть ли хоть один активный тип подключения
         _isConnected = results.isNotEmpty && results.any((result) => result != ConnectivityResult.none);
+        _connectionController.add(_isConnected);
         print(_isConnected ? '🌐 Сеть подключена' : '📶 Сеть отключена');
-        
-        // Для отладки можно выводить все типы подключений
-        if (results.isNotEmpty) {
-          print('📡 Типы подключений: ${results.map((r) => r.toString()).join(', ')}');
-        }
       });
     } catch (e) {
       print('❌ Ошибка инициализации NetworkService: $e');
     }
   }
   
-  /// Проверка подключения к сети
   bool get isConnected => _isConnected;
   
   /// Асинхронная проверка подключения
@@ -93,5 +87,6 @@ class NetworkService {
   void dispose() {
     _subscription?.cancel();
     _subscription = null;
+    _connectionController.close();
   }
 }

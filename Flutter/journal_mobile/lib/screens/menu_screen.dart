@@ -27,7 +27,13 @@ class MainMenuScreen extends StatefulWidget {
   final String token;
   final String currentTheme;
   final Function(String) onThemeChanged;
-  const MainMenuScreen({super.key, required this.token,required this.currentTheme,required this.onThemeChanged,});
+  final bool isOfflineMode;
+  
+  const MainMenuScreen(
+    {super.key, required this.token,
+    required this.currentTheme,required this.onThemeChanged,
+    this.isOfflineMode = false,}
+  );
 
   @override
   State<MainMenuScreen> createState() => _MainMenuScreenState();
@@ -50,7 +56,15 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     
     _dataFuture = _loadData(cleanToken);
     _notificationsStream = _notificationService.notificationsStream;
-    _networkService.initialize();
+    _initializeNetworkService();
+  }
+
+  Future<void> _initializeNetworkService() async {
+    try {
+      await _networkService.initialize();
+    } catch (e) {
+      print('❌ Ошибка инициализации NetworkService: $e');
+    }
   }
 
   @override
@@ -106,55 +120,56 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
   }
   
-Future<void> _syncAllData() async {
-  try {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text('Синхронизация'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Синхронизация данных...'),
-          ],
+  Future<void> _syncAllData() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('Синхронизация'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Синхронизация данных...'),
+            ],
+          ),
         ),
-      ),
-    );
+      );
 
-    await _apiService.syncAllData(widget.token);
-    
-    if (mounted) {
-      Navigator.of(context).pop();
+      await _apiService.syncAllData(widget.token);
+      
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Все данные синхронизированы для офлайн использования! ✅'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      
+      _refreshData();
+      
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка синхронизации: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Все данные синхронизированы для офлайн использования! ✅'),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 3),
-      ),
-    );
-    
-    _refreshData();
-    
-  } catch (e) {
-    if (mounted) {
-      Navigator.of(context).pop();
-    }
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Ошибка синхронизации: $e'),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
-}
+  
   Future<void> _refreshData() async {
       final cleanToken = widget.token.replaceAll('?offline=true', '');
       setState(() {
@@ -455,70 +470,92 @@ Future<void> _syncAllData() async {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (!_networkService.isConnected)
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(12),
-                  color: Colors.black,
-                  child: Row(
+              // Используем StreamBuilder для отслеживания состояния сети
+              StreamBuilder<bool>(
+                stream: _networkService.connectionStream,
+                initialData: _networkService.isConnected,
+                builder: (context, snapshot) {
+                  final isConnected = snapshot.data ?? true;
+                  
+                  return Column(
                     children: [
-                      Icon(Icons.wifi_off, size: 16, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Офлайн режим',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // (Все равно чувствую кто-то проявит тупость и забудет переключиться на свой акк xD ) 14.12.25
-                if (_networkService.isConnected && !_isOffline) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      color: Colors.orange.withOpacity(0.1),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 16,
-                            color: Colors.orange.shade700,
-                          ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'В Offline режиме невозможно переключение между аккаунтами',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: const Color.fromARGB(255, 255, 129, 26),
+                      if (!isConnected)
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(12),
+                          color: Colors.black,
+                          child: Row(
+                            children: [
+                              Icon(Icons.wifi_off, size: 16, color: Colors.orange),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Офлайн режим',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                    Divider(height: 1, color: Colors.grey.shade300),
-                  ],
+                        ),
+                        // (Все равно чувствую кто-то проявит тупость и забудет переключиться на свой акк xD ) 14.12.25
+                      if (isConnected && !_isOffline) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          color: Colors.orange.withOpacity(0.1),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 16,
+                                color: Colors.orange.shade700,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'В Offline режиме невозможно переключение между аккаунтами',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: const Color.fromARGB(255, 255, 129, 26),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Divider(height: 1, color: Colors.grey.shade300),
+                      ],
+                    ],
+                  );
+                },
+              ),
               
               Column(
                 children: [
-                  ListTile(
-                    leading: Icon(Icons.switch_account),
-                    title: Text('Сменить аккаунт'),
-                    enabled: _networkService.isConnected,
-                    onTap: _networkService.isConnected ? () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => AccountSelectionScreen(
-                            currentTheme: widget.currentTheme,
-                            onThemeChanged: widget.onThemeChanged,
-                          ),
-                        ),
+                  // Кнопка "Сменить аккаунт" тоже через StreamBuilder
+                  StreamBuilder<bool>(
+                    stream: _networkService.connectionStream,
+                    initialData: _networkService.isConnected,
+                    builder: (context, snapshot) {
+                      final isConnected = snapshot.data ?? true;
+                      
+                      return ListTile(
+                        leading: Icon(Icons.switch_account),
+                        title: Text('Сменить аккаунт'),
+                        enabled: isConnected,
+                        onTap: isConnected ? () {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => AccountSelectionScreen(
+                                currentTheme: widget.currentTheme,
+                                onThemeChanged: widget.onThemeChanged,
+                              ),
+                            ),
+                          );
+                        } : null,
                       );
-                    } : null,
+                    },
                   ),
                   ListTile(
                     leading: Icon(Icons.settings),
@@ -561,31 +598,41 @@ Future<void> _syncAllData() async {
       drawerEdgeDragWidth: MediaQuery.of(context).size.width,
       body: SafeArea(
         child: Column(children: [
-        if (_isOffline)
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(8),
-              color: Colors.orange,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.wifi_off, size: 16, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Офлайн режим', style: TextStyle(color: Colors.white)),
-                  SizedBox(width: 16),
-                  GestureDetector(
-                    onTap: _refreshData,
-                    child: Row(
-                      children: [
-                        Icon(Icons.refresh, size: 16, color: Colors.white),
-                        SizedBox(width: 4),
-                        Text('Обновить', style: TextStyle(color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          // Баннер офлайн режима тоже через StreamBuilder
+          StreamBuilder<bool>(
+            stream: _networkService.connectionStream,
+            initialData: _networkService.isConnected,
+            builder: (context, snapshot) {
+              final isConnected = snapshot.data ?? true;
+              
+              return !isConnected
+                  ? Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(8),
+                      color: Colors.orange,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.wifi_off, size: 16, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text('Офлайн режим', style: TextStyle(color: Colors.white)),
+                          SizedBox(width: 16),
+                          GestureDetector(
+                            onTap: _refreshData,
+                            child: Row(
+                              children: [
+                                Icon(Icons.refresh, size: 16, color: Colors.white),
+                                SizedBox(width: 4),
+                                Text('Обновить', style: TextStyle(color: Colors.white)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : SizedBox.shrink();
+            },
+          ),
       Expanded(child: 
         FutureBuilder<Map<String, dynamic>>(
         future: _dataFuture,
@@ -853,12 +900,6 @@ Future<void> _syncAllData() async {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      /* Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        spacing: 30,
-                        children: [
-                        ]
-                      ), */
                           SizedBox(
                             width: 250,
                             child: ElevatedButton.icon(
@@ -919,19 +960,27 @@ Future<void> _syncAllData() async {
                             ),
                           ),
                           const SizedBox(height: 50),
-                          SizedBox(
-                            width: 250,
-                            child: ElevatedButton.icon(
-                              icon: Icon(Icons.sync),
-                              label: Text('Синхронизировать все'),
-                              onPressed: _isOffline ? null : () {
-                                _syncAllData();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.purple,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
+                          StreamBuilder<bool>(
+                            stream: _networkService.connectionStream,
+                            initialData: _networkService.isConnected,
+                            builder: (context, snapshot) {
+                              final isConnected = snapshot.data ?? true;
+                              
+                              return SizedBox(
+                                width: 250,
+                                child: ElevatedButton.icon(
+                                  icon: Icon(Icons.sync),
+                                  label: Text('Синхронизировать все'),
+                                  onPressed: !isConnected || _isOffline ? null : () {
+                                    _syncAllData();
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.purple,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                       const SizedBox(height: 50),
                       SizedBox(
