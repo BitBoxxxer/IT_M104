@@ -473,6 +473,34 @@ Future<void> _syncAllData() async {
                     ],
                   ),
                 ),
+                // (Все равно чувствую кто-то проявит тупость и забудет переключиться на свой акк xD ) 14.12.25
+                if (_networkService.isConnected && !_isOffline) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      color: Colors.orange.withOpacity(0.1),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Colors.orange.shade700,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'В Offline режиме невозможно переключение между аккаунтами',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: const Color.fromARGB(255, 255, 129, 26),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: Colors.grey.shade300),
+                  ],
               
               Column(
                 children: [
@@ -529,7 +557,10 @@ Future<void> _syncAllData() async {
           ),
         ),
       ),
-      body: Column(children: [
+      drawerEnableOpenDragGesture: true,
+      drawerEdgeDragWidth: MediaQuery.of(context).size.width,
+      body: SafeArea(
+        child: Column(children: [
         if (_isOffline)
             Container(
               width: double.infinity,
@@ -863,7 +894,9 @@ Future<void> _syncAllData() async {
                               },
                             ),
                           ),
-                          const SizedBox(height: 80),
+                          const SizedBox(height: 50),
+                          const Divider(indent: 16, endIndent: 16),
+                          const SizedBox(height: 50),
                           // TODO: Перенести в экран настроек - ДИ
                           ElevatedButton(
                             onPressed: () async {
@@ -916,37 +949,20 @@ Future<void> _syncAllData() async {
                           child: Icon(Icons.bug_report, color: Colors.white),
                         ),
                       ),
-                      const SizedBox(height: 80),
-
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: SizedBox(
-                          width: 200,
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.logout),
-                            label: const Text('Выйти из профиля'),
-                            onPressed: _logout,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                       SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
                     ],
                   ),
                 ),
               ],
             ),
           );
+        
         },
       ),
       )
     ],)
+      )
+    
     );
   }
 }
