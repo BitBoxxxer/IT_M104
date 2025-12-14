@@ -96,46 +96,54 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               height: 52,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: isCurrentUser ? Colors.blue.shade400 : Colors.grey.shade300,
-                  width: isCurrentUser ? 2 : 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
+                border: hasValidAvatar 
+                    ? null
+                    : Border.all(
+                        color: isCurrentUser ? Colors.blue.shade400 : Colors.grey.shade300,
+                        width: isCurrentUser ? 2 : 1.5,
+                      ),
+                boxShadow: hasValidAvatar
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ]
+                    : null,
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(26),
+                borderRadius: BorderRadius.circular(hasValidAvatar ? 26 : 25),
                 child: hasValidAvatar
                     ? Image.network(
                         user.photoPath,
                         fit: BoxFit.cover,
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.grey.shade200,
-                            child: Center(
+                          return Center(
                               child: CircularProgressIndicator(
                                 value: loadingProgress.expectedTotalBytes != null
                                     ? loadingProgress.cumulativeBytesLoaded /
                                         loadingProgress.expectedTotalBytes!
                                     : null,
                                 strokeWidth: 2,
-                              ),
+                              color: Colors.blue.shade400,
                             ),
                           );
                         },
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
-                            color: Colors.grey.shade200,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isCurrentUser ? Colors.blue.shade400 : Colors.grey.shade300,
+                                width: isCurrentUser ? 2 : 1.5,
+                              ),
+                            ),
                             child: Center(
                               child: Icon(
                                 Icons.person,
-                                color: Colors.grey.shade400,
+                                color: isCurrentUser ? Colors.blue.shade400 : Colors.grey.shade400,
                                 size: 28,
                               ),
                             ),
@@ -143,11 +151,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         },
                       )
                     : Container(
-                        color: Colors.grey.shade200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isCurrentUser ? Colors.blue.shade400 : Colors.grey.shade300,
+                            width: isCurrentUser ? 2 : 1.5,
+                          ),
+                        ),
                         child: Center(
                           child: Icon(
                             Icons.person,
-                            color: Colors.grey.shade400,
+                            color: isCurrentUser ? Colors.blue.shade400 : Colors.grey.shade400,
                             size: 28,
                           ),
                         ),
