@@ -38,59 +38,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     });
   }
 
-  Widget _buildRankIcon(int position) {
-    if (position == 1) {
-      return Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.amber,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(Icons.emoji_events, color: Colors.white, size: 24),
-      );
-    } else if (position == 2) {
-      return Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade400,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(Icons.emoji_events, color: Colors.white, size: 24),
-      );
-    } else if (position == 3) {
-      return Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.orange.shade700,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(Icons.emoji_events, color: Colors.white, size: 24),
-      );
-    } else {
-      return Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.blue.shade100,
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: Text(
-            position.toString(),
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.blue.shade800,
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
   String _normalizeName(String name) {
     return name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }
@@ -108,7 +55,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     
     final isCurrentUser = isCurrentUserById || isCurrentUserByName;
 
-    
+    final bool hasValidAvatar = user.photoPath.isNotEmpty && 
+                              user.photoPath.startsWith('http');
+
     return AnimatedContainer(
       duration: Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -141,8 +90,70 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 )
               : null,
           child: ListTile(
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: _buildRankIcon(displayPosition),
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            leading: Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isCurrentUser ? Colors.blue.shade400 : Colors.grey.shade300,
+                  width: isCurrentUser ? 2 : 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: hasValidAvatar
+                    ? Image.network(
+                        user.photoPath,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.grey.shade200,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey.shade200,
+                            child: Center(
+                              child: Icon(
+                                Icons.person,
+                                color: Colors.grey.shade400,
+                                size: 28,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: Colors.grey.shade200,
+                        child: Center(
+                          child: Icon(
+                            Icons.person,
+                            color: Colors.grey.shade400,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
             title: Row(
               children: [
                 Expanded(
@@ -156,38 +167,31 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ),
                 ),
                 if (isCurrentUser) ...[
-                  SizedBox(width: 8),
+                  SizedBox(width: 6),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [Colors.blue.shade400, Colors.lightBlue.shade400],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.blue.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: Offset(0, 2),
+                          blurRadius: 3,
+                          offset: Offset(0, 1),
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.person, size: 14, color: Colors.white),
-                        SizedBox(width: 4),
-                        Text(
-                          'Вы',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      'Вы',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -196,7 +200,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             subtitle: widget.isGroupLeaderboard
                 ? null
                 : Padding(
-                    padding: EdgeInsets.only(top: 4),
+                    padding: EdgeInsets.only(top: 2),
                     child: Text(
                       user.groupName,
                       style: TextStyle(
@@ -205,55 +209,61 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       ),
                     ),
                   ),
-            trailing: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                gradient: isCurrentUser 
-                    ? LinearGradient(
-                        colors: [Colors.blue.shade100, Colors.lightBlue.shade100],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : LinearGradient(
-                        colors: [Colors.blue.shade50, Colors.lightBlue.shade50],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isCurrentUser ? Colors.blue.shade50 : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isCurrentUser ? Colors.blue.shade200 : Colors.grey.shade300,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.monetization_on, 
+                        size: 14, 
+                        color: Colors.amber.shade700,
                       ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isCurrentUser 
-                      ? Colors.blue.shade300 
-                      : Colors.blue.shade200,
-                  width: 1.5,
+                      SizedBox(width: 4),
+                      Text(
+                        (user.points > 0 ? user.points : user.totalPoints ?? 0).toString(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                boxShadow: [
-                  if (isCurrentUser)
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.1),
-                      blurRadius: 6,
-                      offset: Offset(0, 2),
-                    ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.monetization_on, 
-                    size: 16, 
-                    color: isCurrentUser ? Colors.orange.shade600 : Colors.amber.shade600,
+                
+                SizedBox(width: 8),
+                
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: _getRankColor(displayPosition),
+                    shape: BoxShape.circle,
                   ),
-                  SizedBox(width: 6),
-                  Text(
-                    (user.points > 0 ? user.points : user.totalPoints ?? 0).toString(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isCurrentUser ? Colors.blue.shade900 : Colors.blue.shade800,
-                      fontSize: 14,
+                  child: Center(
+                    child: Text(
+                      displayPosition.toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -261,6 +271,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     );
   }
 
+  Color _getRankColor(int position) {
+    if (position == 1) {
+      return Colors.amber.shade600;
+    } else if (position == 2) {
+      return Colors.grey.shade500;
+    } else if (position == 3) {
+      return Colors.orange.shade700;
+    } else {
+      return Colors.blue.shade400;
+    }
+  }
   List<LeaderboardUser> _filterLeaders(List<LeaderboardUser> leaders) {
     return leaders.where((user) => user.fullName.trim().isNotEmpty).toList();
   }

@@ -1,4 +1,3 @@
-// models/leaderboard_user.dart
 class LeaderboardUser {
   final int studentId;
   final String fullName;
@@ -23,7 +22,7 @@ class LeaderboardUser {
       studentId: json['id'] ?? 0,
       fullName: json['full_name'] ?? '',
       groupName: json['group_name'] ?? '',
-      photoPath: json['photo'] ?? '',
+      photoPath: json['photo_path'] ?? '',
       position: json['position'] ?? 0,
       points: json['amount'] ?? 0,
       totalPoints: json['total_points'] ?? 0,
@@ -35,7 +34,7 @@ class LeaderboardUser {
       'id': studentId,
       'full_name': fullName,
       'group_name': groupName,
-      'photo': photoPath,
+      'photo_path': photoPath,
       'position': position,
       'amount': points,
       'total_points': totalPoints,

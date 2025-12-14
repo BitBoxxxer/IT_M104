@@ -793,24 +793,6 @@ Future<void> _syncAllData() async {
                       SizedBox(
                         width: 250,
                         child: ElevatedButton.icon(
-                          icon: const Icon(Icons.settings),
-                          label: const Text('Настройки'),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => SettingsScreen(
-                                  currentTheme: widget.currentTheme,
-                                  onThemeChanged: widget.onThemeChanged,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: 250,
-                        child: ElevatedButton.icon(
                           icon: const Icon(Icons.library_books),
                           label: const Text('Экзамены'),
                           onPressed: () {
