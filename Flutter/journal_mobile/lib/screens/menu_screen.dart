@@ -56,6 +56,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   
   final List<Widget> _screens = [];
 
+  // Для обработки свайпов
+  double _dragStartX = 0.0;
+  bool _isDragging = false;
+
   @override
   void initState() {
     super.initState();
@@ -436,6 +440,51 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       });
     }
 
+  void _handleHorizontalSwipe(DragUpdateDetails details) {
+    if (!_isDragging) {
+      _dragStartX = details.globalPosition.dx;
+      _isDragging = true;
+      return;
+    }
+    
+    final dragDistance = details.globalPosition.dx - _dragStartX;
+    
+    final sensitivity = 50.0;
+    
+    if (dragDistance.abs() > sensitivity) {
+      if (dragDistance > 0) {
+        _changeTab(-1);
+      } else {
+        _changeTab(1);
+      }
+      _isDragging = false;
+    }
+  }
+
+  void _handleVerticalSwipe(DragUpdateDetails details) {
+    if (!_isDragging) {
+      _dragStartX = details.globalPosition.dy;
+      _isDragging = true;
+      return;
+    }
+    
+    final dragDistance = details.globalPosition.dy - _dragStartX;
+    
+    if (dragDistance < -50 && _panelController.isPanelClosed) {
+      _panelController.open();
+      _isDragging = false;
+    }
+  }
+
+  void _changeTab(int direction) {
+    int newIndex = _selectedIndex + direction;
+    
+    if (newIndex >= 0 && newIndex <= 4) {
+      setState(() {
+        _selectedIndex = newIndex;
+      });
+    }
+  }
 
   Map<String, double> _calculateAverages(List<Mark> marks) {
     double totalHomeWorkMarks = 0;
@@ -511,90 +560,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       'missed_percent': (missedCount / totalLessons) * 100,
     };
   }
-  
-  Widget _buildMarkAverageCard(String title, double average, Color color) {
-    final averageString = average == 0.0 ? 'Н/Д' : average.toStringAsFixed(2);
-    
-    return Expanded(
-      child: Card(
-        color: color.withOpacity(0.8),
-        elevation: 4,
-        margin: const EdgeInsets.symmetric(horizontal: 4.0),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            children: [
-              Text(
-                averageString,
-                style: const TextStyle(
-                  fontSize: 20, 
-                  fontWeight: FontWeight.bold, 
-                  color: Colors.white
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12, 
-                  color: Colors.white70
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttendanceStatCard(String title, double count, double percentage, Color color) {
-    final countString = count.toInt().toString();
-    final percentString = percentage.toStringAsFixed(2);
-    
-    String mainText;
-    
-    if (title == 'Всего пар') {
-      mainText = countString;
-    } else {
-      mainText = '$countString (${percentString}%)';
-    }
-
-    return Expanded(
-      child: Card(
-        color: color.withOpacity(0.9),
-        elevation: 4,
-        margin: const EdgeInsets.symmetric(horizontal: 4.0),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                mainText,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold, 
-                  color: Colors.white
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.white70
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _logout() async {
     final secureStorage = SecureStorageService();
     await secureStorage.clearAll();
@@ -879,7 +844,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         },
       ),
       
-      /* Container(
+      Container(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: FutureBuilder<Map<String, dynamic>>(
           future: _dataFuture,
@@ -941,7 +906,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             return SizedBox.shrink();
           },
         ),
-      ), */
+      ),
       const Divider(indent: 16, endIndent: 16),
 
       FutureBuilder<Map<String, dynamic>>(
@@ -976,61 +941,15 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
                     const Padding(
-                      padding: EdgeInsets.only(left: 12.0, bottom: 8.0),
+                      padding: EdgeInsets.only(left: 12.0, bottom: 8.0, top: 8.0),
                       child: Text(
                         'Статистика',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                     ),
                     
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Card(
-                            elevation: 4,
-                            margin: const EdgeInsets.all(8),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Средние оценки',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    height: 150,
-                                    child: AverageMarksBarChart(averages: averages),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 4,
-                                    alignment: WrapAlignment.center,
-                                    children: [
-                                      _buildLegendItemWithValue(Colors.red, 'Д/Р', averages['home'] ?? 0.0),
-                                      _buildLegendItemWithValue(Colors.green, 'К/Р', averages['control'] ?? 0.0),
-                                      _buildLegendItemWithValue(Colors.purple, 'Л/Р', averages['lab'] ?? 0.0),
-                                      _buildLegendItemWithValue(Colors.blue, 'Общая', averages['overall'] ?? 0.0),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                        Expanded(
-                          child: Card(
+                          Card(
                             elevation: 4,
                             margin: const EdgeInsets.all(8),
                             child: Padding(
@@ -1073,96 +992,141 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                       ),
                                     ],
                                   ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    margin: EdgeInsets.symmetric(horizontal: 4.0),
+                                  ),
                                 ],
                               ),
                             ),
                           ),
+
+              const SizedBox(height: 8),
+              
+              Card(
+                elevation: 4,
+                margin: const EdgeInsets.all(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Средние оценки',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 100,
+                        child: AverageMarksBarChart(averages: averages),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _buildLegendItemWithValue(Colors.red, 'Д/Р', averages['home'] ?? 0.0),
+                          _buildLegendItemWithValue(Colors.green, 'К/Р', averages['control'] ?? 0.0),
+                          _buildLegendItemWithValue(Colors.purple, 'Л/Р', averages['lab'] ?? 0.0),
+                          _buildLegendItemWithValue(Colors.blue, 'Общая', averages['overall'] ?? 0.0),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
-              /* Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 30),
-                    const Text(
-                      'DEBUG:',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    
-                    StreamBuilder<bool>(
-                      stream: _networkService.connectionStream,
-                      initialData: _networkService.isConnected,
-                      builder: (context, snapshot) {
-                        final isConnected = snapshot.data ?? true;
+              Card(
+                elevation: 4,
+                margin: const EdgeInsets.all(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 30),
+                        const Text(
+                          'DEBUG:',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
                         
-                        return SizedBox(
-                          width: 250,
-                          child: ElevatedButton.icon(
-                            icon: Icon(Icons.sync),
-                            label: Text('Синхронизировать все'),
-                            onPressed: !isConnected ? null : () {
-                              _syncAllData();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple,
-                              foregroundColor: Colors.white,
-                            ),
+                        StreamBuilder<bool>(
+                          stream: _networkService.connectionStream,
+                          initialData: _networkService.isConnected,
+                          builder: (context, snapshot) {
+                            final isConnected = snapshot.data ?? true;
+                            
+                            return SizedBox(
+                              width: 250,
+                              child: ElevatedButton.icon(
+                                icon: Icon(Icons.sync),
+                                label: Text('Синхронизировать все'),
+                                onPressed: !isConnected ? null : () {
+                                  _syncAllData();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.purple,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        
+                        const SizedBox(height: 30),
+                        // TODO: Перенести в экран настроек - ДИ
+                        ElevatedButton(
+                          onPressed: () async {
+                            final offlineStorage = OfflineStorageService();
+                            await offlineStorage.fixHomeworkStorageData();
+                            
+                            await _refreshData();
+                            
+                            if (mounted) {
+                              setState(() {});
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Хранилище очищено, загружаем заново...'))
+                              );
+                            }
+                          },
+                          child: Text('Исправить кэш заданий (DEBUG)'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
                           ),
-                        );
-                      },
-                    ),
-                    
-                    const SizedBox(height: 30),
-                    // TODO: Перенести в экран настроек - ДИ
-                    ElevatedButton(
-                      onPressed: () async {
-                        final offlineStorage = OfflineStorageService();
-                        await offlineStorage.fixHomeworkStorageData();
+                        ),
                         
-                        await _refreshData();
-                        
-                        if (mounted) {
-                          setState(() {});
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Хранилище очищено, загружаем заново...'))
-                          );
-                        }
-                      },
-                      child: Text('Исправить кэш заданий (DEBUG)'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
+                        const SizedBox(height: 30),
+                        SizedBox(
+                          width: 250,
+                          child: FloatingActionButton(
+                            backgroundColor: Colors.red,
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => AreaDevelopScreen(),
+                                ),
+                              );
+                            },
+                            child: Icon(Icons.bug_report, color: Colors.white),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                      ],
                     ),
-                    
-                    const SizedBox(height: 30),
-                    SizedBox(
-                      width: 250,
-                      child: FloatingActionButton(
-                        backgroundColor: Colors.red,
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => AreaDevelopScreen(),
-                            ),
-                          );
-                        },
-                        child: Icon(Icons.bug_report, color: Colors.white),
-                      ),
-                    ),
-                    SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
-                  ],
+                  ),
                 ),
-              ), */
+              ),
             ],
           );
         },
       ),
+      
+      SizedBox(height: 90), // кастомный bottom drawer сошел с ума - 17.12.25
       ],
     );
   }
@@ -1184,7 +1148,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         topRight: Radius.circular(24.0),
       ),
       panelBuilder: (sc) => _buildPanelContent(sc),
-      body: Scaffold(
+      body: GestureDetector(
+        onHorizontalDragUpdate: _handleHorizontalSwipe,
+        onVerticalDragUpdate: _handleVerticalSwipe,
+        child: Scaffold(
         extendBodyBehindAppBar: true,
         extendBody: true,
         appBar: AppBar(
@@ -1236,6 +1203,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               _selectedIndex = index;
             });
           },
+          ),
         ),
       ),
     );
