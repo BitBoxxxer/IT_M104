@@ -48,10 +48,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   late Stream<List<NotificationItem>> _notificationsStream;
   bool _isOffline = false;
   
-  // Индекс выбранной вкладки
   int _selectedIndex = 0;
   
-  // Список экранов для навигации
   final List<Widget> _screens = [];
 
   @override
@@ -63,16 +61,19 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     _dataFuture = _loadData(cleanToken);
     _notificationsStream = _notificationService.notificationsStream;
     _initializeNetworkService();
+
+    _selectedIndex = 2;
     
   }
 
   void _initializeScreens() {
     _screens.clear();
     _screens.addAll([
-      _buildMainMenuScreen(),
-      _buildLeaderboardScreen(),
+      _buildMarksAndScheduleScreen(),
       _buildHomeworkScreen(),
+      _buildMainMenuScreen(),
       _buildExamScreen(),
+      _buildLeaderboardScreen(),
     ]);
   }
 
@@ -213,6 +214,61 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMarksAndScheduleScreen() {
+    return Column(
+      children: [
+        AppBar(
+          title: Text('Оценки и Расписание'),
+          centerTitle: true,
+        ),
+        Expanded(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 300,
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.school),
+                    label: Text('Оценки и Пары'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MarksAndProfileScreen(token: widget.token),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+                SizedBox(
+                  width: 300,
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.calendar_today),
+                    label: Text('Расписание'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ScheduleScreen(token: widget.token),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -628,7 +684,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Widget _buildMainContent() {
-    final screenWidth = MediaQuery.of(context).size.width;
     final coverHeight = MediaQuery.of(context).size.height * 0.25;
     final profileHeight = 100.0;
     
@@ -961,41 +1016,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   children: [
                     const SizedBox(height: 30),
                     const Text(
-                      'Выберите раздел:',
+                      'DEBUG:',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 30),
-                    SizedBox(
-                      width: 250,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.school),
-                        label: const Text('Оценки и Пары'),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => MarksAndProfileScreen(token: widget.token),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: 250,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.calendar_today),
-                        label: const Text('Расписание'),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ScheduleScreen(token: widget.token),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
                     
                     StreamBuilder<bool>(
                       stream: _networkService.connectionStream,
@@ -1070,12 +1093,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_screens.isEmpty) {
@@ -1083,13 +1100,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
     return Scaffold(
       extendBodyBehindAppBar: true,
+      extendBody: true,
       appBar: AppBar(
         title: const Text('Главное меню'),
-        backgroundColor: _selectedIndex == 0 ? Colors.transparent : Theme.of(context).appBarTheme.backgroundColor,
-        elevation: _selectedIndex == 0 ? 0 : 4,
+        backgroundColor: _selectedIndex == 2 ? Colors.transparent : Theme.of(context).appBarTheme.backgroundColor,
+        elevation: _selectedIndex == 2 ? 0 : 4,
         automaticallyImplyLeading: false,
         actions: <Widget>[
-          if (_isOffline && _selectedIndex == 0)
+          if (_isOffline && _selectedIndex == 2)
             Padding(
               padding: const EdgeInsets.only(right: 8.0),
               child: Icon(
@@ -1098,9 +1116,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 size: 20,
               ),
             ),
-          if (_selectedIndex == 0)
+          if (_selectedIndex == 2)
             _buildNotificationIcon(),
-          if (_selectedIndex == 0)
+          if (_selectedIndex == 2)
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _refreshData,
@@ -1112,7 +1130,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // ВЕРХНЯЯ ЧАСТЬ - НАСТРОЙКИ И НАВИГАЦИЯ
               Expanded(
                 child: ListView(
                   children: [
@@ -1325,33 +1342,127 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       ),
       drawerEnableOpenDragGesture: true,
       drawerEdgeDragWidth: MediaQuery.of(context).size.width,
-      body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Меню',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.leaderboard),
-            label: 'Рейтинги',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assignment),
-            label: 'Задания',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school),
-            label: 'Экзамены',
-          ),
+      body: Container(
+        child: _screens[_selectedIndex],
+      ),
+      bottomNavigationBar: _buildCustomBottomNavBar(),
+    );
+  }
+  Widget _buildCustomBottomNavBar() {
+    return Container(
+      height: 80,
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildPulsatingNavItem(0, Icons.school, 'Оценки'),
+          _buildPulsatingNavItem(1, Icons.assignment, 'Задания'),
+          _buildCenterNavItem(), // Меню
+          _buildPulsatingNavItem(3, Icons.library_books, 'Экзамены'),
+          _buildPulsatingNavItem(4, Icons.leaderboard, 'Лидеры'),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed,
-        onTap: _onItemTapped,
+      ),
+    );
+  }
+
+  Widget _buildPulsatingNavItem(int index, IconData icon, String label) {
+    final isSelected = _selectedIndex == index;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedIndex = index;
+        });
+      },
+      child: Container(
+        width: 60,
+        height: 60,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOutBack,
+              width: isSelected ? 45 : 35,
+              height: isSelected ? 45 : 35,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: isSelected 
+                    ? Border.all(color: Colors.white, width: 2)
+                    : Border.all(color: Colors.white.withOpacity(0), width: 0), // Заглушка, иначе не работает идея UI - Ди 16.12.25
+                color: isSelected 
+                    ? Colors.white.withOpacity(0.1) 
+                    : Colors.transparent,
+                boxShadow: [
+                  BoxShadow(
+                    color: isSelected 
+                        ? Colors.white.withOpacity(0.5)
+                        : Colors.white.withOpacity(0.2),
+                    spreadRadius: isSelected ? 5 : 0,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: isSelected ? 24 : 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCenterNavItem() {
+    final isSelected = _selectedIndex == 2;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedIndex = 2;
+        });
+      },
+      child: Container(
+        width: 70,
+        height: 70,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOutBack,
+              width: isSelected ? 50 : 40,
+              height: isSelected ? 50 : 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.white.withOpacity(isSelected ? 0.5 : 0.2),
+                    blurRadius: isSelected ? 15 : 8,
+                    spreadRadius: isSelected ? 5 : 2,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.home,
+                  color: Theme.of(context).primaryColor,
+                  size: isSelected ? 26 : 22,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
