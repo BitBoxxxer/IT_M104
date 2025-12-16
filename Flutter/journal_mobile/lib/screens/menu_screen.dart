@@ -9,6 +9,7 @@ import '../services/_network/network_service.dart';
 import '../models/user_data.dart';
 import '../models/mark.dart';
 import '../models/_widgets/notifications/notification_item.dart';
+import '../models/_widgets/navigation/custom_bottom_nav_bar.dart';
 
 import '_account/account_selection_screen.dart';
 import 'marks_and_profile_screen.dart';
@@ -1345,124 +1346,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       body: Container(
         child: _screens[_selectedIndex],
       ),
-      bottomNavigationBar: _buildCustomBottomNavBar(),
-    );
-  }
-  Widget _buildCustomBottomNavBar() {
-    return Container(
-      height: 80,
-      decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildPulsatingNavItem(0, Icons.school, 'Оценки'),
-          _buildPulsatingNavItem(1, Icons.assignment, 'Задания'),
-          _buildCenterNavItem(), // Меню
-          _buildPulsatingNavItem(3, Icons.library_books, 'Экзамены'),
-          _buildPulsatingNavItem(4, Icons.leaderboard, 'Лидеры'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPulsatingNavItem(int index, IconData icon, String label) {
-    final isSelected = _selectedIndex == index;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedIndex = index;
-        });
-      },
-      child: Container(
-        width: 60,
-        height: 60,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOutBack,
-              width: isSelected ? 45 : 35,
-              height: isSelected ? 45 : 35,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: isSelected 
-                    ? Border.all(color: Colors.white, width: 2)
-                    : Border.all(color: Colors.white.withOpacity(0), width: 0), // Заглушка, иначе не работает идея UI - Ди 16.12.25
-                color: isSelected 
-                    ? Colors.white.withOpacity(0.1) 
-                    : Colors.transparent,
-                boxShadow: [
-                  BoxShadow(
-                    color: isSelected 
-                        ? Colors.white.withOpacity(0.5)
-                        : Colors.white.withOpacity(0.2),
-                    spreadRadius: isSelected ? 5 : 0,
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Icon(
-                  icon,
-                  color: Colors.white,
-                  size: isSelected ? 24 : 20,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCenterNavItem() {
-    final isSelected = _selectedIndex == 2;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedIndex = 2;
-        });
-      },
-      child: Container(
-        width: 70,
-        height: 70,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOutBack,
-              width: isSelected ? 50 : 40,
-              height: isSelected ? 50 : 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withOpacity(isSelected ? 0.5 : 0.2),
-                    blurRadius: isSelected ? 15 : 8,
-                    spreadRadius: isSelected ? 5 : 2,
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.home,
-                  color: Theme.of(context).primaryColor,
-                  size: isSelected ? 26 : 22,
-                ),
-              ),
-            ),
-          ],
-        ),
+      bottomNavigationBar: CustomBottomNavBar(
+        selectedIndex: _selectedIndex,
+        onIndexChanged: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
       ),
     );
   }
