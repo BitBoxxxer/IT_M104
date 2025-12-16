@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../services/_offline_service/offline_storage_service.dart';
 import '../services/secure_storage_service.dart';
@@ -10,6 +11,8 @@ import '../models/user_data.dart';
 import '../models/mark.dart';
 import '../models/_widgets/notifications/notification_item.dart';
 import '../models/_widgets/navigation/custom_bottom_nav_bar.dart';
+import '../models/_widgets/charts/pie_chart_widget.dart';
+import '../models/_widgets/charts/bar_chart_widget.dart';
 
 import '_account/account_selection_screen.dart';
 import 'marks_and_profile_screen.dart';
@@ -47,7 +50,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   late Future<Map<String, dynamic>> _dataFuture;
   late Stream<List<NotificationItem>> _notificationsStream;
-  bool _isOffline = false;
+  late PanelController _panelController;
   
   int _selectedIndex = 0;
   
@@ -56,6 +59,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
   void initState() {
     super.initState();
+
+     _panelController = PanelController();
     
     final cleanToken = widget.token.replaceAll('?offline=true', '');
     
@@ -76,6 +81,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       _buildExamScreen(),
       _buildLeaderboardScreen(),
     ]);
+  }
+
+  void _togglePanel() {
+    if (_panelController.isPanelClosed) {
+      _panelController.open();
+    } else {
+      _panelController.close();
+    }
+  }
+
+  void _closePanel() {
+    _panelController.close();
   }
 
   Widget _buildMainMenuScreen() {
@@ -334,12 +351,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         _apiService.getMarks(token),
       ]);
       
-      if (mounted) {
-        setState(() {
-          _isOffline = false;
-        });
-      }
-      
       return {
         'user': results[0] as UserData,
         'marks': results[1] as List<Mark>,
@@ -351,12 +362,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           e.toString().contains('SocketException') ||
           e.toString().contains('Network') ||
           e.toString().contains('офлайн')) {
-        
-        if (mounted) {
-          setState(() {
-            _isOffline = true;
-          });
-        }
         
         return {
           'user': UserData(
@@ -874,7 +879,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         },
       ),
       
-      Container(
+      /* Container(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: FutureBuilder<Map<String, dynamic>>(
           future: _dataFuture,
@@ -936,7 +941,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             return SizedBox.shrink();
           },
         ),
-      ),
+      ), */
       const Divider(indent: 16, endIndent: 16),
 
       FutureBuilder<Map<String, dynamic>>(
@@ -971,47 +976,115 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.only(top: 10.0, bottom: 4.0, left: 12.0, right: 12.0),
-                child: Text(
-                  'Средние оценки',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Row(
+                padding: const EdgeInsets.only(top: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildMarkAverageCard('Ср. Д/Р', averages['home'] ?? 0.0, Colors.red),
-                    _buildMarkAverageCard('Ср. К/Р', averages['control'] ?? 0.0, Colors.green),
-                    _buildMarkAverageCard('Ср. Л/Р', averages['lab'] ?? 0.0, Colors.purple),
-                    _buildMarkAverageCard('Ср. Общая', averages['overall'] ?? 0.0, Colors.blue),
-                  ],
-                ),
-              ),
-              
-              const Padding(
-                padding: EdgeInsets.only(top: 10.0, bottom: 4.0, left: 12.0, right: 12.0),
-                child: Text(
-                  'Статистика посещаемости',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Row(
-                  children: [
-                    _buildAttendanceStatCard('Всего пар', attendance['total'] ?? 0.0, 0.0, Colors.grey.shade700),
-                    _buildAttendanceStatCard('Посещено Пар', attendance['attended'] ?? 0.0, attendance['attended_percent'] ?? 0.0, Colors.green.shade700),
-                    _buildAttendanceStatCard('Опозданий', attendance['late'] ?? 0.0, attendance['late_percent'] ?? 0.0, Colors.orange.shade700),
-                    _buildAttendanceStatCard('Пропусков', attendance['missed'] ?? 0.0, attendance['missed_percent'] ?? 0.0, Colors.red.shade700),
+                    const Padding(
+                      padding: EdgeInsets.only(left: 12.0, bottom: 8.0),
+                      child: Text(
+                        'Статистика',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Card(
+                            elevation: 4,
+                            margin: const EdgeInsets.all(8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Средние оценки',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    height: 150,
+                                    child: AverageMarksBarChart(averages: averages),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    alignment: WrapAlignment.center,
+                                    children: [
+                                      _buildLegendItemWithValue(Colors.red, 'Д/Р', averages['home'] ?? 0.0),
+                                      _buildLegendItemWithValue(Colors.green, 'К/Р', averages['control'] ?? 0.0),
+                                      _buildLegendItemWithValue(Colors.purple, 'Л/Р', averages['lab'] ?? 0.0),
+                                      _buildLegendItemWithValue(Colors.blue, 'Общая', averages['overall'] ?? 0.0),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        Expanded(
+                          child: Card(
+                            elevation: 4,
+                            margin: const EdgeInsets.all(8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Посещаемость (%)',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    height: 150,
+                                    child: AttendancePieChart(attendance: attendance),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      _buildAttendanceLegendItem(
+                                        Colors.green, 
+                                        'Посещено', 
+                                        attendance['attended']?.toInt() ?? 0, 
+                                        attendance['attended_percent'] ?? 0.0
+                                      ),
+                                      _buildAttendanceLegendItem(
+                                        Colors.orange, 
+                                        'Опоздания', 
+                                        attendance['late']?.toInt() ?? 0, 
+                                        attendance['late_percent'] ?? 0.0
+                                      ),
+                                      _buildAttendanceLegendItem(
+                                        Colors.red, 
+                                        'Пропуски', 
+                                        attendance['missed']?.toInt() ?? 0, 
+                                        attendance['missed_percent'] ?? 0.0
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
 
-              Center(
+              /* Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1032,7 +1105,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           child: ElevatedButton.icon(
                             icon: Icon(Icons.sync),
                             label: Text('Синхронизировать все'),
-                            onPressed: !isConnected || _isOffline ? null : () {
+                            onPressed: !isConnected ? null : () {
                               _syncAllData();
                             },
                             style: ElevatedButton.styleFrom(
@@ -1085,7 +1158,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                     SizedBox(height: MediaQuery.of(context).padding.bottom + 20),
                   ],
                 ),
-              ),
+              ), */
             ],
           );
         },
@@ -1099,88 +1172,176 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     if (_screens.isEmpty) {
       _initializeScreens();
     }
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      extendBody: true,
-      appBar: AppBar(
-        title: const Text('Главное меню'),
-        backgroundColor: _selectedIndex == 2 ? Colors.transparent : Theme.of(context).appBarTheme.backgroundColor,
-        elevation: _selectedIndex == 2 ? 0 : 4,
-        automaticallyImplyLeading: false,
-        actions: <Widget>[
-          if (_isOffline && _selectedIndex == 2)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: Icon(
-                Icons.wifi_off,
-                color: Colors.orange,
-                size: 20,
-              ),
-            ),
-          if (_selectedIndex == 2)
-            _buildNotificationIcon(),
-          if (_selectedIndex == 2)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _refreshData,
-              tooltip: 'Обновить данные',
-            ),
-        ],
+
+    return SlidingUpPanel(
+      controller: _panelController,
+      minHeight: 0,
+      maxHeight: MediaQuery.of(context).size.height * 0.6, // 60%
+      parallaxEnabled: true,
+      parallaxOffset: 0.5,
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(24.0),
+        topRight: Radius.circular(24.0),
       ),
-      drawer: Drawer(
-        child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  children: [
-                    FutureBuilder<Map<String, dynamic>>(
-                      future: _dataFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          final UserData userData = snapshot.data!['user'];
-                          return UserAccountsDrawerHeader(
-                            accountName: Text(userData.fullName),
-                            accountEmail: Text('Группа: ${userData.groupName}'),
-                            currentAccountPicture: CircleAvatar(
-                              backgroundImage: userData.photoPath.isNotEmpty
-                                  ? NetworkImage(userData.photoPath)
-                                  : null,
-                              child: userData.photoPath.isEmpty
-                                  ? Icon(Icons.account_circle, size: 48)
-                                  : null,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor,
-                              image: DecorationImage(
-                                image: AssetImage('assets/images/menu_user_background.jpg'),
-                                fit: BoxFit.cover,
-                                colorFilter: ColorFilter.mode(
-                                  Colors.black.withOpacity(0.6),
-                                  BlendMode.darken,
+      panelBuilder: (sc) => _buildPanelContent(sc),
+      body: Scaffold(
+        extendBodyBehindAppBar: true,
+        extendBody: true,
+        appBar: AppBar(
+          backgroundColor: _selectedIndex == 2 ? Colors.transparent : Theme.of(context).appBarTheme.backgroundColor,
+          elevation: _selectedIndex == 2 ? 0 : 4,
+          automaticallyImplyLeading: false,
+          actions: <Widget>[
+              StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected && _selectedIndex == 2) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
+            if (_selectedIndex == 2)
+              _buildNotificationIcon(),
+            if (_selectedIndex == 2)
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _refreshData,
+                tooltip: 'Обновить данные',
+              ),
+            IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: _togglePanel,
+              tooltip: 'Меню',
+            ),
+          ],
+        ),
+        body: Container(
+          child: _screens[_selectedIndex],
+        ),
+        bottomNavigationBar: CustomBottomNavBar(
+          selectedIndex: _selectedIndex,
+          onIndexChanged: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPanelContent(ScrollController sc) {
+    return Material(
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24.0),
+            topRight: Radius.circular(24.0),
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor,
+              ),
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: _dataFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    final UserData userData = snapshot.data!['user'];
+                    return Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundImage: userData.photoPath.isNotEmpty
+                              ? NetworkImage(userData.photoPath)
+                              : null,
+                          child: userData.photoPath.isEmpty
+                              ? Icon(Icons.account_circle, size: 60, color: Colors.white)
+                              : null,
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                userData.fullName,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Группа: ${userData.groupName}',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 14,
                                 ),
                               ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 30,
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 16,
+                              color: Colors.white.withOpacity(0.3),
                             ),
-                          );
-                        }
-                        return UserAccountsDrawerHeader(
-                          accountName: Text('Загрузка...'),
-                          accountEmail: Text(''),
-                          currentAccountPicture: CircleAvatar(
-                            child: CircularProgressIndicator(),
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                          ),
+                            SizedBox(height: 8),
+                            Container(
+                              width: 80,
+                              height: 12,
+                              color: Colors.white.withOpacity(0.3),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                         );
                       },
                     ),
-                    
+            ),
+            Expanded(
+              child: ListView(
+                controller: sc,
+                padding: EdgeInsets.zero,
+                children: [
                     ListTile(
                       leading: Icon(Icons.feedback),
                       title: Text('Отзывы студента'),
                       onTap: () {
-                        Navigator.of(context).pop();
+                        _closePanel();
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => FeedbackReviewScreen(token: widget.token),
@@ -1193,7 +1354,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                       leading: Icon(Icons.emoji_events),
                       title: Text('Список наград'),
                       onTap: () {
-                        Navigator.of(context).pop();
+                        _closePanel();
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => HistoryOfAwardsScreen(),
@@ -1212,8 +1373,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         
                         if (!isConnected) {
                           return Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.all(12),
+                            padding: EdgeInsets.all(16),
                             color: Colors.orange.withOpacity(0.1),
                             child: Row(
                               children: [
@@ -1229,10 +1389,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                             ),
                           );
                         }
-                        
+                        else{
                         return Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: EdgeInsets.all(16),
                           color: Colors.blue.withOpacity(0.1),
                           child: Row(
                             children: [
@@ -1244,7 +1403,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Онлайн режим',
+                                  'Online режим',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.blue.shade700,
@@ -1254,13 +1413,19 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                             ],
                           ),
                         );
-                      },
-                    ),
-
-                     if (!_isOffline) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      }
+                    },
+                  ),
+                  
+                  StreamBuilder<bool>(
+            stream: _networkService.connectionStream,
+            initialData: _networkService.isConnected,
+            builder: (context, snapshot) {
+              final isConnected = snapshot.data ?? true;
+              
+                      if (isConnected) {
+                        return Container(
+                          padding: EdgeInsets.all(16),
                           color: Colors.orange.withOpacity(0.1),
                           child: Row(
                             children: [
@@ -1272,23 +1437,45 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'В Offline режиме невозможно переключение между аккаунтами',
+                                  'Предупреждение: В Offline режиме невозможно переключение между аккаунтами',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: const Color.fromARGB(255, 255, 129, 26),
+                                    color: Colors.orange.shade700,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                     ],
+                        );
+                      }
+                      return SizedBox.shrink();
+                    },
+                  ),
+                  
+                  StreamBuilder<bool>(
+                  stream: _networkService.connectionStream,
+                  initialData: _networkService.isConnected,
+                  builder: (context, snapshot) {
+                    final isConnected = snapshot.data ?? true;
                     
-                    ListTile(
-                      leading: Icon(Icons.switch_account),
-                      title: Text('Сменить аккаунт'),
-                      onTap: () {
-                        Navigator.of(context).pop();
+                    return ListTile(
+                      leading: Icon(
+                        Icons.switch_account,
+                        color: isConnected 
+                          ? Theme.of(context).iconTheme.color
+                          : Colors.grey,
+                      ),
+                      title: Text(
+                        'Сменить аккаунт',
+                        style: TextStyle(
+                          color: isConnected 
+                            ? Theme.of(context).textTheme.titleMedium?.color
+                            : Colors.grey,
+                        ),
+                      ),
+                      enabled: isConnected,
+                      onTap: isConnected ? () {
+                        _closePanel();
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => AccountSelectionScreen(
@@ -1297,13 +1484,16 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                             ),
                           ),
                         );
+                      } : null,
+                        );
                       },
                     ),
+                  
                     ListTile(
                       leading: Icon(Icons.settings),
                       title: Text('Настройки'),
                       onTap: () {
-                        Navigator.of(context).pop();
+                        _closePanel();
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => SettingsScreen(
@@ -1313,47 +1503,115 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           ),
                         );
                       },
-                    ),
-                  ],
-                ),
-              ),
-              
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    minimumSize: Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  ),
+                  
+                  SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        minimumSize: Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: Icon(Icons.logout),
+                      label: Text('Выйти'),
+                      onPressed: () {
+                        _closePanel();
+                        _logout();
+                      },
                     ),
                   ),
-                  icon: Icon(Icons.logout),
-                  label: Text('Выйти'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _logout();
-                  },
+                  
+                  SizedBox(height: MediaQuery.of(context).padding.bottom),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegendItemWithValue(Color color, String text, double value) {
+    final valueText = value > 0 ? value.toStringAsFixed(1) : 'Н/Д';
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
                 ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                text,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
               ),
             ],
           ),
+          Text(
+            valueText,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceLegendItem(Color color, String text, int count, double percent) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              text,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
         ),
-      ),
-      drawerEnableOpenDragGesture: true,
-      drawerEdgeDragWidth: MediaQuery.of(context).size.width,
-      body: Container(
-        child: _screens[_selectedIndex],
-      ),
-      bottomNavigationBar: CustomBottomNavBar(
-        selectedIndex: _selectedIndex,
-        onIndexChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-      ),
+        const SizedBox(height: 2),
+        Text(
+          '$count',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          '(${percent.toStringAsFixed(1)}%)',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
     );
   }
 }
