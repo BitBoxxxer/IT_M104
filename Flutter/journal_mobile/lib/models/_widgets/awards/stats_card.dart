@@ -19,14 +19,13 @@ class StatsCard extends StatelessWidget {
     final totalGems = awards
         .where((a) => a.pointTypesId == 2)
         .fold(0, (sum, a) => sum + a.currentPoint);
-    final totalAchievements = awards.where((a) => a.achievementsId != null).length;
     final totalPoints = totalCoins + totalGems;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Column(
           children: [
             const Text(
@@ -56,7 +55,7 @@ class StatsCard extends StatelessWidget {
                   title: 'ТопГемы',
                   value: totalGems.toString(),
                   icon: Icons.diamond,
-                  color: Colors.purple,
+                  color: Color.fromARGB(255, 180, 100, 220),
                 ),
                 StatItem(
                   title: 'Всего баллов',
@@ -65,29 +64,6 @@ class StatsCard extends StatelessWidget {
                   color: Colors.green,
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            if (totalAchievements > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.emoji_events, size: 16, color: Colors.orange),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Достижений: $totalAchievements',
-                      style: TextStyle(
-                        color: Colors.orange.shade800,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
               ),
           ],
         ),

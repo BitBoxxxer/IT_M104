@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 class FilterChips extends StatelessWidget {
   final String selectedFilter;
   final Function(String) onFilterChanged;
+  final bool isGridView;
+  final VoidCallback? onViewToggle;
 
   const FilterChips({
     super.key,
     required this.selectedFilter,
     required this.onFilterChanged,
+    this.isGridView = true,
+    this.onViewToggle,
   });
 
   @override
@@ -17,7 +21,31 @@ class FilterChips extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Wrap(
+      child: Column(
+        children: [
+          if (onViewToggle != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(
+                    isGridView ? Icons.grid_view : Icons.view_list,
+                    color: Colors.blue,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isGridView ? 'Сетка' : 'Список',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      Wrap(
         spacing: 8,
         children: filterOptions.asMap().entries.map((entry) {
           final index = entry.key;
@@ -39,6 +67,8 @@ class FilterChips extends StatelessWidget {
             ),
           );
         }).toList(),
+      ),
+      ],
       ),
     );
   }

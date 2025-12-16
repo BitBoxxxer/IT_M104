@@ -9,6 +9,7 @@ import '../models/_widgets/awards/error_awards.dart';
 import '../models/_widgets/awards/filter_chips.dart';
 import '../models/_widgets/awards/loading_awards.dart';
 import '../models/_widgets/awards/stats_card.dart';
+import '../models/_widgets/awards/compact_award_card.dart';
 import '../models/activity_record.dart';
 
 class HistoryOfAwardsScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _HistoryOfAwardsScreenState extends State<HistoryOfAwardsScreen> {
   String _errorMessage = '';
   
   String _selectedFilter = 'all';
+  bool _isGridView = true;
 
   @override
   void initState() {
@@ -78,12 +80,22 @@ class _HistoryOfAwardsScreenState extends State<HistoryOfAwardsScreen> {
     });
   }
 
+  void _toggleView() {
+    setState(() {
+      _isGridView = !_isGridView;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('История наград студента'),
         actions: [
+          IconButton(
+            icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
+            onPressed: _toggleView,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadAwards,
@@ -136,29 +148,43 @@ class _HistoryOfAwardsScreenState extends State<HistoryOfAwardsScreen> {
                           onFilterChanged: _handleFilterChanged,
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'Найдено записей: ${filteredAwards.length}',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
                         Expanded(
                           child: RefreshIndicator(
                             onRefresh: _loadAwards,
-                            child: ListView.builder(
-                              itemCount: filteredAwards.length,
-                              itemBuilder: (context, index) {
-                                return AwardCard(award: filteredAwards[index]);
-                              },
-                            ),
+                            child: _isGridView
+                                ? _buildGridView(filteredAwards)
+                                : _buildListView(filteredAwards),
                           ),
                         ),
                       ],
                     );
                   },
                 ),
+    );
+  }
+
+  Widget _buildGridView(List<ActivityRecord> awards) {
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1.8,
+      ),
+      padding: const EdgeInsets.all(18),
+      itemCount: awards.length,
+      itemBuilder: (context, index) {
+        return CompactAwardCard(award: awards[index]);
+      },
+    );
+  }
+
+  Widget _buildListView(List<ActivityRecord> awards) {
+    return ListView.builder(
+      itemCount: awards.length,
+      itemBuilder: (context, index) {
+        return AwardCard(award: awards[index]);
+      },
     );
   }
 }

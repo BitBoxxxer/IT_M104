@@ -25,10 +25,10 @@ class AwardCard extends StatelessWidget {
         : 'Учебная деятельность';
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 3,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -36,21 +36,54 @@ class AwardCard extends StatelessWidget {
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
             colors: [
-              AwardUtils.getPointTypeColor(award.pointTypesId).withOpacity(0.1),
+              _getPointColor(award.pointTypesId).withOpacity(0.08),
               Colors.transparent,
             ],
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildIcon(isAchievement),
-              const SizedBox(width: 12),
-              _buildContent(displayName, description, source, isAchievement),
-              _buildDate(),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      displayName,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 2),
+                    
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 4),
+                    
+                    _buildCompactInfo(source, isAchievement),
+                  ],
+                ),
+              ),
+              _buildCompactDate(),
             ],
           ),
         ),
@@ -60,143 +93,89 @@ class AwardCard extends StatelessWidget {
 
   Widget _buildIcon(bool isAchievement) {
     return Container(
-      width: 50,
-      height: 50,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
-        color: AwardUtils.getPointTypeColor(award.pointTypesId).withOpacity(0.2),
-        borderRadius: BorderRadius.circular(25),
+        color: _getPointColor(award.pointTypesId).withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AwardUtils.getPointTypeColor(award.pointTypesId),
-          width: 2,
+          color: _getPointColor(award.pointTypesId).withOpacity(0.5),
+          width: 1.5,
         ),
       ),
       child: Icon(
         isAchievement 
             ? AwardUtils.getAchievementIcon(award.achievementsType, award.achievementsName)
             : AwardUtils.getPointTypeIcon(award.pointTypesId),
-        color: AwardUtils.getPointTypeColor(award.pointTypesId),
-        size: 24,
+        color: _getPointColor(award.pointTypesId),
+        size: 20,
       ),
     );
   }
 
-  Widget _buildContent(String displayName, String description, String source, bool isAchievement) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            displayName,
+  Widget _buildCompactInfo(String source, bool isAchievement) {
+    return Row(
+      children: [
+        Icon(Icons.class_, size: 12, color: Colors.grey.shade500),
+        const SizedBox(width: 3),
+        Expanded(
+          child: Text(
+            source,
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade800,
+              fontSize: 11,
+              color: Colors.grey.shade500,
             ),
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          
-          const SizedBox(height: 4),
-          
-          Text(
-            description,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          
-          const SizedBox(height: 6),
-          
-          Row(
-            children: [
-              Icon(Icons.class_, size: 14, color: Colors.grey.shade500),
-              const SizedBox(width: 4),
-              Text(
-                source,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 8),
-          
-          _buildBadges(isAchievement),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBadges(bool isAchievement) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 4,
-      children: [
+        ),
         if (award.currentPoint > 0)
-          _buildBadge(
-            AwardUtils.getPointTypeIcon(award.pointTypesId),
-            '+${award.currentPoint}',
-            AwardUtils.getPointTypeColor(award.pointTypesId),
-          ),
-        
-        if (award.badge == 1)
-          _buildBadge(
-            Icons.verified,
-            'Значок',
-            Colors.orange,
-          ),
-        
-        if (isAchievement)
-          _buildBadge(
-            Icons.emoji_events,
-            'Достижение',
-            Colors.green,
-          ),
-      ],
-    );
-  }
-
-  Widget _buildBadge(IconData icon, String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          Container(
+            margin: const EdgeInsets.only(left: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: _getPointColor(award.pointTypesId).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: color,
+          color: _getPointColor(award.pointTypesId).withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
+          Icon(
+                  AwardUtils.getPointTypeIcon(award.pointTypesId),
+                  size: 10,
+                  color: _getPointColor(award.pointTypesId),
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  '+${award.currentPoint}',
+                  style: TextStyle(
+                    color: _getPointColor(award.pointTypesId),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      ),
     );
   }
 
-  Widget _buildDate() {
+  Widget _buildCompactDate() {
     final formattedDate = AwardUtils.formatDate(award.date);
-    return Column(
+    return Container(
+      margin: const EdgeInsets.only(left: 6),
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
           formattedDate.split(' ')[0],
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             color: Colors.grey.shade500,
             fontWeight: FontWeight.w500,
           ),
@@ -204,11 +183,23 @@ class AwardCard extends StatelessWidget {
         Text(
           formattedDate.split(' ')[1],
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             color: Colors.grey.shade500,
           ),
         ),
       ],
+      ),
     );
+  }
+
+  Color _getPointColor(int pointTypesId) {
+    final originalColor = AwardUtils.getPointTypeColor(pointTypesId);
+    
+    if (pointTypesId == 2) {
+      return Color.lerp(originalColor, Colors.white, 0.3) ?? 
+             const Color.fromARGB(255, 180, 100, 220);
+    }
+    
+    return originalColor;
   }
 }
