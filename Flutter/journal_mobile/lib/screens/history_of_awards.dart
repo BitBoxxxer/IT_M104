@@ -169,9 +169,9 @@ class _HistoryOfAwardsScreenState extends State<HistoryOfAwardsScreen> {
         crossAxisCount: 2,
         crossAxisSpacing: 4,
         mainAxisSpacing: 8,
-        childAspectRatio: 1.8,
+        childAspectRatio: 1.1,
       ),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(11),
       itemCount: awards.length,
       itemBuilder: (context, index) {
         return CompactAwardCard(award: awards[index]);

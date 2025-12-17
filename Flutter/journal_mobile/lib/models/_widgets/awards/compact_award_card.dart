@@ -24,11 +24,12 @@ class CompactAwardCard extends StatelessWidget {
         : 'Учебная деятельность';
 
     return Card(
-      margin: const EdgeInsets.all(0),
+      margin: const EdgeInsets.all(4),
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
       ),
+    child: IntrinsicHeight(
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -42,23 +43,24 @@ class CompactAwardCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 36,
-                    height: 30,
+                    width: 40,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: _getPointColor(award.pointTypesId).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: _getPointColor(award.pointTypesId).withOpacity(0.5),
-                        width: 1.5,
+                        width: 2,
                       ),
                     ),
                     child: Icon(
@@ -66,15 +68,15 @@ class CompactAwardCard extends StatelessWidget {
                           ? AwardUtils.getAchievementIcon(award.achievementsType, award.achievementsName)
                           : AwardUtils.getPointTypeIcon(award.pointTypesId),
                       color: _getPointColor(award.pointTypesId),
-                      size: 18,
+                      size: 20,
                     ),
                   ),
                   if (award.currentPoint > 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: _getPointColor(award.pointTypesId).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: _getPointColor(award.pointTypesId).withOpacity(0.3),
                           width: 1,
@@ -85,16 +87,16 @@ class CompactAwardCard extends StatelessWidget {
                         children: [
                           Icon(
                             AwardUtils.getPointTypeIcon(award.pointTypesId),
-                            size: 12,
+                            size: 14,
                             color: _getPointColor(award.pointTypesId),
                           ),
-                          const SizedBox(width: 3),
+                          const SizedBox(width: 4),
                           Text(
                             '+${award.currentPoint}',
                             style: TextStyle(
                               color: _getPointColor(award.pointTypesId),
                               fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                              fontSize: 14,
                             ),
                           ),
                         ],
@@ -103,29 +105,33 @@ class CompactAwardCard extends StatelessWidget {
                 ],
               ),
               
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               
-              Text(
-                displayName,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade500,
+              Flexible(
+                child: Text(
+                  displayName,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
               
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               
-              Text(
-                description,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
+              Flexible(
+                child: Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
               
               const Spacer(),
@@ -136,16 +142,16 @@ class CompactAwardCard extends StatelessWidget {
                   Flexible(
                     child: Row(
                       children: [
-                        Icon(Icons.class_, size: 10, color: Colors.grey.shade600),
-                        const SizedBox(width: 3),
+                        Icon(Icons.class_, size: 12, color: Colors.grey.shade600), // Увеличиваем
+                        const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             source,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: Colors.grey.shade600,
                             ),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -156,6 +162,7 @@ class CompactAwardCard extends StatelessWidget {
                 ],
               ),
             ],
+            ),
           ),
         ),
       ),

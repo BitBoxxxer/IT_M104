@@ -1696,7 +1696,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           children: [
             Icon(Icons.info, color: Colors.blue),
             SizedBox(width: 12),
-            Text('Расшифровка сокращений'),
+            Text('Расшифровка сокращений',style: const TextStyle(fontSize: 22),)
           ],
         ),
         content: Column(

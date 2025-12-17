@@ -184,13 +184,13 @@ class TwelvePointExamsListState extends State<TwelvePointExamsList> {
 
 Widget _buildAnimatedConversionRow(String from, String grade, String description, IconData icon, Color color, int index) {
   return SlideInCard(
-    delay: Duration(milliseconds: 100 + (index * 50)),
+    delay: Duration(milliseconds: 100),
     child: Padding(
       padding: EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
           ScaleAnimation(
-            delay: Duration(milliseconds: 150 + (index * 50)),
+            delay: Duration(milliseconds: 100),
             child: Icon(icon, size: 14, color: color),
           ),
           SizedBox(width: 6),
@@ -198,7 +198,7 @@ Widget _buildAnimatedConversionRow(String from, String grade, String description
           Expanded(
             flex: 2,
             child: FadeInAnimation(
-              delay: Duration(milliseconds: 200 + (index * 50)),
+              delay: Duration(milliseconds: 100),
               child: Text(
                 from,
                 style: TextStyle(
@@ -210,14 +210,14 @@ Widget _buildAnimatedConversionRow(String from, String grade, String description
           ),
           
           FadeInAnimation(
-            delay: Duration(milliseconds: 250 + (index * 50)),
+            delay: Duration(milliseconds: 100),
             child: Icon(Icons.arrow_forward, size: 12, color: Colors.grey[500]),
           ),
           
           Expanded(
             flex: 2,
             child: FadeInAnimation(
-              delay: Duration(milliseconds: 300 + (index * 50)),
+              delay: Duration(milliseconds: 100),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -262,7 +262,7 @@ Widget _buildAnimatedConversionRow(String from, String grade, String description
     final originalGrade = exam.originalNumericGrade;
     
     return SlideInCard(
-      delay: Duration(milliseconds: 100 * index),
+      delay: Duration(milliseconds: 100),
       child: Card(
         margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
         elevation: 2,
@@ -289,7 +289,7 @@ Widget _buildAnimatedConversionRow(String from, String grade, String description
                         ),
                         if (showSystemInfo && isTwelvePoint && originalGrade != null)
                           FadeInAnimation(
-                            delay: Duration(milliseconds: 150 + 100 * index),
+                            delay: Duration(milliseconds: 100),
                             child: Text(
                               '12-балльная система',
                               style: TextStyle(
@@ -303,7 +303,7 @@ Widget _buildAnimatedConversionRow(String from, String grade, String description
                     ),
                   ),
                   ScaleAnimation(
-                    delay: Duration(milliseconds: 200 + 100 * index),
+                    delay: Duration(milliseconds: 100),
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -347,7 +347,7 @@ Widget _buildAnimatedConversionRow(String from, String grade, String description
                 children: [
                   if (exam.teacherName != null && exam.teacherName!.isNotEmpty) 
                     FadeInRow(
-                      delay: Duration(milliseconds: 250 + 100 * index),
+                      delay: Duration(milliseconds: 100),
                       child: Row(
                         children: [
                           Icon(Icons.person, size: 14, color: Colors.grey[600]),
@@ -366,7 +366,7 @@ Widget _buildAnimatedConversionRow(String from, String grade, String description
                   SizedBox(height: 4),
                   
                   FadeInRow(
-                    delay: Duration(milliseconds: 300 + 100 * index),
+                    delay: Duration(milliseconds: 100),
                     child: Row(
                       children: [
                         Icon(Icons.calendar_today, size: 14, color: Colors.blue[700]),
