@@ -44,6 +44,8 @@ class _AverageMarksBarChartState extends State<AverageMarksBarChart> with Single
     final homeAvg = widget.averages['home'] ?? 0.0;
     final controlAvg = widget.averages['control'] ?? 0.0;
     final labAvg = widget.averages['lab'] ?? 0.0;
+    final practicalAvg = widget.averages['practical'] ?? 0.0;
+    final finalAvg = widget.averages['final'] ?? 0.0;
     final overallAvg = widget.averages['overall'] ?? 0.0;
     
     return AnimatedBuilder(
@@ -88,7 +90,7 @@ class _AverageMarksBarChartState extends State<AverageMarksBarChart> with Single
                 barRods: [
                   BarChartRodData(
                     toY: homeAvg * _animation.value,
-                    width: 22,
+                    width: 16,
                     borderRadius: BorderRadius.circular(4),
                     color: Colors.red,
                     backDrawRodData: BackgroundBarChartRodData(
@@ -104,7 +106,7 @@ class _AverageMarksBarChartState extends State<AverageMarksBarChart> with Single
                 barRods: [
                   BarChartRodData(
                     toY: controlAvg * _animation.value,
-                    width: 22,
+                    width: 16,
                     borderRadius: BorderRadius.circular(4),
                     color: Colors.green,
                     backDrawRodData: BackgroundBarChartRodData(
@@ -120,7 +122,7 @@ class _AverageMarksBarChartState extends State<AverageMarksBarChart> with Single
                 barRods: [
                   BarChartRodData(
                     toY: labAvg * _animation.value,
-                    width: 22,
+                    width: 16,
                     borderRadius: BorderRadius.circular(4),
                     color: Colors.purple,
                     backDrawRodData: BackgroundBarChartRodData(
@@ -135,8 +137,40 @@ class _AverageMarksBarChartState extends State<AverageMarksBarChart> with Single
                 x: 3,
                 barRods: [
                   BarChartRodData(
+                    toY: practicalAvg * _animation.value,
+                    width: 16,
+                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.orange,
+                    backDrawRodData: BackgroundBarChartRodData(
+                      show: true,
+                      toY: 5.0,
+                      color: Colors.grey.withOpacity(0.05),
+                    ),
+                  ),
+                ],
+              ),
+              BarChartGroupData(
+                x: 4,
+                barRods: [
+                  BarChartRodData(
+                    toY: finalAvg * _animation.value,
+                    width: 16,
+                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.grey,
+                    backDrawRodData: BackgroundBarChartRodData(
+                      show: true,
+                      toY: 5.0,
+                      color: Colors.grey.withOpacity(0.05),
+                    ),
+                  ),
+                ],
+              ),
+              BarChartGroupData(
+                x: 5,
+                barRods: [
+                  BarChartRodData(
                     toY: overallAvg * _animation.value,
-                    width: 32,
+                    width: 22,
                     borderRadius: BorderRadius.circular(4),
                     color: Colors.blue,
                     backDrawRodData: BackgroundBarChartRodData(

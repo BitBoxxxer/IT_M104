@@ -7,6 +7,7 @@ class Mark {
   final int? labWorkMark;
   final int? classWorkMark;
   final int? practicalWorkMark;
+  final int? finalWorkMark;
   final int? statusWas;
 
   Mark({
@@ -18,6 +19,7 @@ class Mark {
     this.labWorkMark,
     this.classWorkMark,
     this.practicalWorkMark,
+    this.finalWorkMark,
     this.statusWas,
   });
 
@@ -31,6 +33,7 @@ class Mark {
       labWorkMark: json['lab_work_mark'] as int?,
       classWorkMark: json['class_work_mark'] as int?,
       practicalWorkMark: json['practical_work_mark'] as int?,
+      finalWorkMark: json['final_work_mark'] as int?,
       statusWas: json['status_was'] as int?,
     );
   }
@@ -45,6 +48,7 @@ class Mark {
       'lab_work_mark': labWorkMark,
       'class_work_mark': classWorkMark,
       'practical_work_mark': practicalWorkMark,
+      'final_work_mark': finalWorkMark,
       'status_was': statusWas,
     };
   }

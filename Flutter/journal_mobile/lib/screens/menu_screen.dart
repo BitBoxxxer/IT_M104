@@ -487,16 +487,22 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Map<String, double> _calculateAverages(List<Mark> marks) {
+    final filteredMarks = _filterTwelvePointMarks(marks);
+    
     double totalHomeWorkMarks = 0;
     int homeWorkCount = 0;
     double totalControlWorkMarks = 0;
     int controlWorkCount = 0;
     double totalLabWorkMarks = 0;
     int labWorkCount = 0;
+    double totalPracticalWorkMarks = 0;
+    int practicalWorkCount = 0;
+    double totalFinalWorkMarks = 0;
+    int finalWorkCount = 0;
     double totalAllMarks = 0;
     int allMarksCount = 0;
 
-    for (var mark in marks) {
+    for (var mark in filteredMarks) {
       if (mark.homeWorkMark != null) {
         totalHomeWorkMarks += mark.homeWorkMark!;
         homeWorkCount++;
@@ -515,6 +521,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         totalAllMarks += mark.labWorkMark!;
         allMarksCount++;
       }
+      if (mark.practicalWorkMark != null) {
+        totalPracticalWorkMarks += mark.practicalWorkMark!;
+        practicalWorkCount++;
+        totalAllMarks += mark.practicalWorkMark!;
+        allMarksCount++;
+      }
+      if (mark.finalWorkMark != null) {
+        totalFinalWorkMarks += mark.finalWorkMark!;
+        finalWorkCount++;
+        totalAllMarks += mark.finalWorkMark!;
+        allMarksCount++;
+      }
       if (mark.classWorkMark != null) {
         totalAllMarks += mark.classWorkMark!;
         allMarksCount++;
@@ -525,6 +543,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       'home': homeWorkCount > 0 ? totalHomeWorkMarks / homeWorkCount : 0.0,
       'control': controlWorkCount > 0 ? totalControlWorkMarks / controlWorkCount : 0.0,
       'lab': labWorkCount > 0 ? totalLabWorkMarks / labWorkCount : 0.0,
+      'practical': practicalWorkCount > 0 ? totalPracticalWorkMarks / practicalWorkCount : 0.0,
+      'final': finalWorkCount > 0 ? totalFinalWorkMarks / finalWorkCount : 0.0,
       'overall': allMarksCount > 0 ? totalAllMarks / allMarksCount : 0.0,
     };
   }
@@ -934,9 +954,25 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           }
 
           final List<Mark> marks = snapshot.data!['marks'];
+
+          final hasTwelvePointMarks = marks.any((mark) {
+            try {
+              if (mark.dateVisit.isNotEmpty == true) {
+                final markDate = DateTime.parse(mark.dateVisit);
+                final transitionDate = DateTime(2024, 9, 1);
+                return markDate.isBefore(transitionDate);
+              }
+              return false;
+            } catch (e) {
+              return false;
+            }
+          });
           
-          final averages = _calculateAverages(marks);
-          final attendance = _calculateAttendance(marks); 
+          final filteredMarksForAverages = _filterTwelvePointMarks(marks);
+          final twelvePointCount = marks.length - filteredMarksForAverages.length;
+          
+          final averages = _calculateAverages(filteredMarksForAverages);
+          final attendance = _calculateAttendance(marks);
           
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -948,6 +984,48 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                     ),
+                    if (hasTwelvePointMarks)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Card(
+                          color: Colors.orange.withOpacity(0.1),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 20,
+                                  color: Colors.orange.shade800,
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '12-балльная система',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange.shade800,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'У вас есть $twelvePointCount оценок по 12-балльной системе. Они исключены из расчета средних баллов.',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.orange.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ],
+                                ),
+                              ),
+                            ),
+                          ),
                     
                           Card(
                             elevation: 4,
@@ -1010,12 +1088,36 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   padding: const EdgeInsets.all(12.0),
                   child: Column(
                     children: [
-                      const Text(
-                        'Средние оценки',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Средние оценки',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _showAverageMarksLegend(context),
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  Icons.help_outline,
+                                  size: 14,
+                                  color: Colors.blue,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Container(
@@ -1025,12 +1127,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
-                        runSpacing: 4,
+                        runSpacing: 5,
                         alignment: WrapAlignment.center,
                         children: [
                           _buildLegendItemWithValue(Colors.red, 'Д/Р', averages['home'] ?? 0.0),
                           _buildLegendItemWithValue(Colors.green, 'К/Р', averages['control'] ?? 0.0),
                           _buildLegendItemWithValue(Colors.purple, 'Л/Р', averages['lab'] ?? 0.0),
+                          _buildLegendItemWithValue(Colors.orange, 'П/Р', averages['practical'] ?? 0.0),
+                          _buildLegendItemWithValue(Colors.grey, 'И/Р', averages['final'] ?? 0.0),
                           _buildLegendItemWithValue(Colors.blue, 'Общая', averages['overall'] ?? 0.0),
                         ],
                       ),
@@ -1582,4 +1686,82 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       ],
     );
   }
+
+  // TODO: вынести позже. 18.12.25
+  void _showAverageMarksLegend(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.info, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Расшифровка сокращений'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildLegendItem('Д/Р', 'Домашняя работа'),
+            _buildLegendItem('К/Р', 'Контрольная работа'),
+            _buildLegendItem('Л/Р', 'Лабораторная работа'),
+            _buildLegendItem('П/Р', 'Практическая работа'),
+            _buildLegendItem('И/Р', 'Итоговая работа'),
+            _buildLegendItem('Общая', 'Общая средняя оценка'),
+            _buildLegendItem('---', ''),
+            _buildLegendItem('Н/Д', 'Нет оценок'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Понятно'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String abbreviation, String description) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 70,
+            child: Text(
+              abbreviation,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(description),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Mark> _filterTwelvePointMarks(List<Mark> marks) {
+  return marks.where((mark) {
+    try {
+      if (mark.dateVisit.isNotEmpty == true) {
+        final markDate = DateTime.parse(mark.dateVisit);
+        final transitionDate = DateTime(2024, 9, 1);
+        if (markDate.isBefore(transitionDate)) {
+          return false;
+        }
+      }
+      return true;
+    } catch (e) {
+      return true;
+    }
+  }).toList();
+}
 }

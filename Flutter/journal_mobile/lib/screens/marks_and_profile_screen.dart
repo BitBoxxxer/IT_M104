@@ -470,6 +470,10 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
         break;
       case 'practical':
         color = Colors.orange.shade700;
+        break;
+      case 'final':
+        color = Colors.grey.shade700;
+        break;
       default:
         color = Colors.white;
     }
@@ -722,12 +726,14 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                                             _buildMarkChip(mark.labWorkMark, 'lab'),
                                             _buildMarkChip(mark.classWorkMark, 'class'),
                                             _buildMarkChip(mark.practicalWorkMark, 'practical'),
+                                            _buildMarkChip(mark.finalWorkMark, 'final'),
                                             
                                             if (mark.homeWorkMark == null && 
                                                 mark.controlWorkMark == null && 
                                                 mark.labWorkMark == null && 
                                                 mark.classWorkMark == null &&
-                                                mark.practicalWorkMark == null)
+                                                mark.practicalWorkMark == null &&
+                                                mark.finalWorkMark == null)
                                               const Text('Б/О', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                                           ],
                                         ),
