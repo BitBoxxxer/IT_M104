@@ -1040,7 +1040,7 @@ Future<File?> downloadHomeworkFile(String token, Homework homework) async {
       throw Exception('URL файла недоступен');
     }
 
-    final String fileName = homework.filename ?? 
+    final String fileName = homework.safeFilename ?? 
         'homework_${homework.id}_${DateTime.now().millisecondsSinceEpoch}';
 
     print('Downloading homework file: $fileName');
@@ -1052,7 +1052,7 @@ Future<File?> downloadHomeworkFile(String token, Homework homework) async {
       onProgress: (received, total) {
         if (total != -1) {
           double progress = (received / total * 100);
-          print('Download progress: ${progress.toStringAsFixed(2)}%'); // TODO: допилить прогресс в UX - Ди.
+          print('Download progress: ${progress.toStringAsFixed(2)}%');
         }
       },
     );
@@ -1071,7 +1071,7 @@ Future<File?> downloadStudentHomeworkFile(String token, Homework homework) async
       throw Exception('URL файла студенческой работы недоступен');
     }
 
-    final String fileName = homework.studentFilename ?? 
+    final String fileName = homework.safeStudentFilename ?? 
         'student_homework_${homework.id}_${DateTime.now().millisecondsSinceEpoch}';
 
     print('Downloading student homework file: $fileName');

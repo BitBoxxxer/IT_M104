@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'homework.dart';
-import 'homework_loading_state.dart'; // Добавить этот импорт
-import 'homework_error_state.dart';   // Добавить этот импорт  
-import 'homework_empty_state.dart';   // Добавить этот импорт
+import 'homework_loading_state.dart';
+import 'homework_error_state.dart';  
+import 'homework_empty_state.dart';
 import 'homework_stats_card.dart';
 import 'homework_card.dart';
 import 'homework_load_more.dart';
@@ -21,6 +21,7 @@ class HomeworkContent extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final VoidCallback onLoadMore;
   final Map<String, dynamic> tabData;
+  final Function(Homework, bool)? onDownloadRequested;
 
   const HomeworkContent({
     super.key,
@@ -36,26 +37,27 @@ class HomeworkContent extends StatelessWidget {
     required this.onRefresh,
     required this.onLoadMore,
     required this.tabData,
+    this.onDownloadRequested,
   });
 
   @override
   Widget build(BuildContext context) {
     if (isLoading && homeworks.isEmpty) {
-      return HomeworkLoadingState( // Теперь этот виджет распознается
+      return HomeworkLoadingState(
         tabLabel: tabData['label'],
         counter: getCounterByStatus(tabData['counterType']),
       );
     }
 
     if (errorMessage.isNotEmpty) {
-      return HomeworkErrorState( // Теперь этот виджет распознается
+      return HomeworkErrorState(
         errorMessage: errorMessage,
         onRetry: onRefresh,
       );
     }
 
     if (homeworks.isEmpty) {
-      return HomeworkEmptyState( // Теперь этот виджет распознается
+      return HomeworkEmptyState(
         tabStatus: tabStatus,
       );
     }
@@ -96,7 +98,11 @@ class HomeworkContent extends StatelessWidget {
                       onLoadMore: onLoadMore,
                     );
                   }
-                  return HomeworkCard(homework: homeworks[index]);
+                  final homework = homeworks[index];
+                  return HomeworkCard(
+                    homework: homework,
+                    onDownloadRequested: onDownloadRequested,
+                  ); // почему я забыла про коллбек ??? 17.12.25 Т_Т
                 },
               ),
             ),

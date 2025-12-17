@@ -5,10 +5,12 @@ import 'homework.dart';
 
 class HomeworkCard extends StatelessWidget {
   final Homework homework;
+  final Function(Homework, bool)? onDownloadRequested;
 
   const HomeworkCard({
     super.key,
     required this.homework,
+    this.onDownloadRequested,
   });
 
   @override
@@ -299,7 +301,7 @@ class HomeworkCard extends StatelessWidget {
       padding: const EdgeInsets.only(top: 12),
       child: OutlinedButton.icon(
         onPressed: () {
-          // TODO: Implement download student homework
+          _downloadStudentFile();
         },
         icon: const Icon(Icons.download_done, size: 16),
         label: Text(_getStudentDownloadButtonText()),
@@ -317,7 +319,7 @@ class HomeworkCard extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8),
       child: OutlinedButton.icon(
         onPressed: () {
-          // TODO: Implement download homework
+          _downloadTeacherFile();
         },
         icon: const Icon(Icons.download, size: 16),
         label: Text(_getDownloadButtonText()),
@@ -329,7 +331,40 @@ class HomeworkCard extends StatelessWidget {
     );
   }
 
-  // Helper methods
+  /// Скачивание задания ДЛЯ студента - 17.12.25
+   Future<void> _downloadTeacherFile() async {
+    print('🔄 Попытка скачать файл задания _downloadTeacherFile');
+    print('📎 Файл: ${homework.safeFilename}');
+    print('🔗 URL: ${homework.downloadUrl}');
+    
+    if (onDownloadRequested != null && homework.downloadUrl != null) {
+      print('✅ Вызываю коллбек скачивания файла _downloadTeacherFile');
+      onDownloadRequested!(homework, false);
+    } else {
+      print('Не выполнены условия для скачивания файла _downloadTeacherFile');
+      print('   downloadUrl: ${homework.downloadUrl}');
+      print('   onDownloadRequested: ${onDownloadRequested != null}');
+    }
+  }
+
+  /// Скачать уже СДАННЫЙ файл от студента - 17.12.25
+  Future<void> _downloadStudentFile() async {
+    print('🔄 Попытка скачать _downloadStudentFile файл');
+    print('📎 Файл: ${homework.safeStudentFilename}');
+    print('🔗 URL: ${homework.studentDownloadUrl}');
+    
+    if (onDownloadRequested != null && 
+        homework.studentDownloadUrl != null && 
+        homework.safeStudentFilename != null) {
+      print('✅ Вызываю коллбек скачивания _downloadStudentFile файла');
+      onDownloadRequested!(homework, true);
+    } else {
+      print('❌ Не выполнены условия для скачивания _downloadStudentFile файла');
+      print('   studentDownloadUrl: ${homework.studentDownloadUrl}');
+      print('   onDownloadRequested: ${onDownloadRequested != null}');
+    }
+  }
+
   Color _getStatusColor() {
     if (homework.isDeletedStatus) return Colors.grey.shade700;
     if (homework.isExpired) return Colors.red.shade700;

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 import '../services/api_service.dart';
+import '../services/download_service.dart';
 
 import '../models/_widgets/homework/homework_content.dart';
 import '../models/_widgets/homework/homework_tab_bar.dart';
@@ -321,6 +323,42 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     }
   }
 
+  Future<void> _downloadHomeworkFile(Homework homework, bool isStudentFile) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Скачивание ${isStudentFile ? 'сданной работы' : 'задания'}...'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      final file = isStudentFile
+          ? await _apiService.downloadStudentHomeworkFile(widget.token, homework)
+          : await _apiService.downloadHomeworkFile(widget.token, homework);
+
+      if (file != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Файл скачан: ${file.path.split('/').last}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        await DownloadService.openDownloadedFile(file);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка скачивания: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      print('Ошибка скачивания файла: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -359,6 +397,9 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
             onRefresh: _refreshData,
             onLoadMore: () => _loadMoreData(tabStatus),
             tabData: _tabs[tabIndex],
+            onDownloadRequested: (homework, isStudentFile) {
+              _downloadHomeworkFile(homework, isStudentFile);
+            },
           );
         }).toList(),
       ),

@@ -177,6 +177,38 @@ String? get studentFilename => homeworkStud?.filename;
       'is_deleted': isDeleted,
     };
   }
+
+  String? get safeFilename {
+    if (filename != null && filename!.isNotEmpty) {
+      return filename;
+    }
+    
+    if (filePath != null && filePath!.isNotEmpty) {
+      final uri = Uri.parse(filePath!);
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.isNotEmpty) {
+        return pathSegments.last;
+      }
+    }
+    
+    return 'homework_$id';
+  }
+
+  String? get safeStudentFilename {
+    if (homeworkStud?.filename != null && homeworkStud!.filename!.isNotEmpty) {
+      return homeworkStud!.filename;
+    }
+    
+    if (homeworkStud?.filePath != null && homeworkStud!.filePath!.isNotEmpty) {
+      final uri = Uri.parse(homeworkStud!.filePath!);
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.isNotEmpty) {
+        return pathSegments.last;
+      }
+    }
+    
+    return homeworkStud != null ? 'student_work_$id' : null;
+  }
 }
 
 class HomeworkStud {
