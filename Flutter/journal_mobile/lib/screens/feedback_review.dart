@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/_network/network_service.dart';
 import '../services/api_service.dart';
 
 import '../models/_widgets/feedback/empty_feedback.dart';
@@ -19,6 +20,7 @@ class FeedbackReviewScreen extends StatefulWidget {
 
 class _FeedbackReviewScreenState extends State<FeedbackReviewScreen> {
   final ApiService _apiService = ApiService();
+  final NetworkService _networkService = NetworkService();
   late Future<List<FeedbackReview>> _feedbackFuture;
 
   @override
@@ -45,6 +47,27 @@ class _FeedbackReviewScreenState extends State<FeedbackReviewScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 1,
+        actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
+        ],
       ),
       body: FutureBuilder<List<FeedbackReview>>(
         future: _feedbackFuture,

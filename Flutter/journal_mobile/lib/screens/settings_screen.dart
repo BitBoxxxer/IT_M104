@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../services/_network/network_service.dart';
 import '../services/theme_service.dart';
 import '../services/_notification/notification_service.dart';
 import '../services/_offline_service/offline_storage_service.dart';
@@ -21,12 +23,14 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final NotificationService _notificationService = NotificationService();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final NetworkService _networkService = NetworkService();
+
   String? _selectedTheme;
   bool _notificationsEnabled = true;
   bool _hasNotificationPermission = true;
   bool _isLoading = true;
-  final NotificationService _notificationService = NotificationService();
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   @override
   void initState() {
@@ -188,6 +192,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
+        ],
       ),
       body: _isLoading || _selectedTheme == null
     ? const Center(child: CircularProgressIndicator())
@@ -320,14 +345,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 ListTile(
                   leading: Icon(Icons.storage, color: Colors.blue),
-                  title: Text('Офлайн данные'),
+                  title: Text('Offline данные'),
                   subtitle: Text('Управление локально сохраненными данными'),
                 ),
                 Divider(height: 1),
                 ListTile(
                   leading: Icon(Icons.download, color: Colors.green),
                   title: Text('Синхронизировать сейчас'),
-                  subtitle: Text('Обновить все данные для офлайн использования'),
+                  subtitle: Text('Обновить все данные для offline использования'),
                   trailing: Icon(Icons.sync),
                   onTap: () async {
                     final shouldSync = await showDialog<bool>(
@@ -376,7 +401,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 ListTile(
                   leading: Icon(Icons.delete, color: Colors.red),
-                  title: Text('Очистить офлайн данные'),
+                  title: Text('Очистить offline данные'),
                   subtitle: Text('Удалить все локально сохраненные данные'),
                   trailing: Icon(Icons.clean_hands),
                   onTap: () {
@@ -416,7 +441,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Статистика офлайн данных'),
+        title: Text('Статистика offline данных'),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,7 +507,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Данные синхронизированы для офлайн использования ✅'),
+          content: Text('Данные синхронизированы для offline использования ✅'),
           backgroundColor: Colors.green,
         ),
       );
@@ -503,7 +528,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final shouldClear = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Очистка офлайн данных'),
+        title: Text('Очистка offline данных'),
         content: Text('Все локально сохраненные данные будут удалены. Это действие нельзя отменить. Продолжить?'),
         actions: [
           TextButton(
@@ -525,7 +550,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Офлайн данные очищены'),
+            content: Text('offline данные очищены'),
             backgroundColor: Colors.green,
           ),
         );

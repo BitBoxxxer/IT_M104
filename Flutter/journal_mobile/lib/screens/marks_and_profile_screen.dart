@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+
+import '../services/_network/network_service.dart';
+import '../services/api_service.dart';
+
 import '../models/mark.dart';
 import '../models/user_data.dart';
-import '../services/api_service.dart';
 
 class MarksAndProfileScreen extends StatefulWidget {
   final String token;
@@ -13,6 +16,8 @@ class MarksAndProfileScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<MarksAndProfileScreen> {
   final _apiService = ApiService();
+  final NetworkService _networkService = NetworkService();
+
   late Future<List<Mark>> _marksFuture;
   late Future<UserData> _userFuture;
   final TextEditingController _searchController = TextEditingController();
@@ -513,6 +518,27 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
         ),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
+        ],
       ),
       body: Column(
         children: [

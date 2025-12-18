@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/days_element.dart';
-import '../services/api_service.dart';
 import 'package:intl/intl.dart';
+
+import '../services/_network/network_service.dart';
+import '../services/api_service.dart';
+
+import '../models/days_element.dart';
 
 DateTime getMonday(DateTime date) {
   final d = DateTime(date.year, date.month, date.day);
@@ -30,6 +33,8 @@ class ScheduleScreen extends StatefulWidget {
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
   final ApiService _apiService = ApiService();
+  final NetworkService _networkService = NetworkService();
+  
   DateTime _currentDate = DateTime.now(); 
   late Future<List<ScheduleElement>> _scheduleFuture;
   late PageController _pageController;
@@ -305,6 +310,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       appBar: AppBar(
         title: const Text('Расписание'),
         actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
           if (!isCurrentWeek)
             IconButton(
               icon: const Icon(Icons.today),

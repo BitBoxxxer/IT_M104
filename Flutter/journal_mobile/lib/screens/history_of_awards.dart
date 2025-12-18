@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
+import '../services/_network/network_service.dart';
 
 import '../models/_widgets/awards/award_card.dart';
 import '../models/_widgets/awards/empty_awards.dart';
@@ -22,6 +23,7 @@ class HistoryOfAwardsScreen extends StatefulWidget {
 class _HistoryOfAwardsScreenState extends State<HistoryOfAwardsScreen> {
   final ApiService _apiService = ApiService();
   final SecureStorageService _secureStorage = SecureStorageService();
+  final NetworkService _networkService = NetworkService();
   
   late Future<List<ActivityRecord>> _awardsFuture;
   bool _isLoading = true;
@@ -92,6 +94,25 @@ class _HistoryOfAwardsScreenState extends State<HistoryOfAwardsScreen> {
       appBar: AppBar(
         title: const Text('История наград студента'),
         actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
           IconButton(
             icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
             onPressed: _toggleView,

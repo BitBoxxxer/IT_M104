@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 
+import '../services/_network/network_service.dart';
 import '../services/api_service.dart';
 import '../services/download_service.dart';
 
@@ -26,6 +26,7 @@ class HomeworkListScreen extends StatefulWidget {
 class _HomeworkListScreenState extends State<HomeworkListScreen>
     with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
+  final NetworkService _networkService = NetworkService();
 
   final Map<String, List<Homework>> _tabHomeworks = {};
   final Map<String, int> _tabCurrentPages = {};
@@ -371,6 +372,25 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
           getCounterForDeletedTab: _getCounterForDeletedTab,
         ),
         actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _tabIsLoading[_currentFilterStatus]! ? null : _refreshData,

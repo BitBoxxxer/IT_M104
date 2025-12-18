@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 
-import 'package:journal_mobile/models/_widgets/notifications/notification_item.dart';
-import 'package:journal_mobile/models/_rabbits/notification_time.dart';
-import 'package:journal_mobile/models/_widgets/notifications/empty_notifications.dart';
-import 'package:journal_mobile/models/_widgets/notifications/error_notifications.dart';
-import 'package:journal_mobile/models/_widgets/notifications/notification_list.dart';
+import '../services/_notification/notification_service.dart';
+import '../services/secure_storage_service.dart';
+import '../services/_network/network_service.dart';
 
-import 'package:journal_mobile/services/_notification/notification_service.dart';
-import 'package:journal_mobile/services/secure_storage_service.dart';
+import '../models/_widgets/notifications/notification_item.dart';
+import '../models/_rabbits/notification_time.dart';
+import '../models/_widgets/notifications/empty_notifications.dart';
+import '../models/_widgets/notifications/error_notifications.dart';
+import '../models/_widgets/notifications/notification_list.dart';
 
 class UserNotificationScreen extends StatefulWidget {
   const UserNotificationScreen({super.key});
@@ -19,6 +20,8 @@ class UserNotificationScreen extends StatefulWidget {
 
 class _UserNotificationScreenState extends State<UserNotificationScreen> {
   final NotificationService _notificationService = NotificationService();
+  final NetworkService _networkService = NetworkService();
+
   late Stream<List<NotificationItem>> _notificationsStream;
   bool _isLoading = false;
   Timer? _autoRefreshTimer;
@@ -151,6 +154,25 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
       appBar: AppBar(
         title: const Text('Уведомления'),
         actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _refreshNotifications,

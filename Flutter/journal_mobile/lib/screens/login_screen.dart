@@ -1,13 +1,16 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
-import '../models/_system/account_model.dart';
+import 'package:flutter/services.dart';
+
 import '../services/_account/account_manager_service.dart';
+import '../services/_network/network_service.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/url_launcher_service.dart';
+
 import 'menu_screen.dart';
-import 'package:flutter/services.dart';
+
+import '../models/_system/account_model.dart';
 
 class LoginScreen extends StatefulWidget {
   final String currentTheme;
@@ -26,11 +29,14 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _apiService = ApiService();
   final _secureStorage = SecureStorageService();
   final _urlLauncher = UrlLauncherService();
+  final NetworkService _networkService = NetworkService();
+
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  
   bool _isLoading = false;
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
@@ -260,7 +266,7 @@ class _LoginScreenState extends State<LoginScreen> {
         print('✅ Аккаунт сохранен с учетными данными');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Синхронизация данных для офлайн режима...'),
+            content: Text('Синхронизация данных для offline режима...'),
             backgroundColor: Colors.blue,
             behavior: SnackBarBehavior.floating,
           ),
@@ -270,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Все данные сохранены для офлайн использования ✅'),
+              content: Text('Все данные сохранены для offline использования ✅'),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
               duration: Duration(seconds: 3),
@@ -371,7 +377,7 @@ class _LoginScreenState extends State<LoginScreen> {
               CircularProgressIndicator(),
               SizedBox(height: 16),
               Text(
-                _isOfflineMode ? 'Офлайн вход...' : 'Автоматический вход...',
+                _isOfflineMode ? 'Offline вход...' : 'Автоматический вход...',
                 style: TextStyle(
                   fontSize: 16,
                   color: Theme.of(context).colorScheme.onSurface,
@@ -387,31 +393,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
-              if (_isOfflineMode) ...[
-                SizedBox(height: 16),
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.wifi_off, size: 16, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Text(
-                        'Офлайн режим',
-                        style: TextStyle(
-                          color: Colors.orange,
-                          fontSize: 12,
-                        ),
+              StreamBuilder<bool>(
+                stream: _networkService.connectionStream,
+                initialData: _networkService.isConnected,
+                builder: (context, snapshot) {
+                  final isConnected = snapshot.data ?? true;
+                  
+                  if (!isConnected) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: Icon(
+                        Icons.wifi_off,
+                        color: Colors.orange,
+                        size: 20,
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    );
+                  }
+                  return SizedBox.shrink();
+                },
+              ),
             ],
           ),
         ),

@@ -255,7 +255,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     Text('Загрузка приложения...'),
                     if (!_networkService.isConnected)
                       Text(
-                        'Офлайн режим',
+                        'Offline режим',
                         style: TextStyle(color: Colors.orange),
                       ),
                   ],

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:journal_mobile/models/_widgets/exams/error_exams.dart';
 import 'package:journal_mobile/models/_widgets/exams/loading_exams.dart';
+
+import '../services/_network/network_service.dart';
+import '../services/api_service.dart';
+import '../services/secure_storage_service.dart';
+
 import '../models/_widgets/exams/exam_lists/five_point_exams_list.dart';
 import '../models/_widgets/exams/exam_lists/future_exams_list.dart';
 import '../models/_widgets/exams/exam_lists/twelve_point_exams_list.dart';
 import '../models/_widgets/exams/exam_tab_bar.dart';
-import '../services/api_service.dart';
-import '../services/secure_storage_service.dart';
 import '../models/_widgets/exams/exam.dart';
 
 class ExamScreen extends StatefulWidget {
@@ -20,6 +23,7 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   final ApiService _apiService = ApiService();
   final SecureStorageService _secureStorage = SecureStorageService();
+  final NetworkService _networkService = NetworkService();
   
   bool _isLoading = true;
   String _errorMessage = '';
@@ -147,6 +151,27 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
                 tabs: _tabs,
               )
             : null,
+        actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
+        ],
       ),
       body: _isLoading
           ? LoadingExams(debugInfo: _debugInfo)

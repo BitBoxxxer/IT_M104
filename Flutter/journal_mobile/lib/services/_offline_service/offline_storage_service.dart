@@ -86,7 +86,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
           
       final marksJson = marksToSave.map((mark) => mark.toJson()).toList();
       await _storage.write(key: _marksKey, value: jsonEncode(marksJson));
-      print('💾 Оценки сохранены офлайн: ${marksToSave.length} шт (лимит: $_maxMarks)');
+      print('💾 Оценки сохранены offline: ${marksToSave.length} шт (лимит: $_maxMarks)');
     } catch (e) {
       print('❌ Ошибка сохранения оценок: $e');
     }
@@ -102,7 +102,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final List<dynamic> marksList = jsonDecode(jsonString);
       return marksList.map((json) => Mark.fromJson(json)).toList();
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн оценок: $e');
+      print('❌ Ошибка загрузки offline оценок: $e');
       return [];
     }
   }
@@ -110,7 +110,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
   Future<void> saveUserData(UserData user) async {
     try {
       await _storage.write(key: _userKey, value: jsonEncode(user.toJson()));
-      print('💾 Данные пользователя сохранены офлайн');
+      print('💾 Данные пользователя сохранены offline');
     } catch (e) {
       print('❌ Ошибка сохранения пользователя: $e');
     }
@@ -126,7 +126,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final userJson = jsonDecode(jsonString);
       return UserData.fromJson(userJson);
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн пользователя: $e');
+      print('❌ Ошибка загрузки offline пользователя: $e');
       return null;
     }
   }
@@ -139,7 +139,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
           
       final scheduleJson = scheduleToSave.map((element) => element.toJson()).toList();
       await _storage.write(key: _scheduleKey, value: jsonEncode(scheduleJson));
-      print('💾 Расписание сохранено офлайн: ${scheduleToSave.length} шт (лимит: $_maxSchedule)');
+      print('💾 Расписание сохранено offline: ${scheduleToSave.length} шт (лимит: $_maxSchedule)');
     } catch (e) {
       print('❌ Ошибка сохранения расписания: $e');
     }
@@ -155,7 +155,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final List<dynamic> scheduleList = jsonDecode(jsonString);
       return scheduleList.map((json) => ScheduleElement.fromJson(json)).toList();
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн расписания: $e');
+      print('❌ Ошибка загрузки offline расписания: $e');
       return [];
     }
   }
@@ -168,7 +168,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
           
       final activitiesJson = activitiesToSave.map((activity) => activity.toJson()).toList();
       await _storage.write(key: _activityKey, value: jsonEncode(activitiesJson));
-      print('💾 Активности сохранены офлайн: ${activitiesToSave.length} шт (лимит: $_maxActivities)');
+      print('💾 Активности сохранены offline: ${activitiesToSave.length} шт (лимит: $_maxActivities)');
     } catch (e) {
       print('❌ Ошибка сохранения активностей: $e');
     }
@@ -184,7 +184,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final List<dynamic> activitiesList = jsonDecode(jsonString);
       return activitiesList.map((json) => ActivityRecord.fromJson(json)).toList();
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн активностей: $e');
+      print('❌ Ошибка загрузки offline активностей: $e');
       return [];
     }
   }
@@ -197,7 +197,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
           
       final examsJson = examsToSave.map((exam) => exam.toJson()).toList();
       await _storage.write(key: _examsKey, value: jsonEncode(examsJson));
-      print('💾 Экзамены сохранены офлайн: ${examsToSave.length} шт (лимит: $_maxExams)');
+      print('💾 Экзамены сохранены offline: ${examsToSave.length} шт (лимит: $_maxExams)');
     } catch (e) {
       print('❌ Ошибка сохранения экзаменов: $e');
     }
@@ -213,7 +213,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final List<dynamic> examsList = jsonDecode(jsonString);
       return examsList.map((json) => Exam.fromJson(json)).toList();
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн экзаменов: $e');
+      print('❌ Ошибка загрузки offline экзаменов: $e');
       return [];
     }
   }
@@ -226,7 +226,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
           
       final feedbacksJson = feedbacksToSave.map((feedback) => feedback.toJson()).toList();
       await _storage.write(key: _feedbackKey, value: jsonEncode(feedbacksJson));
-      print('💾 Отзывы сохранены офлайн: ${feedbacksToSave.length} шт (лимит: $_maxFeedbacks)');
+      print('💾 Отзывы сохранены offline: ${feedbacksToSave.length} шт (лимит: $_maxFeedbacks)');
     } catch (e) {
       print('❌ Ошибка сохранения отзывов: $e');
     }
@@ -242,7 +242,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final List<dynamic> feedbacksList = jsonDecode(jsonString);
       return feedbacksList.map((json) => FeedbackReview.fromJson(json)).toList();
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн отзывов: $e');
+      print('❌ Ошибка загрузки offline отзывов: $e');
       return [];
     }
   }
@@ -263,7 +263,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final homeworksJson = homeworksToSave.map((homework) => homework.toJson()).toList();
       await _storage.write(key: key, value: jsonEncode(homeworksJson));
       
-      print('💾 $description задания сохранены офлайн: ${homeworksToSave.length} шт (+${newHomeworks.length} новых)');
+      print('💾 $description задания сохранены offline: ${homeworksToSave.length} шт (+${newHomeworks.length} новых)');
       
       final typeStats = <int, int>{};
       for (var hw in homeworksToSave) {
@@ -293,7 +293,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       return homeworksList.map((json) => Homework.fromJson(json)).toList();
       
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн домашних заданий: $e');
+      print('❌ Ошибка загрузки offline домашних заданий: $e');
       return [];
     }
   }
@@ -346,7 +346,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
           
       final leadersJson = leadersToSave.map((leader) => leader.toJson()).toList();
       await _storage.write(key: _groupLeadersKey, value: jsonEncode(leadersJson));
-      print('💾 Лидеры группы сохранены офлайн: ${leadersToSave.length} шт (лимит: $_maxLeaders)');
+      print('💾 Лидеры группы сохранены offline: ${leadersToSave.length} шт (лимит: $_maxLeaders)');
     } catch (e) {
       print('❌ Ошибка сохранения лидеров группы: $e');
     }
@@ -362,7 +362,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final List<dynamic> leadersList = jsonDecode(jsonString);
       return leadersList.map((json) => LeaderboardUser.fromJson(json)).toList();
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн лидеров группы: $e');
+      print('❌ Ошибка загрузки offline лидеров группы: $e');
       return [];
     }
   }
@@ -375,7 +375,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
           
       final leadersJson = leadersToSave.map((leader) => leader.toJson()).toList();
       await _storage.write(key: _streamLeadersKey, value: jsonEncode(leadersJson));
-      print('💾 Лидеры потока сохранены офлайн: ${leadersToSave.length} шт (лимит: $_maxLeaders)');
+      print('💾 Лидеры потока сохранены offline: ${leadersToSave.length} шт (лимит: $_maxLeaders)');
     } catch (e) {
       print('❌ Ошибка сохранения лидеров потока: $e');
     }
@@ -391,7 +391,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final List<dynamic> leadersList = jsonDecode(jsonString);
       return leadersList.map((json) => LeaderboardUser.fromJson(json)).toList();
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн лидеров потока: $e');
+      print('❌ Ошибка загрузки offline лидеров потока: $e');
       return [];
     }
   }
@@ -403,7 +403,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       
       final countersJson = counters.map((counter) => counter.toJson()).toList();
       await _storage.write(key: key, value: jsonEncode(countersJson));
-      print('💾 Счетчики $description заданий сохранены офлайн: ${counters.length} шт');
+      print('💾 Счетчики $description заданий сохранены offline: ${counters.length} шт');
     } catch (e) {
       print('❌ Ошибка сохранения счетчиков ДЗ: $e');
     }
@@ -427,12 +427,12 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final List<dynamic> countersList = jsonDecode(jsonString);
       return countersList.map((json) => HomeworkCounter.fromJson(json)).toList();
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн счетчиков ДЗ: $e');
+      print('❌ Ошибка загрузки offline счетчиков ДЗ: $e');
       return [];
     }
   }
 
-  /// Метод для очистки всех офлайн данных
+  /// Метод для очистки всех offline данных
   Future<void> clearAllOfflineData() async {
     try {
       await _storage.delete(key: _marksKey);
@@ -448,9 +448,9 @@ Future<void> _cleanupIfExceedsLimit<T>(
       await _storage.delete(key: _homeworkCountersType0Key);
       await _storage.delete(key: _homeworkCountersType1Key);
       
-      print('🗑️ Все офлайн данные очищены');
+      print('🗑️ Все offline данные очищены');
     } catch (e) {
-      print('❌ Ошибка очистки офлайн данных: $e');
+      print('❌ Ошибка очистки offline данных: $e');
     }
   }
 
@@ -489,7 +489,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       stats['homeworkCounters'] = homeworkCounters.length;
       
     } catch (e) {
-      print('❌ Ошибка получения статистики офлайн данных: $e');
+      print('❌ Ошибка получения статистики offline данных: $e');
     }
     
     return stats;
@@ -507,7 +507,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
       
       return homeworks;
     } catch (e) {
-      print('❌ Ошибка загрузки офлайн домашних заданий: $e');
+      print('❌ Ошибка загрузки offline домашних заданий: $e');
       return [];
     }
   }

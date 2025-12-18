@@ -365,12 +365,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       if (e.toString().contains('Нет подключения') || 
           e.toString().contains('SocketException') ||
           e.toString().contains('Network') ||
-          e.toString().contains('офлайн')) {
+          e.toString().contains('offline')) {
         
         return {
           'user': UserData(
             studentId: 0,
-            fullName: 'Офлайн режим',
+            fullName: 'offline режим',
             groupName: 'Нет данных',
             photoPath: '',
             pointsInfo: [],
@@ -409,7 +409,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Все данные синхронизированы для офлайн использования! ✅'),
+          content: Text('Все данные синхронизированы для offline использования! ✅'),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 3),
@@ -835,8 +835,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         builder: (context, snapshot) {
           final isConnected = snapshot.data ?? true;
           
-          return !isConnected
-              ? Container(
+          if (!isConnected) {
+            return Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(8),
                   color: Colors.orange,
@@ -845,7 +845,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                     children: [
                       Icon(Icons.wifi_off, size: 16, color: Colors.white),
                       SizedBox(width: 8),
-                      Text('Офлайн режим', style: TextStyle(color: Colors.white)),
+                      Text('Offline режим', style: TextStyle(color: Colors.white)),
                       SizedBox(width: 16),
                       GestureDetector(
                         onTap: _refreshData,
@@ -859,8 +859,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                       ),
                     ],
                   ),
-                )
-              : SizedBox.shrink();
+                );
+              }
+            return SizedBox.shrink();
         },
       ),
       
@@ -1282,18 +1283,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 return SizedBox.shrink();
               },
             ),
-            if (_selectedIndex == 2)
               _buildNotificationIcon(),
-            if (_selectedIndex == 2)
               IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: _refreshData,
-                tooltip: 'Обновить данные',
               ),
             IconButton(
               icon: Icon(Icons.menu),
               onPressed: _togglePanel,
-              tooltip: 'Меню',
             ),
           ],
         ),
@@ -1453,7 +1450,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Офлайн режим',
+                                    'Offline режим',
                                     style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
                                   ),
                                 ),

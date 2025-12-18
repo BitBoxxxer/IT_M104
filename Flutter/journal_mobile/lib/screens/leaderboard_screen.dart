@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../models/leaderboard_user.dart';
+
+import '../services/_network/network_service.dart';
 import '../services/api_service.dart';
+
+import '../models/leaderboard_user.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   final String token;
@@ -22,6 +25,8 @@ class LeaderboardScreen extends StatefulWidget {
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
   final ApiService _apiService = ApiService();
+  final NetworkService _networkService = NetworkService();
+
   late Future<List<LeaderboardUser>> _leadersFuture;
 
   @override
@@ -309,6 +314,27 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ? 'Лидеры группы' 
               : 'Лидеры потока',
         ),
+        actions: [
+          StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                
+                if (!isConnected) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Icon(
+                      Icons.wifi_off,
+                      color: Colors.orange,
+                      size: 20,
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
+        ],
       ),
       body: FutureBuilder<List<LeaderboardUser>>(
         future: _leadersFuture,
