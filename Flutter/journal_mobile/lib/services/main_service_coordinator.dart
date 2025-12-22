@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:journal_mobile/services/data_manager.dart';
+
 import 'api_service.dart';
 import '_notification/notification_service.dart';
 
 class ServiceCoordinator {
   final NotificationService _notificationService = NotificationService();
   final ApiService _apiService = ApiService();
+  final DataManager _dataManager = DataManager();
   
   Timer? _syncTimer;
   bool _servicesRunning = false;
@@ -16,33 +19,34 @@ class ServiceCoordinator {
     _servicesRunning = true;
     _currentToken = token;
     
-    print('🚀 Запуск оптимизированных фоновых сервисов...');
+    print('🚀 Запуск сервисов с SQLite...');
     
     try {
-      await _apiService.syncCriticalDataOnly(token);
+      // Проверяем и загружаем минимальные данные
+      final hasData = await _dataManager.hasOfflineData();
+      
+      if (!hasData) {
+        await _dataManager.syncAllData(background: true);
+      }
       
       _startBackgroundSync(token);
       
-      print('✅ Фоновые сервисы запущены');
+      print('✅ Сервисы запущены (SQLite готов)');
     } catch (e) {
       print('❌ Ошибка запуска сервисов: $e');
       _servicesRunning = false;
     }
   }
   
-  void _startBackgroundSync(String token) {
+   void _startBackgroundSync(String token) {
     _syncTimer?.cancel();
     
     _syncTimer = Timer.periodic(Duration(minutes: 30), (timer) async {
       if (!_servicesRunning) return;
       
       try {
-        print('📱 Фоновая синхронизация...');
-        await _apiService.syncCriticalDataOnly(token);
-        
-        if (timer.tick % 2 == 0) {
-          await _notificationService.checkForUpdates(token);
-        }
+        print('📱 Фоновая синхронизация в SQLite...');
+        await _dataManager.syncAllData(background: true);
       } catch (e) {
         print('⚠️ Ошибка фоновой синхронизации: $e');
       }
@@ -87,8 +91,37 @@ class ServiceCoordinator {
   /// Метод для быстрого старта приложения с приоритетом оффлайн данных
   Future<Map<String, dynamic>> quickStart(String token) async {
     try {
-      print('🚀 Быстрый старт приложения...');
-      return await _apiService.loadCriticalData(token);
+      print('🚀 Быстрый старт с SQLite...');
+      
+      // 1. Пробуем получить данные из SQLite
+      final hasData = await _dataManager.hasOfflineData();
+      
+      if (hasData) {
+        print('📱 Используем данные из SQLite для быстрого старта');
+        
+        final userData = await _dataManager.getUserData();
+        final marks = await _dataManager.getMarks();
+        
+        return {
+          'user': userData,
+          'marks': marks,
+          'source': 'offline',
+        };
+      }
+      
+      // 2. Если данных нет, загружаем из сети
+      print('🌐 Загружаем данные из сети...');
+      
+      await _dataManager.syncAllData(background: true);
+      
+      final userData = await _dataManager.getUserData();
+      final marks = await _dataManager.getMarks();
+      
+      return {
+        'user': userData,
+        'marks': marks,
+        'source': 'online',
+      };
     } catch (e) {
       print('❌ Ошибка быстрого старта: $e');
       rethrow;

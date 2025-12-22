@@ -303,28 +303,33 @@ class SecureStorageService {
 
 /// Класс для асинхронной блокировки с поддержкой возвращаемых значений
 /// ВЫНЕСТИ ЕГО. КАКОГО ОН ТУТ ЗАБЫЛ - 11.12.25
+
 class AsyncLock {
   Future<void>? _lastOperation;
   
-  Future<T> synchronized<T>(Future<T> Function() operation) {
-    final previous = _lastOperation;
-    final completer = Completer<T>();
+  Future<T> synchronized<T>(Future<T> Function() operation) async {
+    // Ждем завершения предыдущей операции
+    while (_lastOperation != null) {
+      try {
+        await _lastOperation;
+      } catch (_) {
+        // Игнорируем ошибки предыдущих операций
+      }
+    }
     
+    // Выполняем новую операцию
+    final completer = Completer<T>();
     _lastOperation = completer.future;
     
-    return previous?.then((_) => operation()).then((value) {
-      completer.complete(value);
-      return value;
-    }).catchError((e) {
+    try {
+      final result = await operation();
+      completer.complete(result);
+      return result;
+    } catch (e) {
       completer.completeError(e);
       throw e;
-    }) 
-    ?? operation().then((value) {
-      completer.complete(value);
-      return value;
-    }).catchError((e) {
-      completer.completeError(e);
-      throw e;
-    });
+    } finally {
+      _lastOperation = null;
+    }
   }
 }

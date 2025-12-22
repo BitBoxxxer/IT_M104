@@ -452,8 +452,9 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                 icon: Icon(Icons.bug_report, color: Colors.red),
                 label: Text('Симулировать ошибку токена', style: TextStyle(color: Colors.red)),
                 onPressed: () async {
-                  final apiService = ApiService();
-                  await apiService.simulateTokenError();
+                  // TODO: apiService.simulateTokenError();
+                  /* final apiService = ApiService();
+                  await apiService.simulateTokenError(); */
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Ошибка токена симулирована! Перезайдите в приложение'),
@@ -474,8 +475,9 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                 icon: Icon(Icons.delete, color: Colors.purple),
                 label: Text('Очистить все данные Secure_Storage', style: TextStyle(color: Colors.purple)),
                 onPressed: () async {
-                  final apiService = ApiService();
-                  await apiService.clearTokenForTesting();
+                  // TODO: apiService.clearTokenForTesting();
+                  /* final apiService = ApiService();
+                  await apiService.clearTokenForTesting(); */
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Secure_Storage данные очищены! Перезайдите в приложение'),

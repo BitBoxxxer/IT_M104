@@ -9,8 +9,8 @@ import 'package:app_settings/app_settings.dart';
 import 'package:flutter/services.dart';
 import 'package:journal_mobile/services/_notification/notification_state_service.dart';
 
+import '../../_database/database_facade.dart';
 import '../api_service.dart';
-import '../secure_storage_service.dart';
 import '../time_manager.dart';
 
 import 'package:journal_mobile/models/_widgets/notifications/notification_item.dart';
@@ -18,9 +18,12 @@ import 'package:journal_mobile/models/mark.dart';
 
 class NotificationService {
   final ApiService _apiService = ApiService();
-  final SecureStorageService _secureStorage = SecureStorageService();
   final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
   final NotificationStateService _stateService = NotificationStateService();
+
+  final DatabaseFacade _databaseFacade = DatabaseFacade();
+  String? _currentAccountId;
+
   bool _isInitialized = false;
 
   final StreamController<List<NotificationItem>> _notificationsController = 
@@ -82,6 +85,50 @@ class NotificationService {
     }
   }
 
+   Future<void> _initializeWithAccount() async {
+    final account = await _databaseFacade.getCurrentAccount();
+    _currentAccountId = account?.id;
+  }
+
+  Future<void> saveNotificationToHistory(NotificationItem notification) async {
+    if (_currentAccountId == null) await _initializeWithAccount();
+    if (_currentAccountId == null) return;
+    
+    await _databaseFacade.saveNotification(notification, _currentAccountId!);
+    _emitNotificationsUpdate();
+  }
+
+  Future<List<NotificationItem>> getNotificationsHistory() async {
+    if (_currentAccountId == null) await _initializeWithAccount();
+    if (_currentAccountId == null) return [];
+    
+    return await _databaseFacade.getNotifications(_currentAccountId!);
+  }
+
+  Future<void> markAsRead(int notificationId) async {
+    if (_currentAccountId == null) await _initializeWithAccount();
+    if (_currentAccountId == null) return;
+    
+    await _databaseFacade.markAsRead(notificationId, _currentAccountId!);
+    _emitNotificationsUpdate();
+  }
+
+  Future<void> clearNotificationsHistory() async {
+    if (_currentAccountId == null) await _initializeWithAccount();
+    if (_currentAccountId == null) return;
+    
+    await _databaseFacade.clearNotifications(_currentAccountId!);
+    _emitNotificationsUpdate();
+  }
+
+  Future<void> deleteNotification(int notificationId) async {
+    if (_currentAccountId == null) await _initializeWithAccount();
+    if (_currentAccountId == null) return;
+    
+    await _databaseFacade.deleteNotification(notificationId, _currentAccountId!);
+    _emitNotificationsUpdate();
+  }
+
   
 
   void _emitNotificationsUpdate() {
@@ -90,25 +137,6 @@ class NotificationService {
         _notificationsController.add(notifications);
       });
     }
-  }
-
-  Future<void> saveNotificationToHistory(NotificationItem notification) async {
-    await _secureStorage.addNotificationToHistory(notification);
-    _emitNotificationsUpdate();
-  }
-
-  Future<List<NotificationItem>> getNotificationsHistory() async {
-    return await _secureStorage.getNotificationsHistory();
-  }
-
-  Future<void> markAsRead(int notificationId) async {
-    await _secureStorage.markNotificationAsRead(notificationId);
-    _emitNotificationsUpdate();
-  }
-
-  Future<void> clearNotificationsHistory() async {
-    await _secureStorage.clearNotificationsHistory();
-    _emitNotificationsUpdate();
   }
 
   Future<void> showTestNotification() async {
@@ -251,18 +279,6 @@ class NotificationService {
 
   Future<bool> isInitialized() async {
     return _isInitialized;
-  }
-
-  Future<void> deleteNotification(int notificationId) async {
-    try {
-      final List<NotificationItem> notifications = await getNotificationsHistory();
-      final updatedNotifications = notifications.where((n) => n.id != notificationId).toList();
-      await _secureStorage.saveNotificationsHistory(updatedNotifications);
-      _emitNotificationsUpdate();
-      print('🗑️ Уведомление $notificationId удалено');
-    } catch (e) {
-      print('❌ Ошибка удаления уведомления: $e');
-    }
   }
 
   Future<void> _createNotificationChannels() async {

@@ -1,6 +1,7 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'dart:convert';
+import 'package:journal_mobile/_database/database_service.dart';
+import 'package:journal_mobile/services/_account/account_manager_service.dart';
 
+import '../../_database/database_facade.dart';
 import '../../models/mark.dart';
 import '../../models/user_data.dart';
 import '../../models/days_element.dart';
@@ -10,445 +11,202 @@ import '../../models/_widgets/exams/exam.dart';
 import '../../models/activity_record.dart';
 import '../../models/_widgets/homework/homework.dart';
 import '../../models/_widgets/homework/homework_counter.dart';
+import '../api_service.dart';
 
 class OfflineStorageService {
   static final OfflineStorageService _instance = OfflineStorageService._internal();
   factory OfflineStorageService() => _instance;
   OfflineStorageService._internal();
 
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final DatabaseFacade _databaseFacade = DatabaseFacade();
+  final DatabaseService _databaseService = DatabaseService();
+  final AccountManagerService _accountManager = AccountManagerService();
+  
+  String? _currentAccountId;
 
-  // Ключи для Secure Storage
-  static const String _marksKey = 'offline_marks';
-  static const String _userKey = 'offline_user';
-  static const String _scheduleKey = 'offline_schedule';
-  static const String _activityKey = 'offline_activity';
-  static const String _examsKey = 'offline_exams';
-  static const String _feedbackKey = 'offline_feedback';
-  static const String _homeworksKey = 'offline_homeworks';
-  static const String _groupLeadersKey = 'offline_group_leaders';
-  static const String _streamLeadersKey = 'offline_stream_leaders';
-  static const String _homeworkCountersKey = 'offline_homework_counters';
-
-  static const String _homeworksType0Key = 'offline_homeworks_type_0';
-  static const String _homeworksType1Key = 'offline_homeworks_type_1';
-  static const String _homeworkCountersType0Key = 'offline_homework_counters_type_0';
-  static const String _homeworkCountersType1Key = 'offline_homework_counters_type_1';
-
-
-  // Ограничения кэша
   static const int _maxMarks = 2000;
   static const int _maxSchedule = 500;
   static const int _maxActivities = 500;
-  static const int _maxExams = 200;
-  static const int _maxFeedbacks = 200;
   static const int _maxHomeworks = 500;
   static const int _maxLeaders = 100;
 
-Future<void> cleanupOldData() async {
-  try {
-    await getOfflineDataStats();
-    print('🧹 Начинаем очистку устаревших данных...');
-    
-    await _cleanupIfExceedsLimit(_marksKey, _maxMarks, getMarks, saveMarks);
-    await _cleanupIfExceedsLimit(_scheduleKey, _maxSchedule, getSchedule, saveSchedule);
-    await _cleanupIfExceedsLimit(_activityKey, _maxActivities, getActivityRecords, saveActivityRecords);
-    
-    print('✅ Очистка данных завершена');
-  } catch (e) {
-    print('❌ Ошибка очистки данных: $e');
-  }
-}
-
-Future<void> _cleanupIfExceedsLimit<T>(
-  String key, 
-  int maxLimit, 
-  Future<List<T>> Function() getData,
-  Future<void> Function(List<T>) saveData,
-) async {
-  try {
-    final data = await getData();
-    if (data.length > maxLimit) {
-      final cleanedData = data.sublist(data.length - maxLimit);
-      await saveData(cleanedData);
-      print('🗑️ Очищены данные $key: ${data.length} -> ${cleanedData.length}');
+  Future<String> _getCurrentAccountId() async {
+    if (_currentAccountId == null) {
+      final account = await _accountManager.getCurrentAccount();
+      if (account == null) {
+        throw Exception('Нет активного аккаунта для работы с оффлайн данными');
+      }
+      _currentAccountId = account.id;
     }
-  } catch (e) {
-    print('❌ Ошибка очистки $key: $e');
+    return _currentAccountId!;
   }
-}
 
   Future<void> saveMarks(List<Mark> marks) async {
-    try {
-      final marksToSave = marks.length > _maxMarks 
-          ? marks.sublist(0, _maxMarks)
-          : marks;
-          
-      final marksJson = marksToSave.map((mark) => mark.toJson()).toList();
-      await _storage.write(key: _marksKey, value: jsonEncode(marksJson));
-      print('💾 Оценки сохранены offline: ${marksToSave.length} шт (лимит: $_maxMarks)');
-    } catch (e) {
-      print('❌ Ошибка сохранения оценок: $e');
-    }
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveMarks(marks, accountId);
+    print('✅ Оценки сохранены в SQLite: ${marks.length} шт');
   }
 
   Future<List<Mark>> getMarks() async {
-    try {
-      final jsonString = await _storage.read(key: _marksKey);
-      if (jsonString == null || jsonString.isEmpty) {
-        return [];
-      }
-      
-      final List<dynamic> marksList = jsonDecode(jsonString);
-      return marksList.map((json) => Mark.fromJson(json)).toList();
-    } catch (e) {
-      print('❌ Ошибка загрузки offline оценок: $e');
-      return [];
-    }
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getMarks(accountId);
   }
 
   Future<void> saveUserData(UserData user) async {
-    try {
-      await _storage.write(key: _userKey, value: jsonEncode(user.toJson()));
-      print('💾 Данные пользователя сохранены offline');
-    } catch (e) {
-      print('❌ Ошибка сохранения пользователя: $e');
-    }
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveUserData(user, accountId);
+    print('✅ Данные пользователя сохранены в SQLite');
   }
 
   Future<UserData?> getUserData() async {
-    try {
-      final jsonString = await _storage.read(key: _userKey);
-      if (jsonString == null || jsonString.isEmpty) {
-        return null;
-      }
-      
-      final userJson = jsonDecode(jsonString);
-      return UserData.fromJson(userJson);
-    } catch (e) {
-      print('❌ Ошибка загрузки offline пользователя: $e');
-      return null;
-    }
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getUserData(accountId);
   }
 
   Future<void> saveSchedule(List<ScheduleElement> schedule) async {
-    try {
-      final scheduleToSave = schedule.length > _maxSchedule 
-          ? schedule.sublist(0, _maxSchedule)
-          : schedule;
-          
-      final scheduleJson = scheduleToSave.map((element) => element.toJson()).toList();
-      await _storage.write(key: _scheduleKey, value: jsonEncode(scheduleJson));
-      print('💾 Расписание сохранено offline: ${scheduleToSave.length} шт (лимит: $_maxSchedule)');
-    } catch (e) {
-      print('❌ Ошибка сохранения расписания: $e');
-    }
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveSchedule(schedule, accountId);
+    print('✅ Расписание сохранено в SQLite: ${schedule.length} шт');
   }
 
   Future<List<ScheduleElement>> getSchedule() async {
-    try {
-      final jsonString = await _storage.read(key: _scheduleKey);
-      if (jsonString == null || jsonString.isEmpty) {
-        return [];
-      }
-      
-      final List<dynamic> scheduleList = jsonDecode(jsonString);
-      return scheduleList.map((json) => ScheduleElement.fromJson(json)).toList();
-    } catch (e) {
-      print('❌ Ошибка загрузки offline расписания: $e');
-      return [];
-    }
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getSchedule(accountId);
+  }
+
+  Future<List<ScheduleElement>> getScheduleByDateRange(DateTime start, DateTime end) async {
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getScheduleByDateRange(accountId, start, end);
   }
 
   Future<void> saveActivityRecords(List<ActivityRecord> activities) async {
-    try {
-      final activitiesToSave = activities.length > _maxActivities 
-          ? activities.sublist(0, _maxActivities)
-          : activities;
-          
-      final activitiesJson = activitiesToSave.map((activity) => activity.toJson()).toList();
-      await _storage.write(key: _activityKey, value: jsonEncode(activitiesJson));
-      print('💾 Активности сохранены offline: ${activitiesToSave.length} шт (лимит: $_maxActivities)');
-    } catch (e) {
-      print('❌ Ошибка сохранения активностей: $e');
-    }
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveActivities(activities, accountId);
+    print('✅ Активности сохранены в SQLite: ${activities.length} шт');
   }
 
   Future<List<ActivityRecord>> getActivityRecords() async {
-    try {
-      final jsonString = await _storage.read(key: _activityKey);
-      if (jsonString == null || jsonString.isEmpty) {
-        return [];
-      }
-      
-      final List<dynamic> activitiesList = jsonDecode(jsonString);
-      return activitiesList.map((json) => ActivityRecord.fromJson(json)).toList();
-    } catch (e) {
-      print('❌ Ошибка загрузки offline активностей: $e');
-      return [];
-    }
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getActivities(accountId);
   }
 
   Future<void> saveExams(List<Exam> exams) async {
-    try {
-      final examsToSave = exams.length > _maxExams 
-          ? exams.sublist(0, _maxExams)
-          : exams;
-          
-      final examsJson = examsToSave.map((exam) => exam.toJson()).toList();
-      await _storage.write(key: _examsKey, value: jsonEncode(examsJson));
-      print('💾 Экзамены сохранены offline: ${examsToSave.length} шт (лимит: $_maxExams)');
-    } catch (e) {
-      print('❌ Ошибка сохранения экзаменов: $e');
-    }
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveExams(exams, accountId);
+    print('✅ Экзамены сохранены в SQLite: ${exams.length} шт');
   }
 
   Future<List<Exam>> getExams() async {
-    try {
-      final jsonString = await _storage.read(key: _examsKey);
-      if (jsonString == null || jsonString.isEmpty) {
-        return [];
-      }
-      
-      final List<dynamic> examsList = jsonDecode(jsonString);
-      return examsList.map((json) => Exam.fromJson(json)).toList();
-    } catch (e) {
-      print('❌ Ошибка загрузки offline экзаменов: $e');
-      return [];
-    }
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getExams(accountId);
+  }
+
+  Future<List<Exam>> getFutureExams() async {
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getFutureExams(accountId);
   }
 
   Future<void> saveFeedbackReviews(List<FeedbackReview> feedbacks) async {
-    try {
-      final feedbacksToSave = feedbacks.length > _maxFeedbacks 
-          ? feedbacks.sublist(0, _maxFeedbacks)
-          : feedbacks;
-          
-      final feedbacksJson = feedbacksToSave.map((feedback) => feedback.toJson()).toList();
-      await _storage.write(key: _feedbackKey, value: jsonEncode(feedbacksJson));
-      print('💾 Отзывы сохранены offline: ${feedbacksToSave.length} шт (лимит: $_maxFeedbacks)');
-    } catch (e) {
-      print('❌ Ошибка сохранения отзывов: $e');
-    }
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveFeedbacks(feedbacks, accountId);
+    print('✅ Отзывы сохранены в SQLite: ${feedbacks.length} шт');
   }
 
   Future<List<FeedbackReview>> getFeedbackReviews() async {
-    try {
-      final jsonString = await _storage.read(key: _feedbackKey);
-      if (jsonString == null || jsonString.isEmpty) {
-        return [];
-      }
-      
-      final List<dynamic> feedbacksList = jsonDecode(jsonString);
-      return feedbacksList.map((json) => FeedbackReview.fromJson(json)).toList();
-    } catch (e) {
-      print('❌ Ошибка загрузки offline отзывов: $e');
-      return [];
-    }
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getFeedbacks(accountId);
   }
 
   Future<void> saveHomeworks(List<Homework> homeworks, {int? type}) async {
-    try {
-      final key = type == 1 ? _homeworksType1Key : _homeworksType0Key;
-      final description = type == 1 ? 'лабораторные' : 'домашние';
-      final existingHomeworks = await getHomeworks(type: type);
-      final existingIds = existingHomeworks.map((h) => h.id).toSet();
-      final newHomeworks = homeworks.where((h) => !existingIds.contains(h.id)).toList();
-      final allHomeworks = [...existingHomeworks, ...newHomeworks];
-      
-      final homeworksToSave = allHomeworks.length > _maxHomeworks 
-          ? allHomeworks.sublist(allHomeworks.length - _maxHomeworks)
-          : allHomeworks;
-          
-      final homeworksJson = homeworksToSave.map((homework) => homework.toJson()).toList();
-      await _storage.write(key: key, value: jsonEncode(homeworksJson));
-      
-      print('💾 $description задания сохранены offline: ${homeworksToSave.length} шт (+${newHomeworks.length} новых)');
-      
-      final typeStats = <int, int>{};
-      for (var hw in homeworksToSave) {
-        final materialType = hw.materialType ?? 0;
-        typeStats[materialType] = (typeStats[materialType] ?? 0) + 1;
-      }
-      print('📊 Статистика materialType:');
-      typeStats.forEach((mt, count) {
-        print('   - materialType=$mt: $count заданий');
-      });
-      
-    } catch (e) {
-      print('❌ Ошибка сохранения домашних заданий: $e');
-    }
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveHomeworks(homeworks, accountId, materialType: type);
+    print('✅ ${type == 1 ? 'Лабораторные' : 'Домашние'} задания сохранены в SQLite: ${homeworks.length} шт');
   }
 
-  Future<List<Homework>> getHomeworks({int? type}) async {
-    try {
-      final key = type == 1 ? _homeworksType1Key : _homeworksType0Key;
-      final jsonString = await _storage.read(key: key);
-      
-      if (jsonString == null || jsonString.isEmpty) {
-        return [];
-      }
-      
-      final List<dynamic> homeworksList = jsonDecode(jsonString);
-      return homeworksList.map((json) => Homework.fromJson(json)).toList();
-      
-    } catch (e) {
-      print('❌ Ошибка загрузки offline домашних заданий: $e');
-      return [];
-    }
-  }
-
-  Future<Map<String, dynamic>> getHomeworksStats() async {
-  try {
-    final homeworksType0 = await getHomeworks(type: 0);
-    final homeworksType1 = await getHomeworks(type: 1);
-    
-    final statsType0 = <int, int>{};
-    final statsType1 = <int, int>{};
-    
-    for (var hw in homeworksType0) {
-      final status = hw.getDisplayStatus();
-      statsType0[status] = (statsType0[status] ?? 0) + 1;
-    }
-    
-    for (var hw in homeworksType1) {
-      final status = hw.getDisplayStatus();
-      statsType1[status] = (statsType1[status] ?? 0) + 1;
-    }
-    
-    print('📊 Статистика оффлайн заданий:');
-    print('   Домашние (type=0): ${homeworksType0.length} заданий');
-    statsType0.forEach((status, count) {
-      print('     - Статус $status: $count заданий');
-    });
-    print('   Лабораторные (type=1): ${homeworksType1.length} заданий');
-    statsType1.forEach((status, count) {
-      print('     - Статус $status: $count заданий');
-    });
-    
-    return {
-      'type0_count': homeworksType0.length,
-      'type1_count': homeworksType1.length,
-      'type0_stats': statsType0,
-      'type1_stats': statsType1,
-    };
-  } catch (e) {
-    print('❌ Ошибка получения статистики заданий: $e');
-    return {};
-    }
-  }
-
-  Future<void> saveGroupLeaders(List<LeaderboardUser> leaders) async {
-    try {
-      final leadersToSave = leaders.length > _maxLeaders 
-          ? leaders.sublist(0, _maxLeaders)
-          : leaders;
-          
-      final leadersJson = leadersToSave.map((leader) => leader.toJson()).toList();
-      await _storage.write(key: _groupLeadersKey, value: jsonEncode(leadersJson));
-      print('💾 Лидеры группы сохранены offline: ${leadersToSave.length} шт (лимит: $_maxLeaders)');
-    } catch (e) {
-      print('❌ Ошибка сохранения лидеров группы: $e');
-    }
-  }
-
-  Future<List<LeaderboardUser>> getGroupLeaders() async {
-    try {
-      final jsonString = await _storage.read(key: _groupLeadersKey);
-      if (jsonString == null || jsonString.isEmpty) {
-        return [];
-      }
-      
-      final List<dynamic> leadersList = jsonDecode(jsonString);
-      return leadersList.map((json) => LeaderboardUser.fromJson(json)).toList();
-    } catch (e) {
-      print('❌ Ошибка загрузки offline лидеров группы: $e');
-      return [];
-    }
-  }
-
-  Future<void> saveStreamLeaders(List<LeaderboardUser> leaders) async {
-    try {
-      final leadersToSave = leaders.length > _maxLeaders 
-          ? leaders.sublist(0, _maxLeaders)
-          : leaders;
-          
-      final leadersJson = leadersToSave.map((leader) => leader.toJson()).toList();
-      await _storage.write(key: _streamLeadersKey, value: jsonEncode(leadersJson));
-      print('💾 Лидеры потока сохранены offline: ${leadersToSave.length} шт (лимит: $_maxLeaders)');
-    } catch (e) {
-      print('❌ Ошибка сохранения лидеров потока: $e');
-    }
-  }
-
-  Future<List<LeaderboardUser>> getStreamLeaders() async {
-    try {
-      final jsonString = await _storage.read(key: _streamLeadersKey);
-      if (jsonString == null || jsonString.isEmpty) {
-        return [];
-      }
-      
-      final List<dynamic> leadersList = jsonDecode(jsonString);
-      return leadersList.map((json) => LeaderboardUser.fromJson(json)).toList();
-    } catch (e) {
-      print('❌ Ошибка загрузки offline лидеров потока: $e');
-      return [];
-    }
+  Future<List<Homework>> getHomeworks({int? type, int? status, int? page, int? limit}) async {
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getHomeworks(
+      accountId, 
+      materialType: type, 
+      status: status, 
+      page: page, 
+      limit: limit
+    );
   }
 
   Future<void> saveHomeworkCounters(List<HomeworkCounter> counters, {int? type}) async {
-    try {
-      final key = type == 1 ? _homeworkCountersType1Key : _homeworkCountersType0Key;
-      final description = type == 1 ? 'лабораторные' : 'домашние';
-      
-      final countersJson = counters.map((counter) => counter.toJson()).toList();
-      await _storage.write(key: key, value: jsonEncode(countersJson));
-      print('💾 Счетчики $description заданий сохранены offline: ${counters.length} шт');
-    } catch (e) {
-      print('❌ Ошибка сохранения счетчиков ДЗ: $e');
-    }
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveHomeworkCounters(counters, accountId, type: type);
+    print('✅ Счетчики ${type == 1 ? 'лабораторных' : 'домашних'} заданий сохранены в SQLite: ${counters.length} шт');
   }
 
   Future<List<HomeworkCounter>> getHomeworkCounters({int? type}) async {
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getHomeworkCounters(accountId, type: type);
+  }
+
+  Future<void> saveGroupLeaders(List<LeaderboardUser> leaders) async {
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveGroupLeaders(leaders, accountId);
+    print('✅ Лидеры группы сохранены в SQLite: ${leaders.length} шт');
+  }
+
+  Future<List<LeaderboardUser>> getGroupLeaders() async {
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getGroupLeaders(accountId);
+  }
+
+  Future<void> saveStreamLeaders(List<LeaderboardUser> leaders) async {
+    final accountId = await _getCurrentAccountId();
+    await _databaseFacade.saveStreamLeaders(leaders, accountId);
+    print('✅ Лидеры потока сохранены в SQLite: ${leaders.length} шт');
+  }
+
+  Future<List<LeaderboardUser>> getStreamLeaders() async {
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getStreamLeaders(accountId);
+  }
+
+
+  //TODO: Доп. методы (утилиты rabbits перенести под архитектуру.)
+  Future<void> cleanupOldData() async {
     try {
-      final key = type == 1 ? _homeworkCountersType1Key : _homeworkCountersType0Key;
-      final jsonString = await _storage.read(key: key);
+      print('🧹 Начинаем очистку устаревших данных...');
       
-      if (jsonString == null || jsonString.isEmpty) {
-        final oldJsonString = await _storage.read(key: _homeworkCountersKey);
-        if (oldJsonString == null || oldJsonString.isEmpty) {
-          return [];
-        }
-        
-        final List<dynamic> countersList = jsonDecode(oldJsonString);
-        return countersList.map((json) => HomeworkCounter.fromJson(json)).toList();
+      final accountId = await _getCurrentAccountId();
+      
+      final allMarks = await getMarks();
+      if (allMarks.length > _maxMarks) {
+        final marksToKeep = allMarks.sublist(allMarks.length - _maxMarks);
+        await saveMarks(marksToKeep);
+        print('🗑️ Очищены оценки: ${allMarks.length} -> ${marksToKeep.length}');
       }
       
-      final List<dynamic> countersList = jsonDecode(jsonString);
-      return countersList.map((json) => HomeworkCounter.fromJson(json)).toList();
+      final allSchedule = await getSchedule();
+      if (allSchedule.length > _maxSchedule) {
+        final scheduleToKeep = allSchedule.sublist(allSchedule.length - _maxSchedule);
+        await saveSchedule(scheduleToKeep);
+        print('🗑️ Очищено расписание: ${allSchedule.length} -> ${scheduleToKeep.length}');
+      }
+      
+      final allActivities = await getActivityRecords();
+      if (allActivities.length > _maxActivities) {
+        final activitiesToKeep = allActivities.sublist(allActivities.length - _maxActivities);
+        await saveActivityRecords(activitiesToKeep);
+        print('🗑️ Очищены активности: ${allActivities.length} -> ${activitiesToKeep.length}');
+      }
+      
+      print('✅ Очистка данных завершена');
     } catch (e) {
-      print('❌ Ошибка загрузки offline счетчиков ДЗ: $e');
-      return [];
+      print('❌ Ошибка очистки данных: $e');
     }
   }
 
-  /// Метод для очистки всех offline данных
   Future<void> clearAllOfflineData() async {
     try {
-      await _storage.delete(key: _marksKey);
-      await _storage.delete(key: _userKey);
-      await _storage.delete(key: _scheduleKey);
-      await _storage.delete(key: _activityKey);
-      await _storage.delete(key: _examsKey);
-      await _storage.delete(key: _feedbackKey);
-      await _storage.delete(key: _homeworksKey);
-      await _storage.delete(key: _groupLeadersKey);
-      await _storage.delete(key: _streamLeadersKey);
-      await _storage.delete(key: _homeworkCountersKey);
-      await _storage.delete(key: _homeworkCountersType0Key);
-      await _storage.delete(key: _homeworkCountersType1Key);
-      
-      print('🗑️ Все offline данные очищены');
+      final accountId = await _getCurrentAccountId();
+      await _databaseService.clearAllForAccount(accountId);
+      print('🗑️ Все offline данные очищены для аккаунта: $accountId');
     } catch (e) {
       print('❌ Ошибка очистки offline данных: $e');
     }
@@ -458,6 +216,8 @@ Future<void> _cleanupIfExceedsLimit<T>(
     final stats = <String, int>{};
     
     try {
+      final accountId = await _getCurrentAccountId();
+      
       final marks = await getMarks();
       stats['marks'] = marks.length;
       
@@ -488,6 +248,11 @@ Future<void> _cleanupIfExceedsLimit<T>(
       final homeworkCounters = await getHomeworkCounters();
       stats['homeworkCounters'] = homeworkCounters.length;
       
+      print('📊 Статистика оффлайн данных для аккаунта $accountId:');
+      stats.forEach((key, value) {
+        print('   - $key: $value');
+      });
+      
     } catch (e) {
       print('❌ Ошибка получения статистики offline данных: $e');
     }
@@ -495,24 +260,10 @@ Future<void> _cleanupIfExceedsLimit<T>(
     return stats;
   }
 
-  // TODO Вынести позже в отдельную директиву по архитектуре проекта. - Ди 13.12.25
-  /// Фильтрация по статусу HomeWork (Домашние / Лабораторные)
   Future<List<Homework>> getHomeworksByStatus(int? status, {int? type}) async {
-    try {
-      final homeworks = await getHomeworks(type: type);
-      
-      if (status != null) {
-        return homeworks.where((hw) => hw.getDisplayStatus() == status).toList();
-      }
-      
-      return homeworks;
-    } catch (e) {
-      print('❌ Ошибка загрузки offline домашних заданий: $e');
-      return [];
-    }
+    return await getHomeworks(type: type, status: status);
   }
 
-  /// Получить статистику по статусам домашних заданий в оффлайн кэше
   Future<Map<String, int>> getHomeworkStatusStats() async {
     try {
       final homeworks = await getHomeworks();
@@ -526,9 +277,6 @@ Future<void> _cleanupIfExceedsLimit<T>(
       
       for (var hw in homeworks) {
         final status = hw.getRealStatus();
-        final statusString = hw.statusString;
-        
-        print('📝 Задание ${hw.id} "${hw.theme}": realStatus=$status, statusString=$statusString');
         
         switch (status) {
           case 0: stats['expired'] = stats['expired']! + 1; break;
@@ -539,7 +287,7 @@ Future<void> _cleanupIfExceedsLimit<T>(
         }
       }
       
-      print('📊 Статистика статусов в оффлайн кэше:');
+      print('📊 Статистика статусов домашних заданий:');
       stats.forEach((status, count) {
         print('  - $status: $count заданий');
       });
@@ -551,15 +299,14 @@ Future<void> _cleanupIfExceedsLimit<T>(
     }
   }
 
+  /// Диагностика типов заданий
   Future<void> debugHomeworkTypes() async {
     try {
-      print('🔍 Диагностика типов заданий в оффлайн хранилище:');
+      print('🔍 Диагностика типов заданий в SQLite:');
       
-      // Получаем все задания
       final allHomeworks = await getHomeworks();
       print('Всего заданий: ${allHomeworks.length}');
       
-      // Группируем по materialType
       final byType = <int, List<Homework>>{};
       for (var hw in allHomeworks) {
         final type = hw.materialType ?? 0;
@@ -576,73 +323,92 @@ Future<void> _cleanupIfExceedsLimit<T>(
         print('   Примеры: ${examples.join(", ")}');
       });
       
-      final type0Homeworks = await getHomeworks(type: 0);
-      final type1Homeworks = await getHomeworks(type: 1);
-      
-      print('Разделенное хранение:');
-      print('   type=0: ${type0Homeworks.length} заданий');
-      print('   type=1: ${type1Homeworks.length} заданий');
-      
     } catch (e) {
       print('❌ Ошибка диагностики: $e');
     }
   }
 
-  /// Исправление старых данных в хранилище
-  Future<void> fixHomeworkStorageData() async {
+  /// Синхронизация лабораторных работ
+  Future<void> syncLabWorks(String token) async {
+  try {
+    print('🔄 Принудительная синхронизация лабораторных работ...');
+    
+    final accountId = await _getCurrentAccountId();
+    
+    // Используем ApiService через ServiceLocator или внедрение зависимостей
+    final apiService = ApiService();
+    final labWorks = await apiService.getHomeworks(token, type: 1);
+    
+    await saveHomeworks(labWorks, type: 1);
+    
+    print('✅ Лабораторные работы синхронизированы: ${labWorks.length} шт');
+  } catch (e) {
+    print('❌ Ошибка синхронизации лабораторных работ: $e');
+  }
+}
+
+  /// Получить домашние задания с пагинацией
+  Future<List<Homework>> getHomeworksPaginated({
+    int? type,
+    int? status,
+    int page = 1,
+    int limit = 6,
+  }) async {
+    return await getHomeworks(
+      type: type,
+      status: status,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  /// Проверить наличие минимальных оффлайн данных
+  Future<bool> hasMinimumOfflineData() async {
     try {
-      print('🛠️ Начинаем исправление данных в хранилище...');
+      final stats = await getOfflineDataStats();
       
-      await _storage.delete(key: _homeworksKey);
-      await _storage.delete(key: _homeworksType0Key);
-      await _storage.delete(key: _homeworksType1Key);
+      final hasUserData = stats['user'] != null && stats['user']! > 0;
+      final hasMarks = stats['marks'] != null && stats['marks']! > 0;
+      final hasSchedule = stats['schedule'] != null && stats['schedule']! > 0;
       
-      print('✅ Данные в хранилище очищены');
+      final hasMinimumData = hasUserData && hasMarks;
       
-      await _storage.write(key: _homeworksType0Key, value: jsonEncode([]));
-      await _storage.write(key: _homeworksType1Key, value: jsonEncode([]));
+      print('📱 Проверка оффлайн данных:');
+      print('   - Есть данные пользователя: $hasUserData');
+      print('   - Есть оценки: $hasMarks');
+      print('   - Есть расписание: $hasSchedule');
+      print('   - Достаточно данных для оффлайн режима: $hasMinimumData');
       
-      print('✅ Хранилища инициализированы заново');
-      
+      return hasMinimumData;
     } catch (e) {
-      print('❌ Ошибка исправления данных: $e');
+      print('❌ Ошибка проверки оффлайн данных: $e');
+      return false;
     }
   }
 
-  /// Диагностика хранилища
-  Future<void> diagnoseHomeworkStorage() async {
+  /// Миграция старых данных из SecureStorage в SQLite
+  Future<void> migrateFromSecureStorage() async {
     try {
-      print('🔍 Диагностика хранилища заданий:');
+      print('🔄 Начинаем миграцию данных из SecureStorage в SQLite...');
       
-      final keys = [_homeworksKey, _homeworksType0Key, _homeworksType1Key];
+      // Здесь можно добавить логику миграции старых данных
+      // Но в новой архитектуре мы начинаем с чистого SQLite
       
-      for (var key in keys) {
-        final data = await _storage.read(key: key);
-        final count = data != null && data.isNotEmpty 
-            ? jsonDecode(data).length 
-            : 0;
-        print('   $key: $count записей');
-      }
-      
+      print('✅ Миграция данных завершена (или не требуется)');
     } catch (e) {
-      print('❌ Ошибка диагностики: $e');
+      print('❌ Ошибка миграции данных: $e');
     }
   }
 
-  Future<void> fixHomeworkCounters() async {
-    try {
-      print('🛠️ Исправляем счетчики заданий...');
-      
-      await _storage.delete(key: _homeworkCountersKey);
-      await _storage.delete(key: _homeworkCountersType0Key);
-      await _storage.delete(key: _homeworkCountersType1Key);
-      
-      await _storage.write(key: _homeworkCountersType0Key, value: jsonEncode([]));
-      await _storage.write(key: _homeworkCountersType1Key, value: jsonEncode([]));
-      
-      print('✅ Счетчики исправлены - готовы для новой синхронизации');
-    } catch (e) {
-      print('❌ Ошибка исправления счетчиков: $e');
-    }
+  /// Установить текущий аккаунт (например, при переключении)
+  Future<void> setCurrentAccount(String accountId) async {
+    _currentAccountId = accountId;
+    print('🔄 Установлен текущий аккаунт для оффлайн данных: $accountId');
+  }
+
+  /// Очистить кэш (в памяти)
+  void clearCache() {
+    _currentAccountId = null;
+    print('🧹 Кэш OfflineStorageService очищен');
   }
 }

@@ -77,4 +77,32 @@ class Account {
   String toString() {
     return 'Account(username: $username, fullName: $fullName, group: $groupName, active: $isActive)';
   }
+
+  factory Account.fromMap(Map<String, dynamic> map) {
+    return Account(
+      id: map['id'] as String? ?? '',
+      username: map['username'] as String? ?? '',
+      fullName: map['full_name'] as String? ?? '', // snake_case из БД
+      groupName: map['group_name'] as String? ?? '',
+      photoPath: map['photo_path'] as String? ?? '',
+      token: map['token'] as String? ?? '',
+      lastLogin: DateTime.parse(map['last_login'] as String? ?? DateTime.now().toIso8601String()),
+      isActive: (map['is_active'] as int?) == 1, // SQLite хранит bool как 0/1
+      studentId: (map['student_id'] as int?) ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'username': username,
+      'full_name': fullName, // snake_case для БД
+      'group_name': groupName,
+      'photo_path': photoPath,
+      'token': token,
+      'last_login': lastLogin.toIso8601String(),
+      'is_active': isActive ? 1 : 0, // преобразуем bool в int
+      'student_id': studentId,
+    };
+  }
 }

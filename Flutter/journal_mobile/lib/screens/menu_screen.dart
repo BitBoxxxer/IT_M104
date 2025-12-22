@@ -1186,8 +1186,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         // TODO: Перенести в экран настроек - ДИ
                         ElevatedButton(
                           onPressed: () async {
-                            final offlineStorage = OfflineStorageService();
-                            await offlineStorage.fixHomeworkStorageData();
+                            // TODO: offlineStorage.fixHomeworkStorageData();
+                            
+                            /* final offlineStorage = OfflineStorageService();
+                            await offlineStorage.fixHomeworkStorageData(); */
                             
                             await _refreshData();
                             

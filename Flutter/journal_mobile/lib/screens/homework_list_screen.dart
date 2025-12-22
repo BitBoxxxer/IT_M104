@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:journal_mobile/services/_offline_service/offline_storage_service.dart';
 
 import '../services/_network/network_service.dart';
 import '../services/api_service.dart';
@@ -27,6 +28,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
   final NetworkService _networkService = NetworkService();
+  final OfflineStorageService _offlineStorageService = OfflineStorageService();
 
   final Map<String, List<Homework>> _tabHomeworks = {};
   final Map<String, int> _tabCurrentPages = {};
@@ -58,7 +60,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
 
     if (widget.isLabWork) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _apiService.syncLabWorks(widget.token);
+        _offlineStorageService.syncLabWorks(widget.token);
       });
     }
     

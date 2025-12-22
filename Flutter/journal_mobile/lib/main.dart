@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import '_database/database_health_check.dart';
+import '_database/sqflite_init.dart';
+
 import 'screens/login_screen.dart';
 import 'services/_account/account_manager_service.dart';
 import 'services/_offline_service/offline_storage_service.dart';
@@ -17,6 +20,8 @@ import 'screens/menu_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+   await SqfliteInitializer.initialize();
   await initializeDateFormatting('ru', null);
   
   try {
@@ -54,6 +59,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Future<void> _initializeServices() async {
     try {
+      await DatabaseHealthCheck.repairDatabaseIfNeeded();
       await _networkService.initialize();
       await _loadTheme();
     } catch (e) {

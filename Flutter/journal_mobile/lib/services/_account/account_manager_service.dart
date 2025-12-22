@@ -1,5 +1,10 @@
 import 'dart:convert';
+import 'dart:math';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../_database/database_config.dart';
+import '../../_database/database_facade.dart';
+import '../../_database/database_service.dart';
 import '../../models/_system/account_model.dart';
 
 class AccountManagerService {
@@ -7,21 +12,25 @@ class AccountManagerService {
   factory AccountManagerService() => _instance;
   AccountManagerService._internal();
 
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
-  static const String _accountsKey = 'multi_accounts_list';
-  static const String _currentAccountIdKey = 'current_account_id';
+  final DatabaseFacade _databaseFacade = DatabaseFacade();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  
+  // Ключи для SecureStorage (ТОЛЬКО для паролей)
+  static String _getUsernameKey(String accountId) => 'acc_${accountId}_username';
+  static String _getPasswordKey(String accountId) => 'acc_${accountId}_password';
+  static const String _masterPasswordKey = 'master_password';
+  static const String _biometricKey = 'biometric_enabled';
 
-  /// Получить список всех сохраненных аккаунтов
+  /// ==================== ОСНОВНЫЕ МЕТОДЫ ====================
+
+  /// Получить список всех сохраненных аккаунтов (из SQLite)
+
   Future<List<Account>> getAllAccounts() async {
     try {
-      final jsonString = await _storage.read(key: _accountsKey) ?? '[]';
-      final List<dynamic> accountsList = jsonDecode(jsonString);
-      
-      return accountsList
-          .map((json) => Account.fromJson(json))
-          .toList();
+      // Используем фасад вместо прямого запроса к БД
+      return await _databaseFacade.getAllAccounts();
     } catch (e) {
-      print('❌ Ошибка загрузки аккаунтов: $e');
+      print('❌ Ошибка getAllAccounts: $e');
       return [];
     }
   }
@@ -29,32 +38,47 @@ class AccountManagerService {
   /// Добавить/обновить аккаунт
   Future<void> addAccount(Account account) async {
     try {
-      List<Account> accounts = await getAllAccounts();
+      print('➕ Добавление аккаунта: ${account.username}');
       
-      accounts = accounts.map((acc) => acc.copyWith(isActive: false)).toList();
+      // 1. Получаем все существующие аккаунты
+      final allAccounts = await getAllAccounts();
       
-      final existingIndex = accounts.indexWhere((a) => a.username == account.username);
-      
-      if (existingIndex >= 0) {
-        accounts[existingIndex] = account.copyWith(
-          isActive: true,
-          lastLogin: DateTime.now(),
-        );
-        print('🔄 Аккаунт обновлен: ${account.username}');
-      } else {
-        final newAccount = account.copyWith(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          isActive: true,
-          lastLogin: DateTime.now(),
-        );
-        accounts.add(newAccount);
-        print('➕ Новый аккаунт добавлен: ${account.username}');
+      // 2. Деактивируем ВСЕ существующие аккаунты
+      for (var existingAccount in allAccounts) {
+        if (existingAccount.isActive) {
+          final deactivated = existingAccount.copyWith(isActive: false);
+          await _databaseFacade.saveAccount(deactivated);
+        }
       }
       
-      await _saveAccounts(accounts);
-      await _setCurrentAccountId(account.id);
+      // 3. Проверяем, существует ли уже такой username
+      final existingIndex = allAccounts.indexWhere((a) => a.username == account.username);
       
-      print('📊 Всего аккаунтов: ${accounts.length}, активен: ${account.username}');
+      if (existingIndex >= 0) {
+        // Обновляем существующий аккаунт
+        final updatedAccount = account.copyWith(
+          id: allAccounts[existingIndex].id,
+          isActive: true,
+          lastLogin: DateTime.now(),
+        );
+        await _databaseFacade.saveAccount(updatedAccount);
+        print('🔄 Аккаунт обновлен: ${account.username}');
+      } else {
+        // Добавляем новый аккаунт
+        final newAccount = account.copyWith(
+          id: _generateAccountId(),
+          isActive: true,
+          lastLogin: DateTime.now(),
+        );
+        await _databaseFacade.saveAccount(newAccount);
+        print('✅ Новый аккаунт добавлен: ${account.username}');
+      }
+      
+      // 4. Проверяем целостность
+      await _ensureSingleActiveAccount();
+      
+      print('📊 Всего аккаунтов: ${(await getAllAccounts()).length}');
+      
     } catch (e) {
       print('❌ Ошибка addAccount: $e');
       rethrow;
@@ -66,36 +90,35 @@ class AccountManagerService {
     try {
       print('🔄 Переключение на аккаунт: $accountId');
       
-      List<Account> accounts = await getAllAccounts();
-      bool found = false;
+      // 1. Получаем все аккаунты
+      final allAccounts = await getAllAccounts();
       
-      accounts = accounts.map((acc) => acc.copyWith(isActive: false)).toList();
+      // 2. Находим целевой аккаунт
+      final targetAccount = allAccounts.firstWhere(
+        (a) => a.id == accountId,
+        orElse: () => throw Exception('Аккаунт с ID $accountId не найден'),
+      );
       
-      for (int i = 0; i < accounts.length; i++) {
-        if (accounts[i].id == accountId) {
-          accounts[i] = accounts[i].copyWith(
-            isActive: true,
-            lastLogin: DateTime.now(),
-          );
-          found = true;
-          print('✅ Аккаунт активирован: ${accounts[i].username}');
-          break;
+      // 3. Деактивируем ВСЕ аккаунты
+      for (var account in allAccounts) {
+        if (account.isActive && account.id != accountId) {
+          final deactivated = account.copyWith(isActive: false);
+          await _databaseFacade.saveAccount(deactivated);
         }
       }
       
-      if (!found) {
-        throw Exception('Аккаунт с ID $accountId не найден');
-      }
+      // 4. Активируем целевой аккаунт
+      final activatedAccount = targetAccount.copyWith(
+        isActive: true,
+        lastLogin: DateTime.now(),
+      );
+      await _databaseFacade.saveAccount(activatedAccount);
       
-      await _saveAccounts(accounts);
-      await _setCurrentAccountId(accountId);
+      print('✅ Аккаунт активирован: ${targetAccount.username}');
       
-      final activeAccounts = accounts.where((a) => a.isActive).length;
-      print('📊 Статистика: всего ${accounts.length} акк., активно: $activeAccounts');
+      // 5. Проверяем целостность
+      await _ensureSingleActiveAccount();
       
-      if (activeAccounts != 1) {
-        print('⚠️ ВНИМАНИЕ: $activeAccounts активных аккаунтов (должен быть 1)');
-      }
     } catch (e) {
       print('❌ Ошибка switchAccount: $e');
       rethrow;
@@ -105,18 +128,34 @@ class AccountManagerService {
   /// Удалить аккаунт
   Future<void> removeAccount(String accountId) async {
     try {
-      List<Account> accounts = await getAllAccounts();
-      final accountToRemove = accounts.firstWhere((a) => a.id == accountId);
-      
-      accounts.removeWhere((account) => account.id == accountId);
-      
-      if (accountToRemove.isActive && accounts.isNotEmpty) {
-        accounts[0] = accounts[0].copyWith(isActive: true);
-        await _setCurrentAccountId(accounts[0].id);
+      // 1. Получаем аккаунт
+      final account = await getAccountById(accountId);
+      if (account == null) {
+        throw Exception('Аккаунт не найден');
       }
       
-      await _saveAccounts(accounts);
-      print('🗑️ Аккаунт удален: ${accountToRemove.username}');
+      print('🗑️ Удаление аккаунта: ${account.username}');
+      
+      // 2. Удаляем учетные данные из SecureStorage
+      await _deleteAccountCredentials(accountId);
+      
+      // 3. Удаляем аккаунт из SQLite
+      await _databaseFacade.deleteAccount(accountId);
+      
+      // 4. Удаляем все данные аккаунта из SQLite
+      await _databaseFacade.clearAllForAccount(accountId);
+      
+      // 5. Если удаляли активный аккаунт, активируем другой (если есть)
+      if (account.isActive) {
+        final remainingAccounts = await getAllAccounts();
+        if (remainingAccounts.isNotEmpty) {
+          await switchAccount(remainingAccounts.first.id);
+          print('🔄 Активирован новый аккаунт: ${remainingAccounts.first.username}');
+        }
+      }
+      
+      print('✅ Аккаунт удален: ${account.username}');
+      
     } catch (e) {
       print('❌ Ошибка removeAccount: $e');
       rethrow;
@@ -126,33 +165,30 @@ class AccountManagerService {
   /// Получить текущий активный аккаунт
   Future<Account?> getCurrentAccount() async {
     try {
-      final accounts = await getAllAccounts();
+      final account = await _databaseFacade.getCurrentAccount();
       
-      final activeAccounts = accounts.where((a) => a.isActive).toList();
-      
-      if (activeAccounts.isEmpty) {
-        print('⚠️ Нет активных аккаунтов');
-        return null;
-      }
-      
-      if (activeAccounts.length > 1) {
-        print('⚠️ ВНИМАНИЕ: найдено ${activeAccounts.length} активных аккаунтов!');
-        
-        for (int i = 1; i < activeAccounts.length; i++) {
-          final index = accounts.indexWhere((a) => a.id == activeAccounts[i].id);
-          if (index >= 0) {
-            accounts[index] = accounts[index].copyWith(isActive: false);
-          }
+      // Если активного аккаунта нет, но есть другие - выбираем первый
+      if (account == null) {
+        final allAccounts = await getAllAccounts();
+        if (allAccounts.isNotEmpty) {
+          await switchAccount(allAccounts.first.id);
+          return allAccounts.first.copyWith(isActive: true);
         }
-        await _saveAccounts(accounts);
-        
-        print('🛠️ Исправлено: теперь 1 активный аккаунт');
-        return activeAccounts.first;
       }
       
-      return activeAccounts.first;
+      return account;
     } catch (e) {
       print('❌ Ошибка getCurrentAccount: $e');
+      return null;
+    }
+  }
+
+  /// Получить аккаунт по ID
+  Future<Account?> getAccountById(String accountId) async {
+    try {
+      return await _databaseFacade.getAccountById(accountId);
+    } catch (e) {
+      print('❌ Ошибка getAccountById: $e');
       return null;
     }
   }
@@ -160,129 +196,57 @@ class AccountManagerService {
   /// Обновить данные аккаунта
   Future<void> updateAccount(Account updatedAccount) async {
     try {
-      List<Account> accounts = await getAllAccounts();
-      final index = accounts.indexWhere((a) => a.id == updatedAccount.id);
-      
-      if (index >= 0) {
-        accounts[index] = updatedAccount;
-        await _saveAccounts(accounts);
-        print('📝 Аккаунт обновлен: ${updatedAccount.username}');
-      }
+      await _databaseFacade.saveAccount(updatedAccount);
+      print('📝 Аккаунт обновлен: ${updatedAccount.username}');
     } catch (e) {
       print('❌ Ошибка updateAccount: $e');
       rethrow;
     }
   }
 
-  /// Восстановить корректность (только 1 активный аккаунт)
-  Future<void> fixMultipleActiveAccounts() async {
+  /// Обновить токен аккаунта
+  Future<void> updateAccountToken(String accountId, String token) async {
     try {
-      List<Account> accounts = await getAllAccounts();
-      final activeAccounts = accounts.where((a) => a.isActive).toList();
+      final account = await getAccountById(accountId);
+      if (account == null) throw Exception('Аккаунт не найден');
       
-      if (activeAccounts.length > 1) {
-        print('🛠️ Исправляем ${activeAccounts.length} активных аккаунтов...');
-        
-        final mostRecent = activeAccounts.reduce((a, b) => 
-          a.lastLogin.isAfter(b.lastLogin) ? a : b
-        );
-        
-        for (int i = 0; i < accounts.length; i++) {
-          accounts[i] = accounts[i].copyWith(
-            isActive: accounts[i].id == mostRecent.id,
-          );
-        }
-        
-        await _saveAccounts(accounts);
-        print('✅ Исправлено: теперь активен только ${mostRecent.username}');
-      }
+      final updatedAccount = account.copyWith(
+        token: token,
+        lastLogin: DateTime.now(),
+      );
+      
+      await updateAccount(updatedAccount);
+      print('🔑 Токен обновлен для аккаунта: ${account.username}');
     } catch (e) {
-      print('❌ Ошибка fixMultipleActiveAccounts: $e');
+      print('❌ Ошибка updateAccountToken: $e');
+      rethrow;
     }
   }
 
-  /// Получить статистику
-  Future<Map<String, dynamic>> getAccountsStats() async {
-    final accounts = await getAllAccounts();
-    final activeAccounts = accounts.where((a) => a.isActive).toList();
-    
-    return {
-      'total': accounts.length,
-      'active': activeAccounts.length,
-      'multiple_active': activeAccounts.length > 1,
-      'accounts': accounts.map((a) => {
-        'username': a.username,
-        'isActive': a.isActive,
-        'lastLogin': a.lastLogin,
-      }).toList(),
-    };
-  }
+  /// ==================== УЧЕТНЫЕ ДАННЫЕ (SecureStorage) ====================
 
-  /// Очистить все аккаунты
-  Future<void> clearAllAccounts() async {
-    try {
-      await _storage.delete(key: _accountsKey);
-      await _storage.delete(key: _currentAccountIdKey);
-      print('🗑️ Все аккаунты очищены');
-    } catch (e) {
-      print('❌ Ошибка clearAllAccounts: $e');
-    }
-  }
-
-  // Приватные методы
-  Future<void> _saveAccounts(List<Account> accounts) async {
-    final accountsJson = accounts.map((account) => account.toJson()).toList();
-    await _storage.write(
-      key: _accountsKey,
-      value: jsonEncode(accountsJson),
-    );
-  }
-
-  Future<void> _setCurrentAccountId(String accountId) async {
-    await _storage.write(key: _currentAccountIdKey, value: accountId);
-  }
-
-  /// Отладочный метод для проверки состояния
-  Future<void> debugAccounts() async {
-    try {
-      final accounts = await getAllAccounts();
-      print('\n=== ДЕБАГ АККАУНТОВ ===');
-      print('Всего аккаунтов: ${accounts.length}');
-      
-      for (var account in accounts) {
-        print('👤 ${account.username}: активен=${account.isActive}, '
-              'последний вход=${account.lastLogin}');
-      }
-      
-      final active = accounts.where((a) => a.isActive).toList();
-      print('Активных: ${active.length}');
-      
-      if (active.length != 1) {
-        print('⚠️ ПРОБЛЕМА: ${active.length} активных аккаунтов!');
-      }
-      
-      print('======================\n');
-    } catch (e) {
-      print('❌ Ошибка debugAccounts: $e');
-    }
-  }
-
+  /// Сохранить учетные данные
   Future<void> saveAccountCredentials(String accountId, String username, String password) async {
     try {
-      final storage = FlutterSecureStorage();
-      await storage.write(key: 'acc_${accountId}_username', value: username);
-      await storage.write(key: 'acc_${accountId}_password', value: password);
+      await _secureStorage.write(
+        key: _getUsernameKey(accountId),
+        value: username,
+      );
+      await _secureStorage.write(
+        key: _getPasswordKey(accountId),
+        value: password,
+      );
       print('🔐 Учетные данные сохранены для аккаунта: $username');
     } catch (e) {
       print('❌ Ошибка сохранения учетных данных: $e');
     }
   }
 
+  /// Получить учетные данные
   Future<Map<String, String?>> getAccountCredentials(String accountId) async {
     try {
-      final storage = FlutterSecureStorage();
-      final username = await storage.read(key: 'acc_${accountId}_username');
-      final password = await storage.read(key: 'acc_${accountId}_password');
+      final username = await _secureStorage.read(key: _getUsernameKey(accountId));
+      final password = await _secureStorage.read(key: _getPasswordKey(accountId));
       
       return {
         'username': username,
@@ -292,5 +256,302 @@ class AccountManagerService {
       print('❌ Ошибка получения учетных данных: $e');
       return {'username': null, 'password': null};
     }
+  }
+
+  /// Удалить учетные данные
+  Future<void> _deleteAccountCredentials(String accountId) async {
+    try {
+      await _secureStorage.delete(key: _getUsernameKey(accountId));
+      await _secureStorage.delete(key: _getPasswordKey(accountId));
+      print('🗑️ Учетные данные удалены для аккаунта: $accountId');
+    } catch (e) {
+      print('❌ Ошибка удаления учетных данных: $e');
+    }
+  }
+
+  /// ==================== МАСТЕР-ПАРОЛЬ И БИОМЕТРИЯ ====================
+
+  /// Сохранить мастер-пароль
+  Future<void> saveMasterPassword(String password) async {
+    try {
+      await _secureStorage.write(key: _masterPasswordKey, value: password);
+      print('🔑 Мастер-пароль сохранен');
+    } catch (e) {
+      print('❌ Ошибка сохранения мастер-пароля: $e');
+    }
+  }
+
+  /// Получить мастер-пароль
+  Future<String?> getMasterPassword() async {
+    try {
+      return await _secureStorage.read(key: _masterPasswordKey);
+    } catch (e) {
+      print('❌ Ошибка получения мастер-пароля: $e');
+      return null;
+    }
+  }
+
+  /// Включить/выключить биометрию
+  Future<void> setBiometricEnabled(bool enabled) async {
+    try {
+      await _secureStorage.write(
+        key: _biometricKey,
+        value: enabled.toString(),
+      );
+      print('👆 Биометрия ${enabled ? 'включена' : 'выключена'}');
+    } catch (e) {
+      print('❌ Ошибка настройки биометрии: $e');
+    }
+  }
+
+  /// Проверить, включена ли биометрия
+  Future<bool> isBiometricEnabled() async {
+    try {
+      final value = await _secureStorage.read(key: _biometricKey);
+      return value == 'true';
+    } catch (e) {
+      print('❌ Ошибка проверки биометрии: $e');
+      return false;
+    }
+  }
+
+  /// ==================== ВОССТАНОВЛЕНИЕ ЦЕЛОСТНОСТИ ====================
+
+  /// Восстановить корректность (только 1 активный аккаунт)
+  Future<void> fixMultipleActiveAccounts() async {
+    try {
+      final allAccounts = await getAllAccounts();
+      final activeAccounts = allAccounts.where((a) => a.isActive).toList();
+      
+      if (activeAccounts.length > 1) {
+        print('🛠️ Исправляем ${activeAccounts.length} активных аккаунтов...');
+        
+        // Выбираем самый "свежий" аккаунт
+        final mostRecent = activeAccounts.reduce((a, b) => 
+          a.lastLogin.isAfter(b.lastLogin) ? a : b
+        );
+        
+        // Деактивируем все, кроме самого свежего
+        for (var account in allAccounts) {
+          if (account.id != mostRecent.id && account.isActive) {
+            final deactivated = account.copyWith(isActive: false);
+            await _databaseFacade.saveAccount(deactivated);
+          }
+        }
+        
+        print('✅ Исправлено: теперь активен только ${mostRecent.username}');
+      }
+    } catch (e) {
+      print('❌ Ошибка fixMultipleActiveAccounts: $e');
+    }
+  }
+
+  /// Гарантировать, что активен только один аккаунт
+  Future<void> _ensureSingleActiveAccount() async {
+    try {
+      final allAccounts = await getAllAccounts();
+      final activeAccounts = allAccounts.where((a) => a.isActive).toList();
+      
+      if (activeAccounts.length != 1) {
+        print('⚠️ Нарушение целостности: ${activeAccounts.length} активных аккаунтов');
+        await fixMultipleActiveAccounts();
+      }
+    } catch (e) {
+      print('❌ Ошибка _ensureSingleActiveAccount: $e');
+    }
+  }
+
+  /// ==================== УТИЛИТЫ ====================
+
+  /// Получить статистику
+  Future<Map<String, dynamic>> getAccountsStats() async {
+    try {
+      final accounts = await getAllAccounts();
+      final activeAccounts = accounts.where((a) => a.isActive).toList();
+      
+      // Проверяем учетные данные
+      final accountsWithCredentials = <Map<String, dynamic>>[];
+      for (var account in accounts) {
+        final credentials = await getAccountCredentials(account.id);
+        accountsWithCredentials.add({
+          'username': account.username,
+          'isActive': account.isActive,
+          'lastLogin': account.lastLogin,
+          'hasCredentials': credentials['password'] != null,
+          'hasUsername': credentials['username'] != null,
+        });
+      }
+      
+      return {
+        'total': accounts.length,
+        'active': activeAccounts.length,
+        'multiple_active': activeAccounts.length > 1,
+        'accounts': accountsWithCredentials,
+      };
+    } catch (e) {
+      print('❌ Ошибка getAccountsStats: $e');
+      return {'error': e.toString()};
+    }
+  }
+
+  /// Очистить все аккаунты
+  Future<void> clearAllAccounts() async {
+    try {
+      print('🗑️ Начинаем очистку всех аккаунтов...');
+      
+      // 1. Получаем все аккаунты
+      final allAccounts = await getAllAccounts();
+      
+      // 2. Удаляем учетные данные каждого аккаунта
+      for (var account in allAccounts) {
+        await _deleteAccountCredentials(account.id);
+      }
+      
+      // 3. Удаляем все данные из SQLite
+      for (var account in allAccounts) {
+        await _databaseFacade.clearAllForAccount(account.id);
+      }
+      
+      // 4. Удаляем все аккаунты из SQLite
+      await _databaseFacade.deleteAllAccounts();
+      
+      // 5. Очищаем мастер-пароль и биометрию
+      await _secureStorage.delete(key: _masterPasswordKey);
+      await _secureStorage.delete(key: _biometricKey);
+      
+      print('✅ Все аккаунты и данные очищены');
+      
+    } catch (e) {
+      print('❌ Ошибка clearAllAccounts: $e');
+    }
+  }
+
+  /// Получить количество аккаунтов
+  Future<int> getAccountsCount() async {
+    try {
+      final accounts = await getAllAccounts();
+      return accounts.length;
+    } catch (e) {
+      print('❌ Ошибка getAccountsCount: $e');
+      return 0;
+    }
+  }
+
+  /// ==================== ОТЛАДКА ====================
+
+  /// Отладочный метод для проверки состояния
+  Future<void> debugAccounts() async {
+    try {
+      final accounts = await getAllAccounts();
+      print('\n=== ДЕБАГ АККАУНТОВ ===');
+      print('Всего аккаунтов: ${accounts.length}');
+      
+      for (var account in accounts) {
+        final credentials = await getAccountCredentials(account.id);
+        print('👤 ${account.username}:');
+        print('   ID: ${account.id}');
+        print('   Активен: ${account.isActive}');
+        print('   Последний вход: ${account.lastLogin}');
+        print('   Токен: ${account.token.substring(0, 20)}...');
+        print('   Учетные данные: ${credentials['username'] != null ? 'есть' : 'нет'}');
+        print('   Пароль: ${credentials['password'] != null ? 'сохранен' : 'отсутствует'}');
+        print('   ---');
+      }
+      
+      final active = accounts.where((a) => a.isActive).toList();
+      print('Активных: ${active.length}');
+      
+      if (active.length != 1) {
+        print('⚠️ ПРОБЛЕМА: ${active.length} активных аккаунтов!');
+      }
+      
+      // Проверяем мастер-пароль и биометрию
+      final masterPassword = await getMasterPassword();
+      final biometricEnabled = await isBiometricEnabled();
+      print('Мастер-пароль: ${masterPassword != null ? 'установлен' : 'нет'}');
+      print('Биометрия: ${biometricEnabled ? 'включена' : 'выключена'}');
+      
+      print('======================\n');
+    } catch (e) {
+      print('❌ Ошибка debugAccounts: $e');
+    }
+  }
+
+  /// Проверить миграцию старых данных
+  Future<void> checkAndMigrateOldData() async {
+    try {
+      print('🔄 Проверка старых данных...');
+      
+      // Старые ключи из предыдущей версии
+      final oldAccountsKey = 'multi_accounts_list';
+      final oldCurrentAccountKey = 'current_account_id';
+      
+      final oldAccountsJson = await _secureStorage.read(key: oldAccountsKey);
+      
+      if (oldAccountsJson != null) {
+        print('📦 Найдены старые данные, начинаем миграцию...');
+        
+        // Парсим старые аккаунты
+        final List<dynamic> oldAccountsList = jsonDecode(oldAccountsJson);
+        final oldCurrentId = await _secureStorage.read(key: oldCurrentAccountKey);
+        
+        for (var oldAccount in oldAccountsList) {
+          try {
+            final account = Account.fromJson(oldAccount);
+            
+            // Сохраняем в новую систему
+            await addAccount(account);
+            
+            // Пробуем получить старые учетные данные
+            final oldUsername = await _secureStorage.read(key: 'username_${account.id}');
+            final oldPassword = await _secureStorage.read(key: 'password_${account.id}');
+            
+            if (oldUsername != null && oldPassword != null) {
+              await saveAccountCredentials(account.id, oldUsername, oldPassword);
+              
+              // Очищаем старые данные
+              await _secureStorage.delete(key: 'username_${account.id}');
+              await _secureStorage.delete(key: 'password_${account.id}');
+            }
+            
+            // Если это был текущий аккаунт
+            if (oldCurrentId == account.id) {
+              await switchAccount(account.id);
+            }
+            
+          } catch (e) {
+            print('❌ Ошибка миграции аккаунта: $e');
+          }
+        }
+        
+        // Очищаем старые ключи
+        await _secureStorage.delete(key: oldAccountsKey);
+        await _secureStorage.delete(key: oldCurrentAccountKey);
+        
+        print('✅ Миграция завершена');
+      } else {
+        print('📭 Старых данных не найдено');
+      }
+      
+    } catch (e) {
+      print('❌ Ошибка миграции: $e');
+    }
+  }
+
+  /// ==================== ПРИВАТНЫЕ МЕТОДЫ ====================
+
+  /// Генерация ID для нового аккаунта
+  String _generateAccountId() {
+    return 'acc_${DateTime.now().millisecondsSinceEpoch}_${_randomString(6)}';
+  }
+
+  /// Генерация случайной строки
+  String _randomString(int length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final random = Random();
+    return String.fromCharCodes(Iterable.generate(
+      length,
+      (_) => chars.codeUnitAt(random.nextInt(chars.length)),
+    ));
   }
 }

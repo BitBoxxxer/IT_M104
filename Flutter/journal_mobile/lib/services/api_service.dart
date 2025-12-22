@@ -2,13 +2,13 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:journal_mobile/services/_account/account_manager_service.dart';
+
+import '_account/account_manager_service.dart';
+
+import '../_database/database_facade.dart';
+import '../_database/repositories/cache_repository.dart';
 
 import '../models/_system/account_model.dart';
-import 'secure_storage_service.dart';
-import '_offline_service/offline_storage_service.dart';
-import 'download_service.dart';
-
 import '../models/mark.dart';
 import '../models/user_data.dart';
 import '../models/days_element.dart';
@@ -19,30 +19,34 @@ import '../models/_widgets/exams/exam.dart';
 import '../models/activity_record.dart';
 import '../models/_widgets/homework/homework.dart';
 import '../models/_widgets/homework/homework_counter.dart';
+import 'download_service.dart';
 
-DateTime getMonday(DateTime date) {
-  final d = DateTime(date.year, date.month, date.day);
-  final day = d.weekday;
-  final diff = day - 1; 
-  return d.subtract(Duration(days: diff));
+class CacheKeys {
+  static const String marks = 'marks_cache';
+  static const String user = 'user_cache';
+  static const String schedule = 'schedule_cache';
+  static const String groupLeaders = 'group_leaders_cache';
+  static const String streamLeaders = 'stream_leaders_cache';
+  static const String feedback = 'feedback_cache';
+  static const String exams = 'exams_cache';
+  static const String futureExams = 'future_exams_cache';
+  static const String activity = 'activity_cache';
+  static const String homeworks = 'homeworks_cache';
+  static const String homeworkCounters = 'homework_counters_cache';
+  
+  static String getMarksCacheKey(String accountId) => '${marks}_$accountId';
+  static String getUserCacheKey(String accountId) => '${user}_$accountId';
+  static String getScheduleCacheKey(String accountId, String dateFrom, String dateTo) => 
+      '${schedule}_${accountId}_${dateFrom}_$dateTo';
 }
 
-DateTime getSunday(DateTime date) {
-  final d = getMonday(date);
-  return d.add(const Duration(days: 6));
-}
-
-String formatDate(DateTime date) {
-  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-}
-
-/// не трогать КОД - НИКОМУ кроме КЕЙСИ (Дианы) !!! НИЗАЧТО (сломаю пальцы и в жопу засуну). 
-/// Исключение, если КЕЙСИ попросит помочь с доработкой этого кода и ВЫ точно знаете что делаете. 
+/// не трогать КОД - НИКОМУ кроме КЕЙСИ (Дианы) !!! НИЗАЧТО (сломаю пальцы и в жопу засуну).
 /// Подумайте дважды прежде чем что-то менять здесь. Иначе - ломайте себе пальцы по одному.
 class ApiService {
   final String _baseUrl = "https://msapi.top-academy.ru/api/v2"; 
-  final SecureStorageService _secureStorage = SecureStorageService();
-  final OfflineStorageService _offlineStorage = OfflineStorageService();
+  final DatabaseFacade _databaseFacade = DatabaseFacade();
+  final AccountManagerService _accountManager = AccountManagerService();
+  final CacheRepository _cacheRepository = CacheRepository();
   
   static int _activeRequests = 0;
   static const int _maxConcurrentRequests = 3;
@@ -51,9 +55,11 @@ class ApiService {
   
   bool _isDisposed = false;
   final Map<String, Completer<dynamic>> _pendingRequests = {};
-
   final Map<String, dynamic> _memoryCache = {};
 
+  static const int _cacheTtlShort = 300;    // 5 минут
+  static const int _cacheTtlMedium = 1800;  // 30 минут
+  
   Future<T> _executeWithLimit<T>(String requestKey, Future<T> Function() request) async {
     if (_isDisposed) throw Exception('ApiService disposed');
     
@@ -92,22 +98,99 @@ class ApiService {
     return '$endpoint${params ?? ''}';
   }
 
-  Future<String?> _reauthenticate() async {
-    final credentials = await _secureStorage.getCredentials();
-    final username = credentials['username'];
-    final password = credentials['password'];
-
-    if (username == null || password == null) {
-      return null; 
+  /// Получить ID текущего аккаунта
+  Future<String> _getCurrentAccountId() async {
+    final account = await _accountManager.getCurrentAccount();
+    if (account == null) {
+      throw Exception('Нет активного аккаунта');
     }
-
-    final newToken = await login(username, password); 
-    
-    if (newToken != null) {
-      await _secureStorage.saveToken(newToken);
-    }
-    return newToken;
+    return account.id;
   }
+
+  /// Получить токен текущего аккаунта
+  Future<String> getCurrentToken() async {
+    final account = await _accountManager.getCurrentAccount();
+    if (account == null) {
+      throw Exception('Нет активного аккаунта');
+    }
+    return account.token;
+  }
+
+  /// Попытаться перелогиниться при 401 ошибке
+  Future<String?> _reauthenticate() async {
+    try {
+      final account = await _accountManager.getCurrentAccount();
+      if (account == null) return null;
+      
+      final credentials = await _accountManager.getAccountCredentials(account.id);
+      final username = credentials['username'];
+      final password = credentials['password'];
+
+      if (username == null || password == null) {
+        return null;
+      }
+
+      final newToken = await login(username, password);
+      
+      if (newToken != null) {
+        final updatedAccount = account.copyWith(token: newToken);
+        await _accountManager.updateAccount(updatedAccount);
+      }
+      return newToken;
+    } catch (e) {
+      print('❌ Ошибка переаутентификации: $e');
+      return null;
+    }
+  }
+
+  /// Основной метод запроса с обработкой 401
+  Future<http.Response> _makeRequest(
+  String url, {
+  String? token,
+  Map<String, String>? headers,
+  dynamic body,
+  String method = 'GET',
+}) async {
+  final currentToken = token ?? await getCurrentToken();
+  final defaultHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $currentToken',
+    'Referer': 'https://journal.top-academy.ru',
+  };
+  
+  if (headers != null) {
+    defaultHeaders.addAll(headers);
+  }
+
+  switch (method.toUpperCase()) {
+    case 'POST':
+      return await http.post(
+        Uri.parse(url),
+        headers: defaultHeaders,
+        body: body != null ? jsonEncode(body) : null,
+      ).timeout(_timeOut);
+      
+    case 'PUT':
+      return await http.put(
+        Uri.parse(url),
+        headers: defaultHeaders,
+        body: body != null ? jsonEncode(body) : null,
+      ).timeout(_timeOut);
+      
+    case 'DELETE':
+      return await http.delete(
+        Uri.parse(url),
+        headers: defaultHeaders,
+      ).timeout(_timeOut);
+      
+    default: // GET
+      return await http.get(
+        Uri.parse(url),
+        headers: defaultHeaders,
+      ).timeout(_timeOut);
+  }
+}
+
 
   Future<String?> login(String username, String password) async {
     return await _executeWithLimit(
@@ -117,10 +200,10 @@ class ApiService {
           Uri.parse('$_baseUrl/auth/login'),
           headers: {
             'Content-Type': 'application/json',
-            'Referer': 'https://journal.top-academy.ru', 
+            'Referer': 'https://journal.top-academy.ru',
           },
           body: jsonEncode({
-            'username': username, 
+            'username': username,
             'password': password,
             'application_key': '6a56a5df2667e65aab73ce76d1dd737f7d1faef9c52e8b8c55ac75f565d8e8a6',
           }),
@@ -130,10 +213,41 @@ class ApiService {
           final data = jsonDecode(response.body);
           final token = data['access_token'];
           
-          await _secureStorage.saveToken(token);
-          await _secureStorage.saveCredentials(username, password);
+          final account = Account(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            username: username,
+            fullName: '',
+            groupName: '',
+            photoPath: '',
+            token: token,
+            lastLogin: DateTime.now(),
+            isActive: true,
+            studentId: 0,
+          );
           
-          return token; 
+          await _accountManager.addAccount(account);
+          
+          // Сохраняем учетные данные для перелогина
+          await _accountManager.saveAccountCredentials(account.id, username, password);
+          
+          // Загружаем и сохраняем данные пользователя
+          try {
+            final userData = await getUser(token);
+            final updatedAccount = account.copyWith(
+              fullName: userData.fullName,
+              groupName: userData.groupName,
+              photoPath: userData.photoPath,
+              studentId: userData.studentId,
+            );
+            await _accountManager.updateAccount(updatedAccount);
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveUserData(userData, account.id);
+          } catch (e) {
+            print('⚠️ Ошибка загрузки данных пользователя: $e');
+          }
+          
+          return token;
         } else {
           print("Login failed: ${response.statusCode}");
           return null;
@@ -142,7 +256,6 @@ class ApiService {
     );
   }
 
-  /// авторизация... [api]
   Future<Account> loginAndCreateAccount(String username, String password) async {
     final token = await login(username, password);
     
@@ -150,635 +263,692 @@ class ApiService {
       throw Exception('Ошибка авторизации');
     }
     
-    final userData = await getUser(token);
-    
-    final account = Account(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      username: username,
-      fullName: userData.fullName,
-      groupName: userData.groupName,
-      photoPath: userData.photoPath,
-      token: token,
-      lastLogin: DateTime.now(),
-      isActive: true,
-      studentId: userData.studentId,
-    );
-    
-    final accountManager = AccountManagerService();
-    await accountManager.addAccount(account);
-    
-    await _secureStorage.saveCredentials(username, password);
+    // Аккаунт уже создан в методе login
+    final account = await _accountManager.getCurrentAccount();
+    if (account == null) {
+      throw Exception('Ошибка создания аккаунта');
+    }
     
     return account;
   }
 
-  /// Получить данные с учетом текущего аккаунта [api]
-  Future<List<Mark>> getMarksForCurrentAccount() async {
-    final accountManager = AccountManagerService();
-    final currentAccount = await accountManager.getCurrentAccount();
-    
-    if (currentAccount == null) {
-      throw Exception('Нет активного аккаунта');
-    }
-    
-    return await getMarks(currentAccount.token);
-  }
+  /// ==================== DATA METHODS WITH SQLite ====================
 
-  /// получение оценок студента [api] - с автоматическим оффлайн сохранением
+  /// Получение оценок с сохранением в SQLite
   Future<List<Mark>> getMarks(String token) async {
     return await _executeWithLimit(
       _getRequestKey('marks'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/progress/operations/student-visits'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru', 
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) { 
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/progress/operations/student-visits'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
+          final response = await _makeRequest('$_baseUrl/progress/operations/student-visits');
           
           if (response.statusCode == 200) {
             final List<dynamic> marksData = jsonDecode(response.body);
             final marks = marksData.map((json) => Mark.fromJson(json)).toList();
             
-            // Автоматически сохраняем в оффлайн хранилище
-            await _offlineStorage.saveMarks(marks);
-            print('✅ Оценки загружены и сохранены оффлайн: ${marks.length} шт');
+            // Сохраняем в SQLite
+            await _databaseFacade.saveMarks(marks, accountId);
+            
+            // Кэшируем в памяти на короткое время
+            await _cacheRepository.save(
+              CacheKeys.getMarksCacheKey(accountId),
+              marks,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlShort),
+            );
+            
+            print('✅ Оценки загружены и сохранены в SQLite: ${marks.length} шт');
             
             return marks;
           } else {
             print("Failed to load marks: ${response.statusCode}");
-            throw Exception('Failed to load marks');
+            
+            // Пробуем загрузить из SQLite
+            final offlineMarks = await _databaseFacade.getMarks(accountId);
+            if (offlineMarks.isNotEmpty) {
+              print('📱 Используем оценки из SQLite: ${offlineMarks.length} шт');
+              return offlineMarks;
+            }
+            
+            throw Exception('Failed to load marks: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки оценок онлайн, пробуем оффлайн: $e');
-          final offlineMarks = await _offlineStorage.getMarks();
+          print('🌐 Ошибка загрузки оценок: $e');
+          
+          // Пробуем загрузить из кэша
+          final cachedData = await _cacheRepository.get(CacheKeys.getMarksCacheKey(accountId), accountId: accountId);
+          if (cachedData is List) {
+            final cachedMarks = cachedData.map((item) => Mark.fromJson(item)).toList();
+            return cachedMarks;
+          }
+          
+          if (cachedData != null && cachedData.isNotEmpty) {
+            print('💾 Используем оценки из кэша: ${cachedData.length} шт');
+            return cachedData;
+          }
+          
+          // Пробуем из SQLite
+          final offlineMarks = await _databaseFacade.getMarks(accountId);
           if (offlineMarks.isNotEmpty) {
-            print('📱 Используем оффлайн оценки: ${offlineMarks.length} шт');
+            print('🗄️ Используем оценки из SQLite: ${offlineMarks.length} шт');
             return offlineMarks;
           }
+          
           rethrow;
         }
       },
     );
   }
-  
-  /// получение данных пользователя [api] - с автоматическим оффлайн сохранением
+
+  Future<List<Mark>> getMarksForCurrentAccount() async {
+    final account = await _accountManager.getCurrentAccount();
+    if (account == null) {
+      throw Exception('Нет активного аккаунта');
+    }
+    return await getMarks(account.token);
+  }
+
+  /// Получение данных пользователя с сохранением в SQLite
   Future<UserData> getUser(String token) async {
     return await _executeWithLimit(
       _getRequestKey('user'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/settings/user-info'), 
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru', 
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/settings/user-info'), 
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru', 
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest('$_baseUrl/settings/user-info');
+          
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
             final user = UserData.fromJson(data);
             
-            await _offlineStorage.saveUserData(user);
-            print('✅ Данные пользователя загружены и сохранены оффлайн');
+            // Сохраняем в SQLite
+            await _databaseFacade.saveUserData(user, accountId);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.getUserCacheKey(accountId),
+              user,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlMedium),
+            );
+            
+            print('✅ Данные пользователя загружены и сохранены в SQLite');
             
             return user;
           } else {
             print("Failed to load user data: ${response.statusCode}");
-            throw Exception('Failed to load user data');
+            
+            // Пробуем из SQLite
+            final offlineUser = await _databaseFacade.getUserData(accountId);
+            if (offlineUser != null) {
+              print('📱 Используем данные пользователя из SQLite');
+              return offlineUser;
+            }
+            
+            throw Exception('Failed to load user data: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки пользователя онлайн, пробуем оффлайн: $e');
-          final offlineUser = await _offlineStorage.getUserData();
+          print('🌐 Ошибка загрузки пользователя: $e');
+          
+          // Пробуем из кэша
+          final cachedUser = await _cacheRepository.get<UserData>(
+            CacheKeys.getUserCacheKey(accountId),
+            accountId: accountId,
+          );
+          
+          if (cachedUser != null) {
+            print('💾 Используем данные пользователя из кэша');
+            return cachedUser;
+          }
+          
+          // Пробуем из SQLite
+          final offlineUser = await _databaseFacade.getUserData(accountId);
           if (offlineUser != null) {
-            print('📱 Используем оффлайн данные пользователя');
+            print('🗄️ Используем данные пользователя из SQLite');
             return offlineUser;
           }
+          
           rethrow;
         }
       },
     );
   }
 
-  /// получение расписания за указанный период [api] - с автоматическим оффлайн сохранением
-  Future<List<ScheduleElement>> getSchedule(String token, String dateFrom, String dateTo) async { 
+  /// Получение расписания с сохранением в SQLite
+  Future<List<ScheduleElement>> getSchedule(String token, String dateFrom, String dateTo) async {
     return await _executeWithLimit(
       _getRequestKey('schedule', '$dateFrom-$dateTo'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        final cacheKey = CacheKeys.getScheduleCacheKey(accountId, dateFrom, dateTo);
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/schedule/operations/get-by-date-range?date_start=$dateFrom&date_end=$dateTo'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/schedule/operations/get-by-date-range?date_start=$dateFrom&date_end=$dateTo'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest(
+            '$_baseUrl/schedule/operations/get-by-date-range?date_start=$dateFrom&date_end=$dateTo',
+          );
+          
           if (response.statusCode == 200) {
-            final List<dynamic> scheduleData = jsonDecode(response.body); 
+            final List<dynamic> scheduleData = jsonDecode(response.body);
             final schedule = scheduleData
                 .map((json) => ScheduleElement.fromJson(json as Map<String, dynamic>))
                 .toList();
             
-            await _offlineStorage.saveSchedule(schedule);
-            print('✅ Расписание загружено и сохранено оффлайн: ${schedule.length} шт');
+            // Сохраняем в SQLite
+            await _databaseFacade.saveSchedule(schedule, accountId);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              cacheKey,
+              schedule,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlMedium),
+            );
+            
+            print('✅ Расписание загружено и сохранено в SQLite: ${schedule.length} шт');
             
             return schedule;
           } else {
             print("Failed to load schedule: ${response.statusCode}");
-            throw Exception('Failed to load schedule');
+            
+            // Пробуем из SQLite (все расписание)
+            final offlineSchedule = await _databaseFacade.getSchedule(accountId);
+            if (offlineSchedule.isNotEmpty) {
+              print('📱 Используем расписание из SQLite: ${offlineSchedule.length} шт');
+              return offlineSchedule;
+            }
+            
+            throw Exception('Failed to load schedule: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки расписания онлайн, пробуем оффлайн: $e');
-          final offlineSchedule = await _offlineStorage.getSchedule();
+          print('🌐 Ошибка загрузки расписания: $e');
+          
+          // Пробуем из кэша
+          final cachedSchedule = await _cacheRepository.get<List<ScheduleElement>>(
+            cacheKey,
+            accountId: accountId,
+          );
+          
+          if (cachedSchedule != null && cachedSchedule.isNotEmpty) {
+            print('💾 Используем расписание из кэша: ${cachedSchedule.length} шт');
+            return cachedSchedule;
+          }
+          
+          // Пробуем из SQLite
+          final offlineSchedule = await _databaseFacade.getSchedule(accountId);
           if (offlineSchedule.isNotEmpty) {
-            print('📱 Используем оффлайн расписание: ${offlineSchedule.length} шт');
+            print('🗄️ Используем расписание из SQLite: ${offlineSchedule.length} шт');
             return offlineSchedule;
           }
+          
           rethrow;
         }
       },
     );
   }
 
-  /// получение лидеров группы [api] - с автоматическим оффлайн сохранением
+  /// Получение лидеров группы с сохранением в SQLite
   Future<List<LeaderboardUser>> getGroupLeaders(String token) async {
     return await _executeWithLimit(
       _getRequestKey('group_leaders'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/dashboard/progress/leader-group'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/dashboard/progress/leader-group'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest('$_baseUrl/dashboard/progress/leader-group');
+          
           if (response.statusCode == 200) {
+            List<LeaderboardUser> leaders;
+            
             try {
               final List<dynamic> leadersData = jsonDecode(response.body);
-              final leaders = leadersData.map((json) => LeaderboardUser.fromJson(json)).toList();
-              
-              await _offlineStorage.saveGroupLeaders(leaders);
-              print('✅ Лидеры группы загружены и сохранены оффлайн: ${leaders.length} шт');
-              
-              return leaders;
+              leaders = leadersData.map((json) => LeaderboardUser.fromJson(json)).toList();
             } catch (e) {
               print("Error parsing group leaders: $e");
               try {
                 final groupModel = GroupPositionModel.fromJson(jsonDecode(response.body));
-                final leaders = groupModel.groupLeaders;
-                
-                await _offlineStorage.saveGroupLeaders(leaders);
-                print('✅ Лидеры группы загружены (альтернативный парсинг) и сохранены оффлайн: ${leaders.length} шт');
-                
-                return leaders;
+                leaders = groupModel.groupLeaders;
               } catch (e2) {
                 print("Alternative parsing also failed: $e2");
                 throw Exception('Failed to parse group leaders data');
               }
             }
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveGroupLeaders(leaders, accountId);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.groupLeaders,
+              leaders,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlShort),
+            );
+            
+            print('✅ Лидеры группы загружены и сохранены в SQLite: ${leaders.length} шт');
+            
+            return leaders;
           } else {
             print("Failed to load group leaders: ${response.statusCode}");
+            
+            // Пробуем из SQLite
+            final offlineLeaders = await _databaseFacade.getGroupLeaders(accountId);
+            if (offlineLeaders.isNotEmpty) {
+              print('📱 Используем лидеров группы из SQLite: ${offlineLeaders.length} шт');
+              return offlineLeaders;
+            }
+            
             throw Exception('Failed to load group leaders: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки лидеров группы онлайн, пробуем оффлайн: $e');
-          final offlineLeaders = await _offlineStorage.getGroupLeaders();
+          print('🌐 Ошибка загрузки лидеров группы: $e');
+          
+          // Пробуем из кэша
+          final cachedLeaders = await _cacheRepository.get<List<LeaderboardUser>>(
+            CacheKeys.groupLeaders,
+            accountId: accountId,
+          );
+          
+          if (cachedLeaders != null && cachedLeaders.isNotEmpty) {
+            print('💾 Используем лидеров группы из кэша: ${cachedLeaders.length} шт');
+            return cachedLeaders;
+          }
+          
+          // Пробуем из SQLite
+          final offlineLeaders = await _databaseFacade.getGroupLeaders(accountId);
           if (offlineLeaders.isNotEmpty) {
-            print('📱 Используем оффлайн лидеров группы: ${offlineLeaders.length} шт');
+            print('🗄️ Используем лидеров группы из SQLite: ${offlineLeaders.length} шт');
             return offlineLeaders;
           }
+          
           rethrow;
         }
       },
     );
   }
 
-  /// получение лидеров потока [api] - с автоматическим оффлайн сохранением
+  /// Получение лидеров потока с сохранением в SQLite
   Future<List<LeaderboardUser>> getStreamLeaders(String token) async {
     return await _executeWithLimit(
       _getRequestKey('stream_leaders'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/dashboard/progress/leader-stream'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/dashboard/progress/leader-stream'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest('$_baseUrl/dashboard/progress/leader-stream');
+          
           if (response.statusCode == 200) {
+            List<LeaderboardUser> leaders;
+            
             try {
               final List<dynamic> leadersData = jsonDecode(response.body);
-              final leaders = leadersData.map((json) => LeaderboardUser.fromJson(json)).toList();
-              
-              await _offlineStorage.saveStreamLeaders(leaders);
-              print('✅ Лидеры потока загружены и сохранены оффлайн: ${leaders.length} шт');
-              
-              return leaders;
+              leaders = leadersData.map((json) => LeaderboardUser.fromJson(json)).toList();
             } catch (e) {
               print("Error parsing stream leaders: $e");
               try {
                 final streamModel = StreamPositionModel.fromJson(jsonDecode(response.body));
-                final leaders = streamModel.streamLeaders;
-                
-                await _offlineStorage.saveStreamLeaders(leaders);
-                print('✅ Лидеры потока загружены (альтернативный парсинг) и сохранены оффлайн: ${leaders.length} шт');
-                
-                return leaders;
+                leaders = streamModel.streamLeaders;
               } catch (e2) {
                 print("Alternative parsing also failed: $e2");
                 throw Exception('Failed to parse stream leaders data');
               }
             }
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveStreamLeaders(leaders, accountId);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.streamLeaders,
+              leaders,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlShort),
+            );
+            
+            print('✅ Лидеры потока загружены и сохранены в SQLite: ${leaders.length} шт');
+            
+            return leaders;
           } else {
             print("Failed to load stream leaders: ${response.statusCode}");
+            
+            // Пробуем из SQLite
+            final offlineLeaders = await _databaseFacade.getStreamLeaders(accountId);
+            if (offlineLeaders.isNotEmpty) {
+              print('📱 Используем лидеров потока из SQLite: ${offlineLeaders.length} шт');
+              return offlineLeaders;
+            }
+            
             throw Exception('Failed to load stream leaders: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки лидеров потока онлайн, пробуем оффлайн: $e');
-          final offlineLeaders = await _offlineStorage.getStreamLeaders();
+          print('🌐 Ошибка загрузки лидеров потока: $e');
+          
+          // Пробуем из кэша
+          final cachedLeaders = await _cacheRepository.get<List<LeaderboardUser>>(
+            CacheKeys.streamLeaders,
+            accountId: accountId,
+          );
+          
+          if (cachedLeaders != null && cachedLeaders.isNotEmpty) {
+            print('💾 Используем лидеров потока из кэша: ${cachedLeaders.length} шт');
+            return cachedLeaders;
+          }
+          
+          // Пробуем из SQLite
+          final offlineLeaders = await _databaseFacade.getStreamLeaders(accountId);
           if (offlineLeaders.isNotEmpty) {
-            print('📱 Используем оффлайн лидеров потока: ${offlineLeaders.length} шт');
+            print('🗄️ Используем лидеров потока из SQLite: ${offlineLeaders.length} шт');
             return offlineLeaders;
           }
+          
           rethrow;
         }
       },
     );
   }
 
-  /// получение отзывов о студенте [api] - с автоматическим оффлайн сохранением
+  /// Получение отзывов с сохранением в SQLite
   Future<List<FeedbackReview>> getFeedbackReview(String token) async {
     return await _executeWithLimit(
       _getRequestKey('feedback'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/reviews/index/list'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/reviews/index/list'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest('$_baseUrl/reviews/index/list');
+          
           if (response.statusCode == 200) {
-            try {
-              final responseData = jsonDecode(response.body);
-              List<dynamic> feedbackData = [];
-              
-              if (responseData is List) {
-                feedbackData = responseData;
-              } else if (responseData['data'] is List) {
-                feedbackData = responseData['data'];
-              } else if (responseData['reviews'] is List) {
-                feedbackData = responseData['reviews'];
-              } else if (responseData['items'] is List) {
-                feedbackData = responseData['items'];
-              }
-              
-              final feedbacks = feedbackData.map((json) => FeedbackReview.fromJson(json)).toList();
-              
-              await _offlineStorage.saveFeedbackReviews(feedbacks);
-              print('✅ Отзывы загружены и сохранены оффлайн: ${feedbacks.length} шт');
-              
-              return feedbacks;
-            } catch (e) {
-              print("Error parsing feedback: $e");
-              throw Exception('Failed to parse feedback data: $e');
+            final responseData = jsonDecode(response.body);
+            List<dynamic> feedbackData = [];
+            
+            if (responseData is List) {
+              feedbackData = responseData;
+            } else if (responseData['data'] is List) {
+              feedbackData = responseData['data'];
+            } else if (responseData['reviews'] is List) {
+              feedbackData = responseData['reviews'];
+            } else if (responseData['items'] is List) {
+              feedbackData = responseData['items'];
             }
+            
+            final feedbacks = feedbackData.map((json) => FeedbackReview.fromJson(json)).toList();
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveFeedbacks(feedbacks, accountId);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.feedback,
+              feedbacks,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlMedium),
+            );
+            
+            print('✅ Отзывы загружены и сохранены в SQLite: ${feedbacks.length} шт');
+            
+            return feedbacks;
           } else {
             print("Failed to load feedback: ${response.statusCode}");
+            
+            // Пробуем из SQLite
+            final offlineFeedbacks = await _databaseFacade.getFeedbacks(accountId);
+            if (offlineFeedbacks.isNotEmpty) {
+              print('📱 Используем отзывы из SQLite: ${offlineFeedbacks.length} шт');
+              return offlineFeedbacks;
+            }
+            
             throw Exception('Failed to load feedback: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки отзывов онлайн, пробуем оффлайн: $e');
-          final offlineFeedbacks = await _offlineStorage.getFeedbackReviews();
+          print('🌐 Ошибка загрузки отзывов: $e');
+          
+          // Пробуем из кэша
+          final cachedFeedbacks = await _cacheRepository.get<List<FeedbackReview>>(
+            CacheKeys.feedback,
+            accountId: accountId,
+          );
+          
+          if (cachedFeedbacks != null && cachedFeedbacks.isNotEmpty) {
+            print('💾 Используем отзывы из кэша: ${cachedFeedbacks.length} шт');
+            return cachedFeedbacks;
+          }
+          
+          // Пробуем из SQLite
+          final offlineFeedbacks = await _databaseFacade.getFeedbacks(accountId);
           if (offlineFeedbacks.isNotEmpty) {
-            print('📱 Используем оффлайн отзывы: ${offlineFeedbacks.length} шт');
+            print('🗄️ Используем отзывы из SQLite: ${offlineFeedbacks.length} шт');
             return offlineFeedbacks;
           }
+          
           rethrow;
         }
       },
     );
   }
 
-  /// получение экзаменов студента [api] - с автоматическим оффлайн сохранением
+  /// Получение экзаменов с сохранением в SQLite
   Future<List<Exam>> getExams(String token) async {
     return await _executeWithLimit(
       _getRequestKey('exams'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/progress/operations/student-exams'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/progress/operations/student-exams'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest('$_baseUrl/progress/operations/student-exams');
+          
           if (response.statusCode == 200) {
-            try {
-              final responseData = jsonDecode(response.body);
-              List<dynamic> examsData = [];
-              
-              if (responseData is List) {
-                examsData = responseData;
-              } else if (responseData['data'] is List) {
-                examsData = responseData['data'];
-              } else if (responseData['exams'] is List) {
-                examsData = responseData['exams'];
-              } else if (responseData['grades'] is List) {
-                examsData = responseData['grades'];
-              } else if (responseData['items'] is List) {
-                examsData = responseData['items'];
-              }
-              
-              final exams = examsData.map((json) => Exam.fromJson(json)).toList();
-              
-              await _offlineStorage.saveExams(exams);
-              print('✅ Экзамены загружены и сохранены оффлайн: ${exams.length} шт');
-              
-              return exams;
-            } catch (e) {
-              print("Error parsing exams: $e");
-              throw Exception('Failed to parse exams data: $e');
+            final responseData = jsonDecode(response.body);
+            List<dynamic> examsData = [];
+            
+            if (responseData is List) {
+              examsData = responseData;
+            } else if (responseData['data'] is List) {
+              examsData = responseData['data'];
+            } else if (responseData['exams'] is List) {
+              examsData = responseData['exams'];
+            } else if (responseData['grades'] is List) {
+              examsData = responseData['grades'];
+            } else if (responseData['items'] is List) {
+              examsData = responseData['items'];
             }
+            
+            final exams = examsData.map((json) => Exam.fromJson(json)).toList();
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveExams(exams, accountId);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.exams,
+              exams,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlMedium),
+            );
+            
+            print('✅ Экзамены загружены и сохранены в SQLite: ${exams.length} шт');
+            
+            return exams;
           } else {
             print("Failed to load exams: ${response.statusCode}");
+            
+            // Пробуем из SQLite
+            final offlineExams = await _databaseFacade.getExams(accountId);
+            if (offlineExams.isNotEmpty) {
+              print('📱 Используем экзамены из SQLite: ${offlineExams.length} шт');
+              return offlineExams;
+            }
+            
             throw Exception('Failed to load exams: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки экзаменов онлайн, пробуем оффлайн: $e');
-          final offlineExams = await _offlineStorage.getExams();
+          print('🌐 Ошибка загрузки экзаменов: $e');
+          
+          // Пробуем из кэша
+          final cachedExams = await _cacheRepository.get<List<Exam>>(
+            CacheKeys.exams,
+            accountId: accountId,
+          );
+          
+          if (cachedExams != null && cachedExams.isNotEmpty) {
+            print('💾 Используем экзамены из кэша: ${cachedExams.length} шт');
+            return cachedExams;
+          }
+          
+          // Пробуем из SQLite
+          final offlineExams = await _databaseFacade.getExams(accountId);
           if (offlineExams.isNotEmpty) {
-            print('📱 Используем оффлайн экзамены: ${offlineExams.length} шт');
+            print('🗄️ Используем экзамены из SQLite: ${offlineExams.length} шт');
             return offlineExams;
           }
+          
           rethrow;
         }
       },
     );
   }
 
-  /// получение предстоящих экзаменов [api] - с автоматическим оффлайн сохранением
+  /// Получение предстоящих экзаменов с сохранением в SQLite
   Future<List<Exam>> getFutureExams(String token) async {
     return await _executeWithLimit(
       _getRequestKey('future_exams'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/dashboard/info/future-exams'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/dashboard/info/future-exams'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest('$_baseUrl/dashboard/info/future-exams');
+          
           if (response.statusCode == 200) {
-            try {
-              final List<dynamic> futureExamsData = jsonDecode(response.body);
-              final exams = futureExamsData.map((json) => Exam.fromJson(json)).toList();
-              
-              await _offlineStorage.saveExams(exams);
-              print('✅ Предстоящие экзамены загружены и сохранены оффлайн: ${exams.length} шт');
-              
-              return exams;
-            } catch (e) {
-              print("Error parsing future exams: $e");
-              throw Exception('Failed to parse future exams data: $e');
-            }
+            final List<dynamic> futureExamsData = jsonDecode(response.body);
+            final exams = futureExamsData.map((json) => Exam.fromJson(json)).toList();
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveExams(exams, accountId);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.futureExams,
+              exams,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlShort),
+            );
+            
+            print('✅ Предстоящие экзамены загружены и сохранены в SQLite: ${exams.length} шт');
+            
+            return exams;
           } else {
             print("Failed to load future exams: ${response.statusCode}");
+            
+            // Пробуем из SQLite (все экзамены)
+            final offlineExams = await _databaseFacade.getExams(accountId);
+            if (offlineExams.isNotEmpty) {
+              print('📱 Используем экзамены из SQLite: ${offlineExams.length} шт');
+              return offlineExams;
+            }
+            
             throw Exception('Failed to load future exams: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки предстоящих экзаменов онлайн, пробуем оффлайн: $e');
-          final offlineExams = await _offlineStorage.getExams();
+          print('🌐 Ошибка загрузки предстоящих экзаменов: $e');
+          
+          // Пробуем из кэша
+          final cachedExams = await _cacheRepository.get<List<Exam>>(
+            CacheKeys.futureExams,
+            accountId: accountId,
+          );
+          
+          if (cachedExams != null && cachedExams.isNotEmpty) {
+            print('💾 Используем экзамены из кэша: ${cachedExams.length} шт');
+            return cachedExams;
+          }
+          
+          // Пробуем из SQLite
+          final offlineExams = await _databaseFacade.getExams(accountId);
           if (offlineExams.isNotEmpty) {
-            print('📱 Используем оффлайн экзамены: ${offlineExams.length} шт');
+            print('🗄️ Используем экзамены из SQLite: ${offlineExams.length} шт');
             return offlineExams;
           }
+          
           rethrow;
         }
       },
     );
   }
 
-  Future<bool> validateToken(String token) async {
-    return await _executeWithLimit(
-      _getRequestKey('validate_token'),
-      () async {
-        try {
-          final response = await http.get(
-            Uri.parse('$_baseUrl/settings/user-info'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_shortTimeOut);
-          
-          return response.statusCode == 200;
-        } catch (e) {
-          return false;
-        }
-      },
-    );
-  }
-
-  /// получение истории активности и наград студента [api] - с автоматическим оффлайн сохранением
+  /// Получение активности с сохранением в SQLite
   Future<List<ActivityRecord>> getProgressActivity(String token) async {
     return await _executeWithLimit(
       _getRequestKey('activity'),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
-          var response = await http.get(
-            Uri.parse('$_baseUrl/dashboard/progress/activity'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                Uri.parse('$_baseUrl/dashboard/progress/activity'),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest('$_baseUrl/dashboard/progress/activity');
+          
           if (response.statusCode == 200) {
-            try {
-              final List<dynamic> activityData = jsonDecode(response.body);
-              final activities = activityData.map((json) => ActivityRecord.fromJson(json)).toList();
-              
-              await _offlineStorage.saveActivityRecords(activities);
-              print('✅ Активности загружены и сохранены оффлайн: ${activities.length} шт');
-              
-              return activities;
-            } catch (e) {
-              print("Error parsing activity data: $e");
-              throw Exception('Failed to parse activity data: $e');
-            }
+            final List<dynamic> activityData = jsonDecode(response.body);
+            final activities = activityData.map((json) => ActivityRecord.fromJson(json)).toList();
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveActivities(activities, accountId);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.activity,
+              activities,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlShort),
+            );
+            
+            print('✅ Активности загружены и сохранены в SQLite: ${activities.length} шт');
+            
+            return activities;
           } else {
             print("Failed to load activity data: ${response.statusCode}");
+            
+            // Пробуем из SQLite
+            final offlineActivities = await _databaseFacade.getActivities(accountId);
+            if (offlineActivities.isNotEmpty) {
+              print('📱 Используем активности из SQLite: ${offlineActivities.length} шт');
+              return offlineActivities;
+            }
+            
             throw Exception('Failed to load activity data: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки активностей онлайн, пробуем оффлайн: $e');
-          final offlineActivities = await _offlineStorage.getActivityRecords();
+          print('🌐 Ошибка загрузки активностей: $e');
+          
+          // Пробуем из кэша
+          final cachedActivities = await _cacheRepository.get<List<ActivityRecord>>(
+            CacheKeys.activity,
+            accountId: accountId,
+          );
+          
+          if (cachedActivities != null && cachedActivities.isNotEmpty) {
+            print('💾 Используем активности из кэша: ${cachedActivities.length} шт');
+            return cachedActivities;
+          }
+          
+          // Пробуем из SQLite
+          final offlineActivities = await _databaseFacade.getActivities(accountId);
           if (offlineActivities.isNotEmpty) {
-            print('📱 Используем оффлайн активности: ${offlineActivities.length} шт');
+            print('🗄️ Используем активности из SQLite: ${offlineActivities.length} шт');
             return offlineActivities;
           }
+          
           rethrow;
         }
       },
     );
   }
 
-  /// получение списка домашних заданий [api] - с автоматическим оффлайн сохранением
+  /// Получение домашних заданий с сохранением в SQLite
   Future<List<Homework>> getHomeworks(
     String token, {
-    int? page, 
-    int? status, 
-    int? groupId, 
+    int? page,
+    int? status,
+    int? groupId,
     int? specId,
     int? type,
   }) async {
@@ -787,6 +957,8 @@ class ApiService {
     return await _executeWithLimit(
       _getRequestKey('homeworks', params),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
           final uri = Uri.parse('$_baseUrl/homework/operations/list');
           final queryParams = <String, String>{};
@@ -804,131 +976,108 @@ class ApiService {
 
           final url = uri.replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
           
-          var response = await http.get(
-            url,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                url,
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest(url.toString());
+          
           if (response.statusCode == 200) {
-            try {
-              final responseData = jsonDecode(response.body);
-              List<dynamic> homeworkData = [];
-              
-              if (responseData is List) {
-                homeworkData = responseData;
-              } else if (responseData['data'] is List) {
-                homeworkData = responseData['data'];
-              } else if (responseData['homeworks'] is List) {
-                homeworkData = responseData['homeworks'];
-              } else if (responseData['items'] is List) {
-                homeworkData = responseData['items'];
-              } else if (responseData['models_list'] is List) {
-                homeworkData = responseData['models_list'];
-              }
-              
-              final homeworks = homeworkData.map((json) => Homework.fromJson(json)).toList();
-              
-              // ИСПРАВЛЕНИЕ: Сохраняем с указанием типа (0=домашние, 1=лабораторные)
-              final homeworkType = type ?? 0;
-              await _offlineStorage.saveHomeworks(homeworks, type: homeworkType);
-              print('✅ ${homeworkType == 1 ? 'Лабораторные' : 'Домашние'} задания загружены и сохранены оффлайн: ${homeworks.length} шт');
-              
-              return homeworks;
-            } catch (e) {
-              print("Error parsing homeworks: $e");
-              throw Exception('Failed to parse homeworks data: $e');
+            final responseData = jsonDecode(response.body);
+            List<dynamic> homeworkData = [];
+            
+            if (responseData is List) {
+              homeworkData = responseData;
+            } else if (responseData['data'] is List) {
+              homeworkData = responseData['data'];
+            } else if (responseData['homeworks'] is List) {
+              homeworkData = responseData['homeworks'];
+            } else if (responseData['items'] is List) {
+              homeworkData = responseData['items'];
+            } else if (responseData['models_list'] is List) {
+              homeworkData = responseData['models_list'];
             }
+            
+            final homeworks = homeworkData.map((json) => Homework.fromJson(json)).toList();
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveHomeworks(homeworks, accountId, materialType: type);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.homeworks,
+              homeworks,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlShort),
+            );
+            
+            print('✅ ${type == 1 ? 'Лабораторные' : 'Домашние'} задания загружены и сохранены в SQLite: ${homeworks.length} шт');
+            
+            return homeworks;
           } else {
             print("Failed to load homeworks: ${response.statusCode}");
+            
+            // Пробуем из SQLite с фильтрацией
+            final offlineHomeworks = await _databaseFacade.getHomeworks(
+              accountId,
+              materialType: type,
+              status: status,
+              page: page,
+              limit: 6,
+            );
+            
+            if (offlineHomeworks.isNotEmpty) {
+              print('📱 Используем ${type == 1 ? 'лабораторные' : 'домашние'} задания из SQLite: ${offlineHomeworks.length} шт');
+              return offlineHomeworks;
+            }
+            
             throw Exception('Failed to load homeworks: ${response.statusCode}');
           }
         } catch (e) {
-          final homeworkType = type ?? 0;
-          final typeName = homeworkType == 1 ? 'лабораторные' : 'домашние';
-          print('📱 Используем оффлайн $typeName задания (type=$homeworkType) - БЕЗ ФИЛЬТРАЦИИ ПО materialType!');
+          print('🌐 Ошибка загрузки домашних заданий: $e');
           
-          final offlineHomeworks = await _offlineStorage.getHomeworks(type: homeworkType);
-          
-          print('📱 Все оффлайн $typeName задания: ${offlineHomeworks.length}');
-          
-          List<Homework> filteredHomeworks;
-          if (status != null) {
-            filteredHomeworks = offlineHomeworks.where((hw) {
-              final displayStatus = hw.getDisplayStatus();
-              return displayStatus == status;
-            }).toList();
-            print('📱 Отфильтровано по статусу $status: ${filteredHomeworks.length} из ${offlineHomeworks.length}');
-          } else {
-            filteredHomeworks = offlineHomeworks;
-          }
-          
-          final currentPage = page ?? 1;
-          final limit = 6;
-          final start = (currentPage - 1) * limit;
-          final end = start + limit;
-          
-          if (start >= filteredHomeworks.length) {
-            print('📱 Пагинация: страница $currentPage пуста (всего: ${filteredHomeworks.length})');
-            return [];
-          }
-          
-          final result = filteredHomeworks.sublist(
-            start,
-            end < filteredHomeworks.length ? end : filteredHomeworks.length,
+          // Пробуем из кэша
+          final cachedHomeworks = await _cacheRepository.get<List<Homework>>(
+            CacheKeys.homeworks,
+            accountId: accountId,
           );
           
-          print('📱 Пагинация оффлайн: страница $currentPage, показано ${result.length} из ${filteredHomeworks.length}');
-          return result;
+          if (cachedHomeworks != null && cachedHomeworks.isNotEmpty) {
+            print('💾 Используем домашние задания из кэша: ${cachedHomeworks.length} шт');
+            
+            // Применяем фильтрацию к кэшированным данным
+            List<Homework> filtered = cachedHomeworks;
+            if (type != null) {
+              filtered = filtered.where((hw) => hw.materialType == type).toList();
+            }
+            if (status != null) {
+              filtered = filtered.where((hw) => hw.getDisplayStatus() == status).toList();
+            }
+            
+            return filtered;
+          }
+          
+          // Пробуем из SQLite
+          final offlineHomeworks = await _databaseFacade.getHomeworks(
+            accountId,
+            materialType: type,
+            status: status,
+            page: page,
+            limit: 6,
+          );
+          
+          if (offlineHomeworks.isNotEmpty) {
+            print('🗄️ Используем домашние задания из SQLite: ${offlineHomeworks.length} шт');
+            return offlineHomeworks;
+          }
+          
+          rethrow;
         }
       },
     );
   }
 
-  /// Улучшенная синхронизация с принудительной очисткой старых данных
-  Future<void> syncLabWorks(String token) async {
-    try {
-      print('🔄 Принудительная синхронизация лабораторных работ...');
-      
-      final labWorks = await getHomeworks(token, type: 1);
-      
-      await _offlineStorage.saveHomeworks(labWorks, type: 1);
-      
-      print('✅ Лабораторные работы синхронизированы: ${labWorks.length} шт');
-      
-      final homeWorks = await getHomeworks(token, type: 0);
-      await _offlineStorage.saveHomeworks(homeWorks, type: 0);
-      
-      print('✅ Домашние задания также синхронизированы: ${homeWorks.length} шт');
-      
-    } catch (e) {
-      print('❌ Ошибка синхронизации лабораторных работ: $e');
-    }
-  }
-
-
-  /// получение счетчиков домашних заданий [api] - с автоматическим оффлайн сохранением
+  /// Получение счетчиков ДЗ с сохранением в SQLite
   Future<List<HomeworkCounter>> getHomeworkCounters(
     String token, {
     int? type,
-    int? groupId, 
+    int? groupId,
     int? specId,
   }) async {
     final params = '${type ?? ''}_${groupId ?? ''}_${specId ?? ''}';
@@ -936,6 +1085,8 @@ class ApiService {
     return await _executeWithLimit(
       _getRequestKey('homework_counters', params),
       () async {
+        final accountId = await _getCurrentAccountId();
+        
         try {
           final uri = Uri.parse('$_baseUrl/count/homework');
           final queryParams = <String, String>{};
@@ -946,93 +1097,156 @@ class ApiService {
           
           final url = uri.replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
           
-          var response = await http.get(
-            url,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              'Referer': 'https://journal.top-academy.ru',
-            },
-          ).timeout(_timeOut);
-
-          if (response.statusCode == 401) {
-            final newToken = await _reauthenticate();
-            if (newToken != null) {
-              response = await http.get(
-                url,
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $newToken',
-                  'Referer': 'https://journal.top-academy.ru',
-                },
-              ).timeout(_timeOut);
-            }
-          }
-
+          final response = await _makeRequest(url.toString());
+          
           if (response.statusCode == 200) {
-            try {
-              final List<dynamic> counterData = jsonDecode(response.body);
-              final counters = counterData.map((json) => HomeworkCounter.fromJson(json)).toList();
-              
-              await _offlineStorage.saveHomeworkCounters(counters, type: type);
-              print('✅ Счетчики ${type == 1 ? 'лабораторных' : 'домашних'} заданий загружены и сохранены оффлайн: ${counters.length} шт');
-              
-              return counters;
-            } catch (e) {
-              print("Error parsing homework counters: $e");
-              throw Exception('Failed to parse homework counters: $e');
-            }
+            final List<dynamic> counterData = jsonDecode(response.body);
+            final counters = counterData.map((json) => HomeworkCounter.fromJson(json)).toList();
+            
+            // Сохраняем в SQLite
+            await _databaseFacade.saveHomeworkCounters(counters, accountId, type: type);
+            
+            // Кэшируем
+            await _cacheRepository.save(
+              CacheKeys.homeworkCounters,
+              counters,
+              accountId: accountId,
+              expiry: Duration(seconds: _cacheTtlShort),
+            );
+            
+            print('✅ Счетчики ${type == 1 ? 'лабораторных' : 'домашних'} заданий загружены и сохранены в SQLite: ${counters.length} шт');
+            
+            return counters;
           } else {
             print("Failed to load homework counters: ${response.statusCode}");
+            
+            // Пробуем из SQLite
+            final offlineCounters = await _databaseFacade.getHomeworkCounters(accountId, type: type);
+            if (offlineCounters.isNotEmpty) {
+              print('📱 Используем счетчики из SQLite: ${offlineCounters.length} шт');
+              return offlineCounters;
+            }
+            
             throw Exception('Failed to load homework counters: ${response.statusCode}');
           }
         } catch (e) {
-          print('🌐 Ошибка загрузки счетчиков ДЗ онлайн, пробуем оффлайн: $e');
+          print('🌐 Ошибка загрузки счетчиков ДЗ: $e');
           
-          final offlineCounters = await _offlineStorage.getHomeworkCounters(type: type);
+          // Пробуем из кэша
+          final cachedCounters = await _cacheRepository.get<List<HomeworkCounter>>(
+            CacheKeys.homeworkCounters,
+            accountId: accountId,
+          );
+          
+          if (cachedCounters != null && cachedCounters.isNotEmpty) {
+            print('💾 Используем счетчики из кэша: ${cachedCounters.length} шт');
+            return cachedCounters;
+          }
+          
+          // Пробуем из SQLite
+          final offlineCounters = await _databaseFacade.getHomeworkCounters(accountId, type: type);
           if (offlineCounters.isNotEmpty) {
-            print('📱 Используем оффлайн счетчики ${type == 1 ? 'лабораторных' : 'домашних'} заданий: ${offlineCounters.length} шт');
+            print('🗄️ Используем счетчики из SQLite: ${offlineCounters.length} шт');
             return offlineCounters;
           }
           
-          final oldCounters = await _offlineStorage.getHomeworkCounters();
-          print('📱 Используем общие оффлайн счетчики (обратная совместимость): ${oldCounters.length} шт');
-          return oldCounters;
+          rethrow;
         }
       },
     );
   }
 
-  /// удаление домашнего задания [api] // TODO: Допилить - Ди (Будущий func)
-Future<bool> deleteHomework(String token, int homeworkId) async {
-  var response = await http.post(
-    Uri.parse('$_baseUrl/homework/operations/delete'),
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-      'Referer': 'https://journal.top-academy.ru',
-    },
-    body: jsonEncode({'id': homeworkId}),
-  );
+  /// ==================== SYNC METHODS ====================
 
-  if (response.statusCode == 401) {
-    final newToken = await _reauthenticate();
-    if (newToken != null) {
-      response = await http.post(
-        Uri.parse('$_baseUrl/homework/operations/delete'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $newToken',
-          'Referer': 'https://journal.top-academy.ru',
-        },
-        body: jsonEncode({'id': homeworkId}),
-      );
+  Future<void> syncCriticalDataOnly(String token) async {
+    if (_isDisposed) return;
+    
+    print('🔄 Синхронизация критических данных...');
+    
+    try {
+      final accountId = await _getCurrentAccountId();
+      
+      await Future.wait([
+        getUser(token).then((user) async {
+          await _databaseFacade.saveUserData(user, accountId);
+        }),
+        getMarks(token).then((marks) async {
+          await _databaseFacade.saveMarks(marks, accountId);
+        }),
+      ], eagerError: false);
+      
+      print('✅ Критические данные синхронизированы в SQLite');
+    } catch (e) {
+      print('⚠️ Ошибка синхронизации критических данных: $e');
     }
   }
 
-  return response.statusCode == 200;
-}
+  Future<void> syncAllData(String token) async {
+    if (_isDisposed) return;
+    
+    print('🔄 Полная синхронизация данных в SQLite...');
+    
+    try {
+      final accountId = await _getCurrentAccountId();
+      
+      // Критические данные
+      await syncCriticalDataOnly(token);
+      await Future.delayed(Duration(milliseconds: 200));
+      
+      // Второстепенные данные
+      final now = DateTime.now();
+      final monday = getMonday(now);
+      final sunday = getSunday(now);
+      
+      await getSchedule(token, formatDate(monday), formatDate(sunday)).then((schedule) async {
+        await _databaseFacade.saveSchedule(schedule, accountId);
+      });
+      
+      await Future.delayed(Duration(milliseconds: 200));
+      
+      await Future.wait([
+        getExams(token).then((exams) => _databaseFacade.saveExams(exams, accountId)),
+        getHomeworks(token, type: 0).then((homeworks) => _databaseFacade.saveHomeworks(homeworks, accountId, materialType: 0)),
+        getGroupLeaders(token).then((leaders) => _databaseFacade.saveGroupLeaders(leaders, accountId)),
+        getFeedbackReview(token).then((feedbacks) => _databaseFacade.saveFeedbacks(feedbacks, accountId)),
+        getProgressActivity(token).then((activities) => _databaseFacade.saveActivities(activities, accountId)),
+      ], eagerError: false);
+      
+      print('✅ Все данные синхронизированы в SQLite');
+    } catch (e) {
+      print('❌ Ошибка полной синхронизации: $e');
+    }
+  }
 
+  /// ==================== UTILITY METHODS ====================
+
+  Future<bool> validateToken(String token) async {
+    return await _executeWithLimit(
+      _getRequestKey('validate_token'),
+      () async {
+        try {
+          final response = await _makeRequest('$_baseUrl/settings/user-info');
+          return response.statusCode == 200;
+        } catch (e) {
+          return false;
+        }
+      },
+    );
+  }
+
+  /// ==================== DISPOSE ====================
+
+  void dispose() {
+    _isDisposed = true;
+    _pendingRequests.forEach((key, completer) {
+      if (!completer.isCompleted) {
+        completer.completeError(Exception('Service disposed'));
+      }
+    });
+    _pendingRequests.clear();
+    _memoryCache.clear();
+    print('🔴 ApiService disposed');
+  }
 /// загрузка файла задания [api]
 Future<File?> downloadHomeworkFile(String token, Homework homework) async {
   try {
@@ -1052,6 +1266,7 @@ Future<File?> downloadHomeworkFile(String token, Homework homework) async {
       onProgress: (received, total) {
         if (total != -1) {
           double progress = (received / total * 100);
+          print('Download progress: ${progress.toStringAsFixed(2)}%'); // TODO: допилить прогресс в UX - Ди.
           print('Download progress: ${progress.toStringAsFixed(2)}%');
         }
       },
@@ -1094,134 +1309,21 @@ Future<File?> downloadStudentHomeworkFile(String token, Homework homework) async
     rethrow;
   }
 }
-
-  /// Упрощенная синхронизация только критических данных
-  Future<void> syncCriticalDataOnly(String token) async {
-    if (_isDisposed) return;
-    
-    print('🔄 Синхронизация критических данных...');
-    
-    try {
-      await Future.wait([
-        _syncUserData(token),
-        _syncMarks(token),
-      ], eagerError: false);
-      
-      print('✅ Критические данные синхронизированы');
-    } catch (e) {
-      print('⚠️ Ошибка синхронизации критических данных: $e');
-    }
-  }
-
-  /// Полная синхронизация (только при ручном вызове)
-  Future<void> syncAllData(String token) async {
-    if (_isDisposed) return;
-    
-    print('🔄 Полная синхронизация данных...');
-    
-    try {
-      // Критические данные
-      await syncCriticalDataOnly(token);
-      await Future.delayed(Duration(milliseconds: 200));
-      
-      // Второстепенные данные
-      await _syncSchedule(token);
-      await Future.delayed(Duration(milliseconds: 200));
-      
-      await _syncAdditionalData(token);
-      
-      print('✅ Все данные синхронизированы');
-    } catch (e) {
-      print('❌ Ошибка полной синхронизации: $e');
-    }
-  }
-
-  Future<void> _syncUserData(String token) async {
-    try {
-      final user = await getUser(token);
-      await _offlineStorage.saveUserData(user);
-    } catch (e) {
-      print('⚠️ Ошибка синхронизации пользователя: $e');
-    }
-  }
-
-  Future<void> _syncMarks(String token) async {
-    try {
-      final marks = await getMarks(token);
-      await _offlineStorage.saveMarks(marks);
-    } catch (e) {
-      print('⚠️ Ошибка синхронизации оценок: $e');
-    }
-  }
-
-  Future<void> _syncSchedule(String token) async {
-    try {
-      final now = DateTime.now();
-      final monday = getMonday(now);
-      final sunday = getSunday(now);
-      final schedule = await getSchedule(token, formatDate(monday), formatDate(sunday));
-      await _offlineStorage.saveSchedule(schedule);
-    } catch (e) {
-      print('⚠️ Ошибка синхронизации расписания: $e');
-    }
-  }
-
-  Future<void> _syncAdditionalData(String token) async {
-    try {
-      await Future.wait([
-        getExams(token).then(_offlineStorage.saveExams).catchError((e) => print('⚠️ Экзамены: $e')),
-        getHomeworks(token, type: 0).then(_offlineStorage.saveHomeworks).catchError((e) => print('⚠️ ДЗ: $e')),
-        getGroupLeaders(token).then(_offlineStorage.saveGroupLeaders).catchError((e) => print('⚠️ Лидеры группы: $e')),
-      ], eagerError: false);
-    } catch (e) {
-      print('⚠️ Ошибка синхронизации дополнительных данных: $e');
-    }
-  }
-
-  /// Метод для быстрой загрузки критических данных с приоритетом оффлайн
-  Future<Map<String, dynamic>> loadCriticalData(String token) async {
-    try {
-      print('🚀 Быстрая загрузка критических данных...');
-      
-      final results = await Future.wait([
-        getUser(token),
-        getMarks(token),
-      ], eagerError: false);
-      
-      return {
-        'user': results[0] as UserData,
-        'marks': results[1] as List<Mark>,
-      };
-    } catch (e) {
-      print('❌ Ошибка загрузки критических данных: $e');
-      rethrow;
-    }
-  }
-
-// Для тестов. Запросы чисто для проверок РАЗРАБОТЧИКАМ
-/// замена токена на некорректный для тестирования обработки ошибки [api]
-Future<void> simulateTokenError() async {
-  final secureStorage = SecureStorageService();
-  await secureStorage.saveToken('invalid_token_12345');
-  print('Искусственная ошибка токена активирована!');
 }
 
-/// очищение токена для тестирования обработки ошибки [api]
-Future<void> clearTokenForTesting() async {
-  final secureStorage = SecureStorageService();
-  await secureStorage.clearAll();
-  print('Все данные очищены для тестирования!');
+// Вспомогательные функции (оставить как есть)
+DateTime getMonday(DateTime date) {
+  final d = DateTime(date.year, date.month, date.day);
+  final day = d.weekday;
+  final diff = day - 1; 
+  return d.subtract(Duration(days: diff));
 }
 
-  void dispose() {
-    _isDisposed = true;
-    _pendingRequests.forEach((key, completer) {
-      if (!completer.isCompleted) {
-        completer.completeError(Exception('Service disposed'));
-      }
-    });
-    _pendingRequests.clear();
-    _memoryCache.clear();
-    print('🔴 ApiService disposed');
-  }
+DateTime getSunday(DateTime date) {
+  final d = getMonday(date);
+  return d.add(const Duration(days: 6));
+}
+
+String formatDate(DateTime date) {
+  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 }
