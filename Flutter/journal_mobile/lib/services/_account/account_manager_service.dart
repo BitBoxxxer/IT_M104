@@ -538,6 +538,60 @@ class AccountManagerService {
     }
   }
 
+  /// Очистить дублирующиеся аккаунты по username
+Future<void> cleanupDuplicateAccounts() async {
+  try {
+    print('🧹 Очистка дублирующихся аккаунтов...');
+    
+    final allAccounts = await getAllAccounts();
+    final uniqueUsernames = <String>{};
+    final accountsToDelete = <Account>[];
+    
+    // Ищем дубли
+    for (var account in allAccounts) {
+      final lowercaseUsername = account.username.toLowerCase();
+      
+      if (uniqueUsernames.contains(lowercaseUsername)) {
+        // Нашли дубль
+        accountsToDelete.add(account);
+        print('❌ Найден дублирующийся аккаунт: ${account.username} (ID: ${account.id})');
+      } else {
+        uniqueUsernames.add(lowercaseUsername);
+      }
+    }
+    
+    // Удаляем дубли
+    for (var duplicateAccount in accountsToDelete) {
+      // Сохраняем учетные данные перед удалением
+      final credentials = await getAccountCredentials(duplicateAccount.id);
+      final remainingAccount = allAccounts.firstWhere(
+        (a) => a.username.toLowerCase() == duplicateAccount.username.toLowerCase() 
+            && a.id != duplicateAccount.id
+      );
+      
+      if (remainingAccount.id.isNotEmpty && credentials['password'] != null) {
+        // Переносим учетные данные на оставшийся аккаунт
+        await saveAccountCredentials(
+          remainingAccount.id, 
+          credentials['username'] ?? '', 
+          credentials['password'] ?? ''
+        );
+      }
+      
+      await removeAccount(duplicateAccount.id);
+    }
+    
+    if (accountsToDelete.isNotEmpty) {
+      print('✅ Удалено ${accountsToDelete.length} дублирующихся аккаунтов');
+    } else {
+      print('✅ Дублирующихся аккаунтов не найдено');
+    }
+    
+  } catch (e) {
+    print('❌ Ошибка очистки дублей: $e');
+  }
+}
+
   /// ==================== ПРИВАТНЫЕ МЕТОДЫ ====================
 
   /// Генерация ID для нового аккаунта

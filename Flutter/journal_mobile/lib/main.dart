@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'app_initializer.dart';
+
 import '_database/database_health_check.dart';
 import '_database/sqflite_init.dart';
 
@@ -30,6 +32,9 @@ void main() async {
     print('Ошибка инициализации уведомлений: $e');
   }
 
+  final appInitializer = AppInitializer();
+  await appInitializer.initializeApp();
+  await appInitializer.checkDataMigration();
   runApp(const MyApp());
 }
 
