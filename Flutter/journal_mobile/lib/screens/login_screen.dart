@@ -128,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await _onlineAutoLogin(username, password);
       } 
       else if (hasToken) {
-        await _offlineAutoLogin(token, username ?? 'unknown');
+        await _offlineAutoLogin(token, username ?? 'username_offline');
       }
     } catch (e) {
       print("Auto-login error: $e");
@@ -241,29 +241,12 @@ class _LoginScreenState extends State<LoginScreen> {
       final token = await _apiService.login(username, password);
 
       if (token != null && mounted) {
-        final userData = await _apiService.getUser(token);
-        
         final accountManager = AccountManagerService();
+        final account = await accountManager.getCurrentAccount();
         
-        final accountId = DateTime.now().millisecondsSinceEpoch.toString();
+        if (account != null) {
+          print('✅ Аккаунт создан: ${account.username} (ID: ${account.id})');
         
-        final account = Account(
-          id: accountId,
-          username: username,
-          fullName: userData.fullName,
-          groupName: userData.groupName,
-          photoPath: userData.photoPath,
-          token: token,
-          lastLogin: DateTime.now(),
-          isActive: true,
-          studentId: userData.studentId,
-        );
-        
-        await accountManager.addAccount(account);
-        
-        await accountManager.saveAccountCredentials(accountId, username, password);
-        
-        print('✅ Аккаунт сохранен с учетными данными');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Синхронизация данных для offline режима...'),
@@ -297,6 +280,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
         _navigateToMainMenu(token, isOffline: false);
+      }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

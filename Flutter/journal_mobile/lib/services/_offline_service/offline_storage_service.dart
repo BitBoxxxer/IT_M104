@@ -41,6 +41,18 @@ class OfflineStorageService {
     return _currentAccountId!;
   }
 
+  Future<void> clearAccountData(String accountId) async {
+    try {
+      print('🧹 Явная очистка данных аккаунта $accountId из OfflineStorage');
+      
+      await _databaseFacade.clearAllForAccount(accountId);
+      
+      print('✅ Данные аккаунта очищены в OfflineStorage');
+    } catch (e) {
+      print('❌ Ошибка очистки данных в OfflineStorage: $e');
+    }
+  }
+
   Future<void> saveMarks(List<Mark> marks) async {
     final accountId = await _getCurrentAccountId();
     await _databaseFacade.saveMarks(marks, accountId);

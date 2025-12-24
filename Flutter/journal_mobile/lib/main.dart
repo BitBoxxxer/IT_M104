@@ -25,6 +25,9 @@ void main() async {
 
    await SqfliteInitializer.initialize();
   await initializeDateFormatting('ru', null);
+  final accountManager = AccountManagerService();
+  
+  await accountManager.migrateOldAccountIds();
   
   try {
     await NotificationService().initialize();
@@ -35,8 +38,36 @@ void main() async {
   final appInitializer = AppInitializer();
   await appInitializer.initializeApp();
   await appInitializer.checkDataMigration();
+  await _verifyAccountIntegrity();
   runApp(const MyApp());
 }
+
+  /// TODO: Вынесли || удалить.
+  /// Времено - нужно было проверить целостность сохраненных данных из разных сервисос.
+  Future<void> _verifyAccountIntegrity() async {
+    try {
+      print('🔍 Проверка целостности аккаунтов при запуске...');
+      
+      final accountManager = AccountManagerService();
+      final accounts = await accountManager.getAllAccounts();
+      
+      print('📊 Найдено аккаунтов: ${accounts.length}');
+      
+      for (var account in accounts) {
+        final hasCredentials = await accountManager.getAccountCredentials(account.id);
+        
+        if (hasCredentials['username'] == null && hasCredentials['password'] == null) {
+          print('⚠️ Аккаунт без учетных данных: ${account.username}');
+          print('   🗑️ Удаляем поврежденный аккаунт...');
+          await accountManager.removeAccount(account.id);
+        }
+      }
+      
+      print('✅ Проверка целостности завершена');
+    } catch (e) {
+      print('❌ Ошибка проверки целостности: $e');
+    }
+  }
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});

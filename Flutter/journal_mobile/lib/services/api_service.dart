@@ -212,40 +212,27 @@ class ApiService {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final token = data['access_token'];
-          
-          final account = Account(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            username: username,
-            fullName: '',
-            groupName: '',
-            photoPath: '',
-            token: token,
-            lastLogin: DateTime.now(),
-            isActive: true,
-            studentId: 0,
-          );
-          
-          await _accountManager.addAccount(account);
-          
-          // Сохраняем учетные данные для перелогина
-          await _accountManager.saveAccountCredentials(account.id, username, password);
-          
-          // Загружаем и сохраняем данные пользователя
-          try {
-            final userData = await getUser(token);
-            final updatedAccount = account.copyWith(
-              fullName: userData.fullName,
-              groupName: userData.groupName,
-              photoPath: userData.photoPath,
-              studentId: userData.studentId,
-            );
-            await _accountManager.updateAccount(updatedAccount);
-            
-            // Сохраняем в SQLite
-            await _databaseFacade.saveUserData(userData, account.id);
+        final accountManager = AccountManagerService();
+        
+        UserData? userData;
+        try {
+          final userResponse = await _makeRequest('$_baseUrl/settings/user-info', token: token);
+          if (userResponse.statusCode == 200) {
+            userData = UserData.fromJson(jsonDecode(userResponse.body));
+          }
           } catch (e) {
             print('⚠️ Ошибка загрузки данных пользователя: $e');
           }
+          /// временная глушилка для создания пустой оболочки
+        await accountManager.addAccountWithCredentials(
+          username: username,
+          password: password,
+          token: token,
+          fullName: userData?.fullName ?? '',
+          groupName: userData?.groupName ?? '',
+          photoPath: userData?.photoPath ?? '',
+          studentId: userData?.studentId ?? 0,
+        );
           
           return token;
         } else {

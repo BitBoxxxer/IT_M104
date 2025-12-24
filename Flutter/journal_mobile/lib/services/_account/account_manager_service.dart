@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../../_database/database_config.dart';
 import '../../_database/database_facade.dart';
-import '../../_database/database_service.dart';
 import '../../models/_system/account_model.dart';
+import '../_offline_service/offline_storage_service.dart';
+import 'account_id_generator.dart';
 
 class AccountManagerService {
   static final AccountManagerService _instance = AccountManagerService._internal();
@@ -128,38 +128,83 @@ class AccountManagerService {
   /// Удалить аккаунт
   Future<void> removeAccount(String accountId) async {
     try {
-      // 1. Получаем аккаунт
       final account = await getAccountById(accountId);
       if (account == null) {
         throw Exception('Аккаунт не найден');
       }
       
-      print('🗑️ Удаление аккаунта: ${account.username}');
+      print('Удаление аккаунта: ${account.username} (ID: $accountId)');
       
-      // 2. Удаляем учетные данные из SecureStorage
+      print('📊 Статистика перед удалением:');
+      final stats = await getAccountsStats();
+      print('   Всего аккаунтов: ${stats['total']}');
+      print('   Активных: ${stats['active']}');
+
+      final offlineService = OfflineStorageService();
+      await offlineService.clearAccountData(accountId);
+      
       await _deleteAccountCredentials(accountId);
+      print('🔐 Учетные данные удалены');
       
-      // 3. Удаляем аккаунт из SQLite
-      await _databaseFacade.deleteAccount(accountId);
+      await _clearServiceCaches(accountId);
       
-      // 4. Удаляем все данные аккаунта из SQLite
-      await _databaseFacade.clearAllForAccount(accountId);
-      
-      // 5. Если удаляли активный аккаунт, активируем другой (если есть)
       if (account.isActive) {
         final remainingAccounts = await getAllAccounts();
         if (remainingAccounts.isNotEmpty) {
+          print('🔄 Активируем новый аккаунт: ${remainingAccounts.first.username}');
           await switchAccount(remainingAccounts.first.id);
-          print('🔄 Активирован новый аккаунт: ${remainingAccounts.first.username}');
+        } else {
+          print('📭 Больше нет сохраненных аккаунтов');
         }
       }
       
-      print('✅ Аккаунт удален: ${account.username}');
+      final finalAccounts = await getAllAccounts();
+      final stillExists = finalAccounts.any((a) => a.id == accountId);
+      
+      if (stillExists) {
+        print('АККАУНТ НЕ УДАЛЕН! ID: $accountId все еще в базе');
+        throw Exception('Не удалось полностью удалить аккаунт');
+      }
+      
+      print('✅ Аккаунт полностью удален: ${account.username}');
       
     } catch (e) {
-      print('❌ Ошибка removeAccount: $e');
+      print('❌ КРИТИЧЕСКАЯ ошибка removeAccount: $e');
+      await _debugAccountRemoval(accountId);
       rethrow;
     }
+  }
+
+  /// Очистить кэши сервисов
+  Future<void> _clearServiceCaches(String accountId) async {
+    try {
+      final offlineService = OfflineStorageService();
+      offlineService.clearCache();
+      
+      await _secureStorage.delete(key: 'user_token');
+      await _secureStorage.delete(key: 'auth_token');
+      await _secureStorage.delete(key: 'current_account_id');
+      
+      print('🧹 Кэши сервисов очищены');
+    } catch (e) {
+      print('⚠️ Ошибка очистки кэшей: $e');
+    }
+  }
+
+  /// Диагностика удаления аккаунта
+  Future<void> _debugAccountRemoval(String accountId) async {
+    print('🔍 ДИАГНОСТИКА удаления аккаунта $accountId:');
+    
+    final allAccounts = await getAllAccounts();
+    final existsInDb = allAccounts.any((a) => a.id == accountId);
+    print('   В базе данных: ${existsInDb ? "ДА" : "НЕТ"}');
+    
+    final credentials = await getAccountCredentials(accountId);
+    final hasCredentials = credentials['username'] != null || credentials['password'] != null;
+    print('   Учетные данные: ${hasCredentials ? "ДА" : "НЕТ"}');
+    
+    final token = await _secureStorage.read(key: 'user_token');
+    print('   Сохраненный токен: ${token != null ? "ДА" : "НЕТ"}');
   }
 
   /// Получить текущий активный аккаунт
@@ -592,20 +637,94 @@ Future<void> cleanupDuplicateAccounts() async {
   }
 }
 
+  /// Миграция старых ID аккаунтов в новый формат
+  Future<void> migrateOldAccountIds() async {
+    try {
+      print('🔄 Проверка старых ID аккаунтов...');
+      
+      final allAccounts = await getAllAccounts();
+      int migratedCount = 0;
+      
+      for (var account in allAccounts) {
+        if (!account.id.startsWith('acc_') && account.id.isNotEmpty) {
+          print('🔄 Миграция аккаунта ${account.username} со старым ID: ${account.id}');
+          
+          final newAccount = account.copyWith(
+            id: _generateAccountId(),
+          );
+          
+          await _databaseFacade.saveAccount(newAccount);
+          
+          final credentials = await getAccountCredentials(account.id);
+          if (credentials['username'] != null && credentials['password'] != null) {
+            await saveAccountCredentials(
+              newAccount.id,
+              credentials['username']!,
+              credentials['password']!,
+            );
+          }
+          
+          await _databaseFacade.deleteAccount(account.id);
+          await _deleteAccountCredentials(account.id);
+          
+          migratedCount++;
+        }
+      }
+      
+      if (migratedCount > 0) {
+        print('✅ Мигрировано $migratedCount аккаунтов в новый формат ID');
+      } else {
+        print('✅ Все аккаунты уже в правильном формате');
+      }
+    } catch (e) {
+      print('❌ Ошибка миграции ID аккаунтов: $e');
+    }
+  }
+
+  // Господи спасибо за дубликаты
+  Future<Account> addAccountWithCredentials({
+      required String username,
+      required String password,
+      String? token,
+      String? fullName,
+      String? groupName,
+      String? photoPath,
+      int studentId = 0,
+    }) async {
+      try {
+        print('➕ Создание нового аккаунта: $username');
+        
+        final accountId = _generateAccountId();
+        
+        final account = Account(
+          id: accountId,
+          username: username,
+          fullName: fullName ?? '',
+          groupName: groupName ?? '',
+          photoPath: photoPath ?? '',
+          token: token ?? '',
+          lastLogin: DateTime.now(),
+          isActive: true,
+          studentId: studentId,
+        );
+        
+        await addAccount(account);
+        
+        await saveAccountCredentials(accountId, username, password);
+        
+        print('✅ Аккаунт создан с ID: $accountId');
+        
+        return account;
+      } catch (e) {
+        print('❌ Ошибка создания аккаунта: $e');
+        rethrow;
+      }
+    }
+
   /// ==================== ПРИВАТНЫЕ МЕТОДЫ ====================
 
   /// Генерация ID для нового аккаунта
   String _generateAccountId() {
-    return 'acc_${DateTime.now().millisecondsSinceEpoch}_${_randomString(6)}';
-  }
-
-  /// Генерация случайной строки
-  String _randomString(int length) {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    final random = Random();
-    return String.fromCharCodes(Iterable.generate(
-      length,
-      (_) => chars.codeUnitAt(random.nextInt(chars.length)),
-    ));
+    return AccountIdGenerator.generateAccountId();
   }
 }
