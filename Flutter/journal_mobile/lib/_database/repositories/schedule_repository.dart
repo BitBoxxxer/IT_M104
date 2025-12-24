@@ -1,4 +1,5 @@
 import 'package:journal_mobile/models/days_element.dart';
+import 'package:sqflite/sqflite.dart';
 import '../database_service.dart';
 import '../database_config.dart';
 
@@ -8,14 +9,12 @@ class ScheduleRepository {
   Future<void> saveSchedule(List<ScheduleElement> schedule, String accountId) async {
     final db = await _dbService.database;
     await db.transaction((txn) async {
-      // Удаляем старые данные расписания
       await txn.delete(
         DatabaseConfig.tableSchedule,
         where: 'account_id = ?',
         whereArgs: [accountId],
       );
 
-      // Вставляем новые данные
       for (final element in schedule) {
         await txn.insert(DatabaseConfig.tableSchedule, {
           'account_id': accountId,
@@ -26,8 +25,7 @@ class ScheduleRepository {
           'room_name': element.roomName,
           'subject_name': element.subjectName,
           'teacher_name': element.teacherName,
-          'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        });
+        }, conflictAlgorithm: ConflictAlgorithm.replace,);
       }
     });
   }
@@ -75,20 +73,6 @@ class ScheduleRepository {
       'subject_name': data['subject_name'],
       'teacher_name': data['teacher_name'],
     })).toList();
-  }
-
-  Future<DateTime?> getLastSyncTime(String accountId) async {
-    final result = await _dbService.rawQuery(
-      'SELECT MAX(sync_timestamp) as last_sync FROM ${DatabaseConfig.tableSchedule} WHERE account_id = ?',
-      [accountId],
-    );
-    
-    if (result.isEmpty || result.first['last_sync'] == null) {
-      return null;
-    }
-    
-    final timestamp = result.first['last_sync'] as int;
-    return DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
   }
 
   Future<int> getScheduleCount(String accountId) async {

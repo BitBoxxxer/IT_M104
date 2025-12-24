@@ -19,8 +19,6 @@ class CacheRepository {
       'key': key,
       'account_id': accountId,
       'value': jsonEncode(value),
-      'expires_at': expiryTimestamp,
-      'created_at': DateTime.now().millisecondsSinceEpoch,
     });
   }
 
@@ -31,19 +29,12 @@ class CacheRepository {
       DatabaseConfig.tableCache,
       where: 'key = ? AND (account_id = ? OR account_id IS NULL)',
       whereArgs: [key, accountId],
-      orderBy: 'created_at DESC',
       limit: 1,
     );
 
     if (cacheData.isEmpty) return null;
 
     final data = cacheData.first;
-    final expiresAt = data['expires_at'] as int?;
-
-    if (expiresAt != null && now > expiresAt) {
-      await remove(key, accountId: accountId);
-      return null;
-    }
 
     try {
       final value = jsonDecode(data['value'] as String);
@@ -78,7 +69,6 @@ class CacheRepository {
     
     await _dbService.delete(
       DatabaseConfig.tableCache,
-      where: 'expires_at IS NOT NULL AND expires_at < ?',
       whereArgs: [now],
     );
   }

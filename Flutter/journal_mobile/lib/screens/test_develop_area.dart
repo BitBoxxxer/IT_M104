@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/api_service.dart';
 import '../services/_notification/notification_service.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
@@ -57,7 +56,7 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                       'Тестирование уведомлений',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 30),
                     
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -110,7 +109,7 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                       ],
                     ),
                     
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 50),
                     
                     // Кнопки тестирования уведомлений
                     Wrap(
@@ -166,128 +165,7 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                         ),
                       ],
                     ),
-                    
-                    const SizedBox(height: 20),
-
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.notification_important, size: 18),
-                      label: const Text('Проверить систему'),
-                      onPressed: () async {
-                        print('🔄 Проверка системы уведомлений...');
-                        
-                        try {
-                          final isInitialized = await _notificationService.isInitialized();
-                          print('📱 Система инициализирована: $isInitialized');
-                          
-                          if (!isInitialized) {
-                            print('⚠️ Переинициализируем систему...');
-                            await _notificationService.initialize();
-                          }
-
-                          final status = await _notificationService.getNotificationStatus();
-                          print('📱 Статус системы: $status');
-                          
-                          final bool? granted = await _notificationService.areNotificationsEnabled();
-                          print('📱 Разрешения на уведомления: $granted');
-                          
-                          final activeChannels = await _notificationService.getActiveNotificationChannels();
-                          print('📱 Активные каналы: ${activeChannels?.length ?? 0}');
-                          
-                          if (activeChannels != null) {
-                            for (final channel in activeChannels) {
-                              print('   - ${channel.id}: ${channel.name}');
-                            }
-                          }
-                          
-                          await _notificationService.showTestNotification();
-                          print('✅ Тестовое уведомление отправлено в систему');
-                          
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Диагностика уведомлений'),
-                              content: SingleChildScrollView(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('✅ Инициализирована: $isInitialized'),
-                                    Text('✅ Разрешения: ${granted ?? "неизвестно"}'),
-                                    Text('✅ Каналы: ${activeChannels?.length ?? 0}'),
-                                    const SizedBox(height: 10),
-                                    const Text('Тестовое уведомление отправлено!'),
-                                    const SizedBox(height: 10),
-                                    if (granted == false)
-                                      const Text(
-                                        '⚠️ Включите уведомления в настройках устройства',
-                                        style: TextStyle(color: Colors.orange),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('OK'),
-                                ),
-                              ],
-                            ),
-                          );
-                          
-                        } catch (e) {
-                          print('❌ Ошибка отправки: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Ошибка: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.perm_device_info, size: 18),
-                      label: const Text('Проверить разрешения'),
-                      onPressed: () async {
-                        final status = await _notificationService.checkPermissionStatus();
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Статус разрешений'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Разрешения: ${status['enabled'] ?? "неизвестно"}'),
-                                Text('Платформа: ${status['platform'] ?? "неизвестно"}'),
-                                Text('Инициализирована: ${status['initialized'] ?? false}'),
-                                const SizedBox(height: 10),
-                                if (status['enabled'] == false)
-                                  const Text(
-                                    '⚠️ Включите уведомления в настройках устройства',
-                                    style: TextStyle(color: Colors.orange),
-                                  ),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('OK'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal.shade100,
-                        foregroundColor: Colors.teal.shade800,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 50),
 
                     // Дополнительные функции
                     Wrap(
@@ -308,85 +186,8 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                             foregroundColor: Colors.purple.shade800,
                           ),
                         ),
+                        const SizedBox(height: 50),
 
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.speed, size: 18),
-                          label: const Text('Быстрая проверка'),
-                          onPressed: () async {
-                            final prefs = await SharedPreferences.getInstance();
-                            final lastCheck = prefs.getInt('last_successful_check') ?? 0;
-                            
-                            final now = DateTime.now().millisecondsSinceEpoch;
-                            
-                            // Если lastCheck равен 0, значит проверка никогда не выполнялась
-                            if (lastCheck == 0) {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Статус Polling'),
-                                  content: const Text('Проверка еще не выполнялась'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text('OK'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              return;
-                            }
-                            
-                            if (lastCheck > now || (now - lastCheck) > 365 * 24 * 60 * 60 * 1000) {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Статус Polling'),
-                                  content: const Text('Данные времени повреждены'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text('OK'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              return;
-                            }
-                            
-                            final diffMinutes = (now - lastCheck) ~/ 60000;
-                            final nextCheckIn = 15 - diffMinutes;
-                            
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('Статус Polling'),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Polling включен: $_pollingEnabled'),
-                                    Text('Последняя проверка: $diffMinutes минут назад'),
-                                    Text('Следующая проверка: через ${nextCheckIn > 0 ? nextCheckIn : 0} минут'),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      diffMinutes >= 15 ? '✅ Готов к проверке' : '⏳ Ожидание...',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: diffMinutes >= 15 ? Colors.green : Colors.orange
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('OK'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.settings, size: 18),
                           label: const Text('Переинициализировать'),
@@ -441,100 +242,6 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                   }
                 },
                 child: Text('Показать новый стиль SnackBar'),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: 250,
-              child: ElevatedButton.icon(
-                icon: Icon(Icons.bug_report, color: Colors.red),
-                label: Text('Симулировать ошибку токена', style: TextStyle(color: Colors.red)),
-                onPressed: () async {
-                  // TODO: apiService.simulateTokenError();
-                  /* final apiService = ApiService();
-                  await apiService.simulateTokenError(); */
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Ошибка токена симулирована! Перезайдите в приложение'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade50,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            SizedBox(
-              width: 250,
-              child: ElevatedButton.icon(
-                icon: Icon(Icons.delete, color: Colors.purple),
-                label: Text('Очистить все данные Secure_Storage', style: TextStyle(color: Colors.purple)),
-                onPressed: () async {
-                  // TODO: apiService.clearTokenForTesting();
-                  /* final apiService = ApiService();
-                  await apiService.clearTokenForTesting(); */
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Secure_Storage данные очищены! Перезайдите в приложение'),
-                      backgroundColor: const Color.fromARGB(255, 181, 64, 202),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple.shade50,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            SizedBox(
-              width: 250,
-              child: ElevatedButton.icon(
-                icon: Icon(Icons.security, color: Colors.blue),
-                label: Text('Проверить текущий токен', style: TextStyle(color: Colors.blue)),
-                onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  final token = prefs.getString('token');
-                  final username = prefs.getString('username');
-                  
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text('Информация о токене'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Токен: ${token?.substring(0, 20)}...'),
-                          Text('Длина: ${token?.length ?? 0} символов'),
-                          Text('Username: $username'),
-                          SizedBox(height: 10),
-                          Text(
-                            token == null || token.isEmpty ? 'Токен отсутствует' : 'Токен есть',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: token == null || token.isEmpty ? Colors.red : Colors.green
-                            ),
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade50,
-                ),
               ),
             ),
           ],

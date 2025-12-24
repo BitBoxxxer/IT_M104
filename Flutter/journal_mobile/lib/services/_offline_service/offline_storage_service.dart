@@ -1,3 +1,4 @@
+import 'package:journal_mobile/_database/database_config.dart';
 import 'package:journal_mobile/_database/database_service.dart';
 import 'package:journal_mobile/services/_account/account_manager_service.dart';
 
@@ -93,7 +94,7 @@ class OfflineStorageService {
 
   Future<void> saveActivityRecords(List<ActivityRecord> activities) async {
     final accountId = await _getCurrentAccountId();
-    await _databaseFacade.saveActivities(activities, accountId);
+    await _databaseFacade.saveActivities(activities, accountId, strategy: SyncStrategy.append);
     print('✅ Активности сохранены в SQLite: ${activities.length} шт');
   }
 

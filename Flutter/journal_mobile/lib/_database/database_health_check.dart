@@ -15,7 +15,6 @@ class DatabaseHealthCheck {
       }
       
       final dbService = DatabaseService();
-      final db = await dbService.database;
       
       final stats = await dbService.getDatabaseStats();
       print('📊 Статистика базы данных: $stats');

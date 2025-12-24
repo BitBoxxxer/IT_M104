@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
+import '../_database/database_facade.dart';
+
+import '../services/_account/account_manager_service.dart';
 import '../services/_offline_service/offline_storage_service.dart';
+import '../services/data_manager.dart';
 import '../services/secure_storage_service.dart';
 import '../services/api_service.dart';
 import '../services/_notification/notification_service.dart';
@@ -581,20 +585,41 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     };
   }
   Future<void> _logout() async {
-    final secureStorage = SecureStorageService();
-    await secureStorage.clearAll();
-
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) =>
-            LoginScreen(
+    try {
+      final accountManager = AccountManagerService();
+      final currentAccount = await accountManager.getCurrentAccount();
+      
+      if (currentAccount != null) {
+        final offlineStorage = OfflineStorageService();
+        await offlineStorage.clearAllOfflineData();
+        
+        final databaseFacade = DatabaseFacade();
+        await databaseFacade.clearAllForAccount(currentAccount.id);
+        await accountManager.removeAccount(currentAccount.id);
+      }
+      
+      final secureStorage = SecureStorageService();
+      await secureStorage.clearAll();
+      
+      final dataManager = DataManager();
+      await dataManager.clearAllData();
+      
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => LoginScreen(
               currentTheme: widget.currentTheme,
               onThemeChanged: widget.onThemeChanged,
             ),
-        ),
-        (Route<dynamic> route) => false,
-      );
+          ),
+          (Route<dynamic> route) => false,
+        );
+      }
+      
+      print('✅ Выход выполнен: все данные аккаунта очищены');
+    } catch (e) {
+      print('❌ Ошибка при выходе: $e');
+
     }
   }
 
@@ -1157,54 +1182,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         const Text(
                           'DEBUG:',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        
-                        StreamBuilder<bool>(
-                          stream: _networkService.connectionStream,
-                          initialData: _networkService.isConnected,
-                          builder: (context, snapshot) {
-                            final isConnected = snapshot.data ?? true;
-                            
-                            return SizedBox(
-                              width: 250,
-                              child: ElevatedButton.icon(
-                                icon: Icon(Icons.sync),
-                                label: Text('Синхронизировать все'),
-                                onPressed: !isConnected ? null : () {
-                                  _syncAllData();
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.purple,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        
-                        const SizedBox(height: 30),
-                        // TODO: Перенести в экран настроек - ДИ
-                        ElevatedButton(
-                          onPressed: () async {
-                            // TODO: offlineStorage.fixHomeworkStorageData();
-                            
-                            /* final offlineStorage = OfflineStorageService();
-                            await offlineStorage.fixHomeworkStorageData(); */
-                            
-                            await _refreshData();
-                            
-                            if (mounted) {
-                              setState(() {});
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Хранилище очищено, загружаем заново...'))
-                              );
-                            }
-                          },
-                          child: Text('Исправить кэш заданий (DEBUG)'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                          ),
                         ),
                         
                         const SizedBox(height: 30),

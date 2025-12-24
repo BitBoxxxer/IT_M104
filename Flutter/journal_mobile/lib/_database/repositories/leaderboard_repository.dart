@@ -1,5 +1,6 @@
 // lib/services/_database/repositories/leaderboard_repository.dart
 import 'package:journal_mobile/models/leaderboard_user.dart';
+import 'package:sqflite/sqflite.dart';
 import '../database_service.dart';
 import '../database_config.dart';
 
@@ -26,9 +27,7 @@ class LeaderboardRepository {
           'photo_path': leader.photoPath,
           'position': leader.position,
           'points': leader.points,
-          'total_points': leader.totalPoints,
-          'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        });
+        }, conflictAlgorithm: ConflictAlgorithm.replace,);
       }
     });
   }
@@ -48,7 +47,6 @@ class LeaderboardRepository {
       'photo_path': data['photo_path'],
       'position': data['position'],
       'amount': data['points'],
-      'total_points': data['total_points'],
     })).toList();
   }
 
@@ -72,9 +70,7 @@ class LeaderboardRepository {
           'photo_path': leader.photoPath,
           'position': leader.position,
           'points': leader.points,
-          'total_points': leader.totalPoints,
-          'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        });
+        }, conflictAlgorithm: ConflictAlgorithm.replace,);
       }
     });
   }
@@ -94,26 +90,7 @@ class LeaderboardRepository {
       'photo_path': data['photo_path'],
       'position': data['position'],
       'amount': data['points'],
-      'total_points': data['total_points'],
     })).toList();
-  }
-
-  Future<DateTime?> getLastSyncTime(String accountId, bool isGroupLeaders) async {
-    final tableName = isGroupLeaders 
-      ? DatabaseConfig.tableGroupLeaders
-      : DatabaseConfig.tableStreamLeaders;
-
-    final result = await _dbService.rawQuery(
-      'SELECT MAX(sync_timestamp) as last_sync FROM $tableName WHERE account_id = ?',
-      [accountId],
-    );
-    
-    if (result.isEmpty || result.first['last_sync'] == null) {
-      return null;
-    }
-    
-    final timestamp = result.first['last_sync'] as int;
-    return DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
   }
 
   Future<int> getLeadersCount(String accountId, bool isGroupLeaders) async {
@@ -150,7 +127,6 @@ class LeaderboardRepository {
       'photo_path': data['photo_path'],
       'position': data['position'],
       'amount': data['points'],
-      'total_points': data['total_points'],
     })).toList();
   }
 
@@ -176,7 +152,6 @@ class LeaderboardRepository {
       'photo_path': data['photo_path'],
       'position': data['position'],
       'amount': data['points'],
-      'total_points': data['total_points'],
     });
   }
 

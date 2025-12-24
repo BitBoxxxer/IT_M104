@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../_database/database_facade.dart';
 import '../../services/_account/account_manager_service.dart';
 import '../../services/_account/account_auth_service.dart';
+import '../../services/_offline_service/offline_storage_service.dart';
 import '../../services/api_service.dart';
 
+import '../../services/data_manager.dart';
+import '../../services/secure_storage_service.dart';
 import '../login_screen.dart';
 import '../menu_screen.dart';
 
@@ -29,7 +33,6 @@ class _AccountSelectionScreenState extends State<AccountSelectionScreen> {
 
   late Future<List<Account>> _accountsFuture;
   bool _isLoading = false;
-  String? _switchingAccountId;
 
   @override
   void initState() {
@@ -53,10 +56,6 @@ class _AccountSelectionScreenState extends State<AccountSelectionScreen> {
       );
       return;
     }
-
-    setState(() {
-      _switchingAccountId = account.id;
-    });
 
     try {
       print('🔄 Начинаем переключение на: ${account.username}');
@@ -116,12 +115,6 @@ class _AccountSelectionScreenState extends State<AccountSelectionScreen> {
         
         // Обновляем список
         await _refreshAccounts();
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _switchingAccountId = null;
-        });
       }
     }
   }
@@ -259,6 +252,106 @@ class _AccountSelectionScreenState extends State<AccountSelectionScreen> {
     }
   }
 
+  Future<void> _clearAllAccounts() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Очистить все аккаунты?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Это действие:'),
+            SizedBox(height: 8),
+            Text('• Удалит ВСЕ сохраненные аккаунты'),
+            Text('• Очистит все офлайн-данные'),
+            Text('• Удалит все сохраненные логины'),
+            Text('• Сбросит все токены'),
+            SizedBox(height: 12),
+            Text('Это действие НЕОБРАТИМО!'),
+            SizedBox(height: 8),
+            Text('Вы уверены?', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Очистить всё', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      print('🧹 Начинаем полную очистку всех аккаунтов...');
+      
+      final accounts = await _accountManager.getAllAccounts();
+      
+      final databaseFacade = DatabaseFacade();
+      final offlineStorage = OfflineStorageService();
+      
+      for (var account in accounts) {
+        try {
+          await databaseFacade.clearAllForAccount(account.id);
+          await offlineStorage.clearAllOfflineData();
+          print('🗑️ Данные аккаунта очищены: ${account.username}');
+        } catch (e) {
+          print('⚠️ Ошибка очистки данных аккаунта ${account.username}: $e');
+        }
+      }
+      
+      await _accountManager.clearAllAccounts();
+      
+      final secureStorage = SecureStorageService();
+      await secureStorage.clearAll();
+      
+      final dataManager = DataManager();
+      await dataManager.clearAllData();
+      
+      await _refreshAccounts();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Все аккаунты и данные успешно очищены'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => LoginScreen(
+              currentTheme: widget.currentTheme,
+              onThemeChanged: widget.onThemeChanged,
+            ),
+          ),
+          (Route<dynamic> route) => false,
+        );
+      }
+      
+      print('✅ Все аккаунты полностью очищены');
+      
+    } catch (e) {
+      print('❌ Ошибка очистки всех аккаунтов: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -323,49 +416,6 @@ class _AccountSelectionScreenState extends State<AccountSelectionScreen> {
                         children: [
                           SizedBox(
                             width: double.infinity,
-                            child: OutlinedButton.icon(
-                              icon: Icon(Icons.refresh, size: 18),
-                              label: Text('Обновить токены всех аккаунтов'),
-                              onPressed: _isLoading
-                                  ? null
-                                  : () async {
-                                      setState(() {
-                                        _isLoading = true;
-                                      });
-                                      
-                                      try {
-                                        await _accountAuthService.reauthenticateAllAccounts();
-                                        await _refreshAccounts();
-                                        
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Токены всех аккаунтов обновлены'),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                      } catch (e) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Ошибка: $e'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      } finally {
-                                        if (mounted) {
-                                          setState(() {
-                                            _isLoading = false;
-                                          });
-                                        }
-                                      }
-                                    },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.blue,
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
                             child: ElevatedButton.icon(
                               icon: Icon(Icons.add),
                               label: Text('Добавить новый аккаунт'),
@@ -383,62 +433,27 @@ class _AccountSelectionScreenState extends State<AccountSelectionScreen> {
                             ),
                           ),
                           SizedBox(height: 8),
-                          if (accounts.isNotEmpty)
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              icon: Icon(Icons.build, size: 18),
-                              label: Text('Исправить активные аккаунты'),
-                              onPressed: _isLoading
-                                  ? null
-                                  : () async {
-                                      final accountManager = AccountManagerService();
-                                      await accountManager.fixMultipleActiveAccounts();
-                                      await _refreshAccounts();
-                                      
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Состояние аккаунтов исправлено'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    },
-                                style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.orange,
-                              ),
-                            ),
-                          ),
                             SizedBox(
                               width: double.infinity,
                               child: OutlinedButton(
-                                onPressed: () async {
-                                  final confirmed = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: Text('Очистить все аккаунты?'),
-                                      content: Text('Это действие удалит все сохраненные аккаунты. Продолжить?'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.of(context).pop(false),
-                                          child: Text('Отмена'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () => Navigator.of(context).pop(true),
-                                          child: Text('Очистить', style: TextStyle(color: Colors.red)),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  
-                                  if (confirmed == true) {
-                                    await _accountManager.clearAllAccounts();
-                                    await _refreshAccounts();
-                                  }
-                                },
-                                child: Text('Очистить все аккаунты'),
+                                onPressed: _isLoading ? null : _clearAllAccounts,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.red,
                                 ),
+                                child: _isLoading 
+                                    ? Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text('Очистка...'),
+                                        ],
+                                      )
+                                    : Text('Очистить все аккаунты'),
                               ),
                             ),
                         ],

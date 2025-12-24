@@ -1,87 +1,104 @@
-// lib/services/_database/repositories/feedback_repository.dart
 import 'package:journal_mobile/models/feedback_review.dart';
-import '../database_service.dart';
+import '_base_repository.dart';
 import '../database_config.dart';
 
-class FeedbackRepository {
-  final DatabaseService _dbService = DatabaseService();
-
-  Future<void> saveFeedbacks(List<FeedbackReview> feedbacks, String accountId) async {
-    final db = await _dbService.database;
-    await db.transaction((txn) async {
-      // Удаляем старые отзывы
-      await txn.delete(
-        DatabaseConfig.tableFeedbackReviews,
-        where: 'account_id = ?',
-        whereArgs: [accountId],
-      );
-
-      // Вставляем новые
-      for (final feedback in feedbacks) {
-        await txn.insert(DatabaseConfig.tableFeedbackReviews, {
-          'account_id': accountId,
-          'teacher': feedback.teacherName,
-          'spec': feedback.subject,
-          'message': feedback.feedbackText,
-          'date': feedback.date,
-          'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        });
-      }
+class FeedbackRepository extends BaseRepository<FeedbackReview> {
+  @override
+  String get tableName => DatabaseConfig.tableFeedbackReviews;
+  
+  @override
+  String getUniqueKey(FeedbackReview feedback) {
+    // Отзывы уникальны по учителю, предмету и дате
+    return '${feedback.teacherName}_${feedback.subject}_${feedback.date}_${feedback.feedbackText.substring(0, min(50, feedback.feedbackText.length))}';
+  }
+  
+  @override
+  Map<String, dynamic> toMap(FeedbackReview feedback, String accountId) {
+    return {
+      'account_id': accountId,
+      'teacher': feedback.teacherName,
+      'spec': feedback.subject,
+      'message': feedback.feedbackText,
+      'date': feedback.date,
+    };
+  }
+  
+  @override
+  FeedbackReview fromMap(Map<String, dynamic> map) {
+    return FeedbackReview.fromJson({
+      'teacher': map['teacher'],
+      'spec': map['spec'],
+      'message': map['message'],
+      'date': map['date'],
     });
   }
-
+  
+  @override
+  Map<String, dynamic> getUniqueWhereClause(FeedbackReview feedback) {
+    return {
+      'teacher': feedback.teacherName,
+      'spec': feedback.subject,
+      'date': feedback.date,
+      'message': feedback.feedbackText,
+    };
+  }
+  
+  /// Сохранить отзывы с выбором стратегии
+  Future<void> saveFeedbacks(
+    List<FeedbackReview> feedbacks, 
+    String accountId, {
+    SyncStrategy strategy = SyncStrategy.append,
+    bool cleanupMissing = false,
+  }) async {
+    await saveItems(
+      feedbacks, 
+      accountId,
+      strategy: strategy,
+      cleanupMissing: cleanupMissing,
+    );
+    
+    print('✅ Отзывы сохранены (стратегия: $strategy): ${feedbacks.length} шт');
+  }
+  
+  /// Получить все отзывы
   Future<List<FeedbackReview>> getFeedbacks(String accountId) async {
-    final feedbacksData = await _dbService.query(
-      DatabaseConfig.tableFeedbackReviews,
+    final feedbacksData = await dbService.query(
+      tableName,
       where: 'account_id = ?',
       whereArgs: [accountId],
       orderBy: 'date DESC',
     );
-
-    return feedbacksData.map((data) => FeedbackReview.fromJson({
-      'teacher': data['teacher'],
-      'spec': data['spec'],
-      'message': data['message'],
-      'date': data['date'],
-    })).toList();
+    
+    return feedbacksData.map(fromMap).toList();
   }
-
+  
+  /// Получить последние отзывы
   Future<List<FeedbackReview>> getRecentFeedbacks(String accountId, int limit) async {
-    final feedbacksData = await _dbService.query(
-      DatabaseConfig.tableFeedbackReviews,
+    final feedbacksData = await dbService.query(
+      tableName,
       where: 'account_id = ?',
       whereArgs: [accountId],
       orderBy: 'date DESC',
       limit: limit,
     );
-
-    return feedbacksData.map((data) => FeedbackReview.fromJson({
-      'teacher': data['teacher'],
-      'spec': data['spec'],
-      'message': data['message'],
-      'date': data['date'],
-    })).toList();
-  }
-
-  Future<DateTime?> getLastSyncTime(String accountId) async {
-  final result = await _dbService.rawQuery(
-    'SELECT MAX(sync_timestamp) as last_sync FROM ${DatabaseConfig.tableFeedbackReviews} WHERE account_id = ?',
-    [accountId],
-  );
-  
-  if (result.isEmpty || result.first['last_sync'] == null) {
-    return null;
+    
+    return feedbacksData.map(fromMap).toList();
   }
   
-  final timestamp = result.first['last_sync'] as int;
-  return DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
-}
-
+  /// Получить количество отзывов
   Future<int> getFeedbacksCount(String accountId) async {
-    final result = await _dbService.rawQuery(
-      'SELECT COUNT(*) as count FROM ${DatabaseConfig.tableFeedbackReviews} WHERE account_id = ?',
+    final result = await dbService.rawQuery(
+      'SELECT COUNT(*) as count FROM $tableName WHERE account_id = ?',
       [accountId],
     );
     return result.first['count'] as int;
   }
-} // tableFeedbackReviews
+  
+  /// Бэквард-совместимость: старый метод с заменой
+  Future<void> saveFeedbacksLegacy(List<FeedbackReview> feedbacks, String accountId) async {
+    await saveFeedbacks(feedbacks, accountId, strategy: SyncStrategy.replace);
+  }
+  
+  /// Утилитарный метод для получения минимума
+  int min(int a, int b) => a < b ? a : b;
+}

@@ -25,7 +25,6 @@ class LeaderboardUser {
       photoPath: json['photo_path'] ?? '',
       position: json['position'] ?? 0,
       points: json['amount'] ?? 0,
-      totalPoints: json['total_points'] ?? 0,
     );
   }
 
@@ -37,7 +36,6 @@ class LeaderboardUser {
       'photo_path': photoPath,
       'position': position,
       'amount': points,
-      'total_points': totalPoints,
     };
   }
 }

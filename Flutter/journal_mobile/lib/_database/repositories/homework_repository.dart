@@ -1,60 +1,140 @@
-// lib/services/_database/repositories/homework_repository.dart
 import 'dart:convert';
 import 'package:journal_mobile/models/_widgets/homework/homework.dart';
 import 'package:journal_mobile/models/_widgets/homework/homework_counter.dart';
-import '../database_service.dart';
+import 'package:sqflite/sqflite.dart';
+import '_base_repository.dart';
 import '../database_config.dart';
 
-class HomeworkRepository {
-  final DatabaseService _dbService = DatabaseService();
-
-  Future<void> saveHomeworks(List<Homework> homeworks, String accountId, {int? materialType}) async {
-    final db = await _dbService.database;
-    await db.transaction((txn) async {
-      // Удаляем старые задания (с учетом типа материала, если указан)
-      if (materialType != null) {
-        await txn.delete(
-          DatabaseConfig.tableHomeworks,
-          where: 'account_id = ? AND material_type = ?',
-          whereArgs: [accountId, materialType],
-        );
-      } else {
-        await txn.delete(
-          DatabaseConfig.tableHomeworks,
-          where: 'account_id = ?',
-          whereArgs: [accountId],
-        );
-      }
-
-      // Вставляем новые задания
-      for (final homework in homeworks) {
-        await txn.insert(DatabaseConfig.tableHomeworks, {
-          'account_id': accountId,
-          'id': homework.id,
-          'teacher_work_id': homework.teacherWorkId,
-          'subject_name': homework.subjectName,
-          'theme': homework.theme,
-          'description': homework.description,
-          'creation_time': homework.creationTime.millisecondsSinceEpoch,
-          'completion_time': homework.completionTime.millisecondsSinceEpoch,
-          'overdue_time': homework.overdueTime?.millisecondsSinceEpoch,
-          'filename': homework.filename,
-          'file_path': homework.filePath,
-          'comment': homework.comment,
-          'status': homework.status,
-          'common_status': homework.commonStatus,
-          'homework_stud': homework.homeworkStud != null ? jsonEncode(homework.homeworkStud!.toJson()) : null,
-          'homework_comment': homework.homeworkComment != null ? jsonEncode(homework.homeworkComment!.toJson()) : null,
-          'cover_image': homework.coverImage,
-          'teacher_name': homework.teacherName,
-          'material_type': homework.materialType ?? materialType ?? 0,
-          'is_deleted': homework.isDeleted == true ? 1 : 0,
-          'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        });
-      }
-    });
+class HomeworkRepository extends BaseRepository<Homework> {
+  @override
+  String get tableName => DatabaseConfig.tableHomeworks;
+  
+  @override
+  String getUniqueKey(Homework homework) {
+    // ДЗ уникально по ID, типу материала и teacher_work_id
+    return '${homework.id}_${homework.materialType ?? 0}_${homework.teacherWorkId}';
   }
+  
+  @override
+  Map<String, dynamic> toMap(Homework homework, String accountId) {
+    return {
+      'account_id': accountId,
+      'id': homework.id,
+      'teacher_work_id': homework.teacherWorkId,
+      'subject_name': homework.subjectName,
+      'theme': homework.theme,
+      'description': homework.description,
+      'creation_time': homework.creationTime.millisecondsSinceEpoch,
+      'completion_time': homework.completionTime.millisecondsSinceEpoch,
+      'overdue_time': homework.overdueTime?.millisecondsSinceEpoch,
+      'file_path': homework.filePath,
+      'comment': homework.comment,
+      'status': homework.status,
+      'common_status': homework.commonStatus,
+      'homework_stud': homework.homeworkStud != null ? jsonEncode(homework.homeworkStud!.toJson()) : null,
+      'homework_comment': homework.homeworkComment != null ? jsonEncode(homework.homeworkComment!.toJson()) : null,
+      'cover_image': homework.coverImage,
+      'teacher_name': homework.teacherName,
+      'material_type': homework.materialType ?? 0,
+      'is_deleted': homework.isDeleted == true ? 1 : 0,
+    };
+  }
+  
+  @override
+  Homework fromMap(Map<String, dynamic> map) {
+    try {
+      HomeworkStud? homeworkStud;
+      if (map['homework_stud'] != null) {
+        try {
+          final studJson = jsonDecode(map['homework_stud'] as String);
+          homeworkStud = HomeworkStud.fromJson(studJson);
+        } catch (e) {
+          print('Ошибка парсинга homework_stud: $e');
+        }
+      }
 
+      HomeworkComment? homeworkComment;
+      if (map['homework_comment'] != null) {
+        try {
+          final commentJson = jsonDecode(map['homework_comment'] as String);
+          homeworkComment = HomeworkComment.fromJson(commentJson);
+        } catch (e) {
+          print('Ошибка парсинга homework_comment: $e');
+        }
+      }
+
+      DateTime parseTimestamp(int? timestamp) {
+        if (timestamp == null) return DateTime.now();
+        return DateTime.fromMillisecondsSinceEpoch(timestamp);
+      }
+
+      return Homework.fromJson({
+        'id': map['id'],
+        'teacher': map['teacher_work_id'],
+        'name_spec': map['subject_name'],
+        'theme': map['theme'],
+        'comment': map['description'],
+        'creation_time': parseTimestamp(map['creation_time'] as int?).toIso8601String(),
+        'completion_time': parseTimestamp(map['completion_time'] as int?).toIso8601String(),
+        'overdue_time': map['overdue_time'] != null 
+            ? parseTimestamp(map['overdue_time'] as int).toIso8601String() 
+            : null,
+        'file_path': map['file_path'],
+        'status': map['status'],
+        'common_status': map['common_status'],
+        'homework_stud': homeworkStud?.toJson(),
+        'homework_comment': homeworkComment?.toJson(),
+        'cover_image': map['cover_image'],
+        'fio_teach': map['teacher_name'],
+        'material_type': map['material_type'],
+        'is_deleted': map['is_deleted'] == 1,
+      });
+    } catch (e) {
+      print('Ошибка парсинга домашнего задания: $e');
+      return Homework.fromJson({
+        'id': 0,
+        'teacher': 0,
+        'name_spec': 'Ошибка загрузки',
+        'theme': 'Ошибка парсинга данных',
+        'creation_time': DateTime.now().toIso8601String(),
+        'completion_time': DateTime.now().toIso8601String(),
+        'fio_teach': 'Препод',
+      });
+    }
+  }
+  
+  @override
+  Map<String, dynamic> getUniqueWhereClause(Homework homework) {
+    return {
+      'id': homework.id,
+      'material_type': homework.materialType ?? 0,
+      'teacher_work_id': homework.teacherWorkId,
+    };
+  }
+  
+  /// Сохранить домашние задания с выбором стратегии
+  Future<void> saveHomeworks(
+    List<Homework> homeworks, 
+    String accountId, {
+    int? materialType,
+    SyncStrategy strategy = SyncStrategy.merge,
+    bool cleanupMissing = false,
+  }) async {
+    await saveItems(
+      homeworks, 
+      accountId,
+      strategy: strategy,
+      extraWhere: materialType != null ? 'material_type = ?' : null,
+      extraWhereArgs: materialType != null ? [materialType] : null,
+      cleanupMissing: cleanupMissing,
+    );
+    
+    final typeName = materialType == 1 ? 'лабораторных' : 'домашних';
+    print('✅ $typeName заданий сохранено (стратегия: $strategy): ${homeworks.length} шт');
+  }
+  
+  // ====== Существующие методы (адаптированные) ======
+  
   Future<List<Homework>> getHomeworks(
     String accountId, {
     int? materialType,
@@ -87,83 +167,24 @@ class HomeworkRepository {
       limitClause = 'LIMIT $limit OFFSET $offset';
     }
 
-    final homeworksData = await _dbService.rawQuery('''
-      SELECT * FROM ${DatabaseConfig.tableHomeworks}
+    final homeworksData = await dbService.rawQuery('''
+      SELECT * FROM $tableName
       WHERE $queryBuilder
       ORDER BY $orderBy
       $limitClause
     ''', whereArgs);
 
-    return homeworksData.map((data) {
-      try {
-        // Парсим вложенные объекты
-        HomeworkStud? homeworkStud;
-        if (data['homework_stud'] != null) {
-          try {
-            final studJson = jsonDecode(data['homework_stud'] as String);
-            homeworkStud = HomeworkStud.fromJson(studJson);
-          } catch (e) {
-            print('Ошибка парсинга homework_stud: $e');
-          }
-        }
-
-        HomeworkComment? homeworkComment;
-        if (data['homework_comment'] != null) {
-          try {
-            final commentJson = jsonDecode(data['homework_comment'] as String);
-            homeworkComment = HomeworkComment.fromJson(commentJson);
-          } catch (e) {
-            print('Ошибка парсинга homework_comment: $e');
-          }
-        }
-
-        DateTime parseTimestamp(int? timestamp) {
-          if (timestamp == null) return DateTime.now();
-          return DateTime.fromMillisecondsSinceEpoch(timestamp);
-        }
-
-        return Homework.fromJson({
-          'id': data['id'],
-          'teacher': data['teacher_work_id'],
-          'name_spec': data['subject_name'],
-          'theme': data['theme'],
-          'comment': data['description'],
-          'creation_time': parseTimestamp(data['creation_time'] as int?).toIso8601String(),
-          'completion_time': parseTimestamp(data['completion_time'] as int?).toIso8601String(),
-          'overdue_time': data['overdue_time'] != null 
-              ? parseTimestamp(data['overdue_time'] as int).toIso8601String() 
-              : null,
-          'filename': data['filename'],
-          'file_path': data['file_path'],
-          'status': data['status'],
-          'common_status': data['common_status'],
-          'homework_stud': homeworkStud?.toJson(),
-          'homework_comment': homeworkComment?.toJson(),
-          'cover_image': data['cover_image'],
-          'fio_teach': data['teacher_name'],
-          'material_type': data['material_type'],
-          'is_deleted': data['is_deleted'] == 1,
-        });
-      } catch (e) {
-        print('Ошибка парсинга домашнего задания: $e');
-        // Возвращаем заглушку в случае ошибки
-        return Homework.fromJson({
-          'id': 0,
-          'teacher': 0,
-          'name_spec': 'Ошибка загрузки',
-          'theme': 'Ошибка парсинга данных',
-          'creation_time': DateTime.now().toIso8601String(),
-          'completion_time': DateTime.now().toIso8601String(),
-          'fio_teach': 'Система',
-        });
-      }
-    }).toList();
+    return homeworksData.map(fromMap).toList();
   }
 
-  Future<void> saveHomeworkCounters(List<HomeworkCounter> counters, String accountId, {int? type}) async {
-    final db = await _dbService.database;
+  /// Сохранить счетчики домашних заданий
+  Future<void> saveHomeworkCounters(
+    List<HomeworkCounter> counters, 
+    String accountId, {
+    int? type,
+  }) async {
+    final db = await dbService.database;
     await db.transaction((txn) async {
-      // Удаляем старые счетчики
       if (type != null) {
         await txn.delete(
           DatabaseConfig.tableHomeworkCounters,
@@ -178,18 +199,19 @@ class HomeworkRepository {
         );
       }
 
-      // Вставляем новые счетчики
       for (final counter in counters) {
         await txn.insert(DatabaseConfig.tableHomeworkCounters, {
           'account_id': accountId,
           'counter_type': counter.counterType,
           'counter': counter.counter,
-          'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        });
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,);
       }
     });
+    
+    print('✅ Счетчики сохранены: ${counters.length} шт');
   }
-
+  
   Future<List<HomeworkCounter>> getHomeworkCounters(String accountId, {int? type}) async {
     final whereArgs = <dynamic>[accountId];
     String whereClause = 'account_id = ?';
@@ -199,7 +221,7 @@ class HomeworkRepository {
       whereArgs.add(type);
     }
 
-    final countersData = await _dbService.query(
+    final countersData = await dbService.query(
       DatabaseConfig.tableHomeworkCounters,
       where: whereClause,
       whereArgs: whereArgs,
@@ -211,29 +233,11 @@ class HomeworkRepository {
       'counter': data['counter'],
     })).toList();
   }
+  
+  //TODO: ВЫНЕСТИ
+  // ====== Дополнительные методы (без изменений) ======
 
-  Future<DateTime?> getLastSyncTime(String accountId, {int? materialType}) async {
-    final whereArgs = <dynamic>[accountId];
-    String whereClause = 'account_id = ?';
-    
-    if (materialType != null) {
-      whereClause += ' AND material_type = ?';
-      whereArgs.add(materialType);
-    }
-
-    final result = await _dbService.rawQuery(
-      'SELECT MAX(sync_timestamp) as last_sync FROM ${DatabaseConfig.tableHomeworks} WHERE $whereClause',
-      whereArgs,
-    );
-
-    if (result.isEmpty || result.first['last_sync'] == null) {
-      return null;
-    }
-
-    final timestamp = result.first['last_sync'] as int;
-    return DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
-  }
-
+  
   Future<int> getHomeworksCount(String accountId, {int? materialType, int? status}) async {
     final whereArgs = <dynamic>[accountId];
     String whereClause = 'account_id = ?';
@@ -250,8 +254,8 @@ class HomeworkRepository {
 
     whereClause += ' AND (is_deleted IS NULL OR is_deleted = 0)';
 
-    final result = await _dbService.rawQuery(
-      'SELECT COUNT(*) as count FROM ${DatabaseConfig.tableHomeworks} WHERE $whereClause',
+    final result = await dbService.rawQuery(
+      'SELECT COUNT(*) as count FROM $tableName WHERE $whereClause',
       whereArgs,
     );
     
@@ -259,7 +263,6 @@ class HomeworkRepository {
     return result.first['count'] as int;
   }
 
-  //TODO: ВЫНЕСТИ Дополнительные методы для работы с домашними заданиями
   Future<List<Homework>> getExpiredHomeworks(String accountId, {int? materialType}) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final whereArgs = <dynamic>[accountId, now];
@@ -270,14 +273,14 @@ class HomeworkRepository {
       whereArgs.add(materialType);
     }
 
-    final homeworksData = await _dbService.query(
-      DatabaseConfig.tableHomeworks,
+    final homeworksData = await dbService.query(
+      tableName,
       where: whereClause,
       whereArgs: whereArgs,
       orderBy: 'completion_time ASC',
     );
 
-    return _parseHomeworkList(homeworksData);
+    return homeworksData.map(fromMap).toList();
   }
 
   Future<List<Homework>> getPendingHomeworks(String accountId, {int? materialType}) async {
@@ -290,14 +293,14 @@ class HomeworkRepository {
       whereArgs.add(materialType);
     }
 
-    final homeworksData = await _dbService.query(
-      DatabaseConfig.tableHomeworks,
+    final homeworksData = await dbService.query(
+      tableName,
       where: whereClause,
       whereArgs: whereArgs,
       orderBy: 'completion_time ASC',
     );
 
-    return _parseHomeworkList(homeworksData);
+    return homeworksData.map(fromMap).toList();
   }
 
   Future<List<Homework>> getHomeworksBySubject(String accountId, String subjectName, {int? materialType}) async {
@@ -309,88 +312,21 @@ class HomeworkRepository {
       whereArgs.add(materialType);
     }
 
-    final homeworksData = await _dbService.query(
-      DatabaseConfig.tableHomeworks,
+    final homeworksData = await dbService.query(
+      tableName,
       where: whereClause,
       whereArgs: whereArgs,
       orderBy: 'completion_time ASC',
     );
 
-    return _parseHomeworkList(homeworksData);
-  }
-
-  // Вспомогательный метод для парсинга списка домашних заданий
-  List<Homework> _parseHomeworkList(List<Map<String, dynamic>> homeworksData) {
-    return homeworksData.map((data) {
-      try {
-        HomeworkStud? homeworkStud;
-        if (data['homework_stud'] != null) {
-          try {
-            final studJson = jsonDecode(data['homework_stud'] as String);
-            homeworkStud = HomeworkStud.fromJson(studJson);
-          } catch (e) {
-            print('Ошибка парсинга homework_stud: $e');
-          }
-        }
-
-        HomeworkComment? homeworkComment;
-        if (data['homework_comment'] != null) {
-          try {
-            final commentJson = jsonDecode(data['homework_comment'] as String);
-            homeworkComment = HomeworkComment.fromJson(commentJson);
-          } catch (e) {
-            print('Ошибка парсинга homework_comment: $e');
-          }
-        }
-
-        DateTime parseTimestamp(int? timestamp) {
-          if (timestamp == null) return DateTime.now();
-          return DateTime.fromMillisecondsSinceEpoch(timestamp);
-        }
-
-        return Homework.fromJson({
-          'id': data['id'],
-          'teacher': data['teacher_work_id'],
-          'name_spec': data['subject_name'],
-          'theme': data['theme'],
-          'comment': data['description'],
-          'creation_time': parseTimestamp(data['creation_time'] as int?).toIso8601String(),
-          'completion_time': parseTimestamp(data['completion_time'] as int?).toIso8601String(),
-          'overdue_time': data['overdue_time'] != null 
-              ? parseTimestamp(data['overdue_time'] as int).toIso8601String() 
-              : null,
-          'filename': data['filename'],
-          'file_path': data['file_path'],
-          'status': data['status'],
-          'common_status': data['common_status'],
-          'homework_stud': homeworkStud?.toJson(),
-          'homework_comment': homeworkComment?.toJson(),
-          'cover_image': data['cover_image'],
-          'fio_teach': data['teacher_name'],
-          'material_type': data['material_type'],
-          'is_deleted': data['is_deleted'] == 1,
-        });
-      } catch (e) {
-        print('Ошибка парсинга домашнего задания: $e');
-        return Homework.fromJson({
-          'id': 0,
-          'teacher': 0,
-          'name_spec': 'Ошибка загрузки',
-          'theme': 'Ошибка парсинга данных',
-          'creation_time': DateTime.now().toIso8601String(),
-          'completion_time': DateTime.now().toIso8601String(),
-          'fio_teach': 'Система',
-        });
-      }
-    }).toList();
+    return homeworksData.map(fromMap).toList();
   }
 
   Future<void> updateHomeworkStatus(int homeworkId, String accountId, int status) async {
-    await _dbService.update(
-      DatabaseConfig.tableHomeworks,
+    await dbService.update(
+      tableName,
       {
         'status': status,
-        'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       },
       where: 'id = ? AND account_id = ?',
       whereArgs: [homeworkId, accountId],
@@ -398,11 +334,10 @@ class HomeworkRepository {
   }
 
   Future<void> markHomeworkAsDeleted(int homeworkId, String accountId) async {
-    await _dbService.update(
-      DatabaseConfig.tableHomeworks,
+    await dbService.update(
+      tableName,
       {
         'is_deleted': 1,
-        'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
       },
       where: 'id = ? AND account_id = ?',
       whereArgs: [homeworkId, accountId],
@@ -410,8 +345,8 @@ class HomeworkRepository {
   }
 
   Future<Homework?> getHomeworkById(int homeworkId, String accountId) async {
-    final homeworksData = await _dbService.query(
-      DatabaseConfig.tableHomeworks,
+    final homeworksData = await dbService.query(
+      tableName,
       where: 'id = ? AND account_id = ?',
       whereArgs: [homeworkId, accountId],
       limit: 1,
@@ -419,6 +354,16 @@ class HomeworkRepository {
 
     if (homeworksData.isEmpty) return null;
 
-    return _parseHomeworkList(homeworksData).first;
+    return homeworksData.map(fromMap).first;
+  }
+  
+  /// Бэквард-совместимость: старый метод с заменой
+  Future<void> saveHomeworksLegacy(List<Homework> homeworks, String accountId, {int? materialType}) async {
+    await saveHomeworks(
+      homeworks, 
+      accountId, 
+      materialType: materialType,
+      strategy: SyncStrategy.replace,
+    );
   }
 }

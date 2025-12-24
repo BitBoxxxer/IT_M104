@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../_database/database_config.dart';
 import '_account/account_manager_service.dart';
 
 import '../_database/database_facade.dart';
@@ -878,7 +879,7 @@ class ApiService {
             final activities = activityData.map((json) => ActivityRecord.fromJson(json)).toList();
             
             // Сохраняем в SQLite
-            await _databaseFacade.saveActivities(activities, accountId);
+            await _databaseFacade.saveActivities(activities, accountId, strategy: SyncStrategy.append);
             
             // Кэшируем
             await _cacheRepository.save(
@@ -1196,7 +1197,7 @@ class ApiService {
         getHomeworks(token, type: 0).then((homeworks) => _databaseFacade.saveHomeworks(homeworks, accountId, materialType: 0)),
         getGroupLeaders(token).then((leaders) => _databaseFacade.saveGroupLeaders(leaders, accountId)),
         getFeedbackReview(token).then((feedbacks) => _databaseFacade.saveFeedbacks(feedbacks, accountId)),
-        getProgressActivity(token).then((activities) => _databaseFacade.saveActivities(activities, accountId)),
+        getProgressActivity(token).then((activities) => _databaseFacade.saveActivities(activities, accountId, strategy:  SyncStrategy.append)),
       ], eagerError: false);
       
       print('✅ Все данные синхронизированы в SQLite');

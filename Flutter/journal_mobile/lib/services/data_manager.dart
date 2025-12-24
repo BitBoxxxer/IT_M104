@@ -126,7 +126,6 @@ class DataManager {
       print('🔄 ${background ? 'Фоновая' : 'Полная'} синхронизация...');
       
       final token = await _apiService.getCurrentToken();
-      if (token == null) throw Exception('Нет активного аккаунта');
 
       // Критические данные
       final userData = await getUserData(forceRefresh: true);

@@ -22,7 +22,6 @@ class DatabaseService {
   Future<Database> get database async {
     if (_database != null) return _database!;
     
-    // Если инициализация уже идет, ждем ее завершения
     if (_databaseCompleter != null) {
       return await _databaseCompleter!.future;
     }
@@ -30,9 +29,7 @@ class DatabaseService {
     _databaseCompleter = Completer<Database>();
     
     try {
-      // Проверяем, инициализирован ли sqflite
       if (!SqfliteInitializer.isInitialized) {
-        print('⚠️ Sqflite не инициализирован, инициализируем...');
         await SqfliteInitializer.initialize();
       }
       
@@ -50,19 +47,18 @@ class DatabaseService {
   Future<Database> _initDatabase() async {
     final path = join(await getDatabasesPath(), DatabaseConfig.databaseName);
     
-    print('📱 Открываем базу данных: $path');
+    print('Путь БД: $path');
     
     return await openDatabase(
       path,
       version: DatabaseConfig.databaseVersion,
       onCreate: (Database db, int version) async {
-        print('📱 Создаем таблицы базы данных...');
+        print('БД createtable');
         await DatabaseMigrations.createTables(db, version);
-        print('✅ Таблицы созданы успешно');
       },
       onUpgrade: DatabaseMigrations.upgradeDatabase,
       onDowngrade: (Database db, int oldVersion, int newVersion) async {
-        print('⚠️ Даунгрейд базы данных с $oldVersion до $newVersion');
+        print('Даунгрейд БД');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableMarks}');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableUsers}');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableSchedule}');
@@ -154,6 +150,8 @@ class DatabaseService {
       await txn.delete(DatabaseConfig.tableGroupLeaders, where: 'account_id = ?', whereArgs: [accountId]);
       await txn.delete(DatabaseConfig.tableStreamLeaders, where: 'account_id = ?', whereArgs: [accountId]);
       await txn.delete(DatabaseConfig.tableCache, where: 'account_id = ?', whereArgs: [accountId]);
+
+      await txn.rawDelete('DELETE FROM sqlite_sequence');
     });
   }
 

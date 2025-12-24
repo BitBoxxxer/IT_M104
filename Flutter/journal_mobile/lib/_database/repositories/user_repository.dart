@@ -21,7 +21,6 @@ class UserRepository {
       'photo_path': user.photoPath,
       'position': user.position,
       'points_info': jsonEncode(user.pointsInfo),
-      'sync_timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
     });
   }
 

@@ -10,8 +10,6 @@ import '../services/url_launcher_service.dart';
 
 import 'menu_screen.dart';
 
-import '../models/_system/account_model.dart';
-
 class LoginScreen extends StatefulWidget {
   final String currentTheme;
   final Function(String) onThemeChanged;
@@ -245,42 +243,73 @@ class _LoginScreenState extends State<LoginScreen> {
         final account = await accountManager.getCurrentAccount();
         
         if (account != null) {
-          print('✅ Аккаунт создан: ${account.username} (ID: ${account.id})');
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Синхронизация данных для offline режима...'),
-            backgroundColor: Colors.blue,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-
-      _apiService.syncAllData(token).then((_) {
-        if (mounted) {
+          print('✅ Аккаунт найден: ${account.username} (ID: ${account.id})');
+          
+          final allAccounts = await accountManager.getAllAccounts();
+          final duplicateAccounts = allAccounts.where((a) => a.username == username).toList();
+          
+          if (duplicateAccounts.length > 1) {
+            print('⚠️ Обнаружены дубликаты аккаунтов: ${duplicateAccounts.length}');
+            
+            final newestAccount = duplicateAccounts.reduce((a, b) => 
+              a.lastLogin.isAfter(b.lastLogin) ? a : b
+            );
+            
+            for (var duplicate in duplicateAccounts) {
+              if (duplicate.id != newestAccount.id) {
+                print('🗑️ Удаляем дубликат: ${duplicate.username} (ID: ${duplicate.id})');
+                await accountManager.removeAccount(duplicate.id);
+              }
+            }
+            
+            await accountManager.switchAccount(newestAccount.id);
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Все данные сохранены для offline использования ✅'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-      }).catchError((e) {
-        print('Ошибка синхронизации: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Синхронизация завершена с ошибками ⚠️'),
-              backgroundColor: Colors.orange,
+              content: Text('Синхронизация данных для offline режима...'),
+              backgroundColor: Colors.blue,
               behavior: SnackBarBehavior.floating,
             ),
           );
-        }
-      });
 
-        _navigateToMainMenu(token, isOffline: false);
-      }
+          _apiService.syncAllData(token).then((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Все данные сохранены для offline использования ✅'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            }
+          }).catchError((e) {
+            print('Ошибка синхронизации: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Синхронизация завершена с ошибками ⚠️'),
+                  backgroundColor: Colors.orange,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          });
+
+          _navigateToMainMenu(token, isOffline: false);
+        } else {
+          print('❌ Аккаунт не найден после логина');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Ошибка создания аккаунта'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -327,7 +356,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
-
   String? _validateUsername(String? value) {
     if (value == null || value.isEmpty) {
       return 'Введите логин';

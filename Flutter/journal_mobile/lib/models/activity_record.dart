@@ -74,8 +74,6 @@ class ActivityRecord {
       'achievements_type': achievementsType,
       'badge': badge,
       'old_competition': oldCompetition,
-      'lesson_subject': lessonSubject,
-      'lesson_theme': lessonTheme,
     };
   }
 }

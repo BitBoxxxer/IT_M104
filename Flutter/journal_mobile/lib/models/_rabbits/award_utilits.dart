@@ -56,6 +56,10 @@ class AwardUtils {
         return 'Участие в мероприятии';
       case 'HELP':
         return 'Помощь одногруппникам';
+      case 'HOMETASK_INTIME':
+        return 'Вовремя выполненная работа';
+      case 'AUTO_MARK_EXPIRED_HOMEWORK':
+        return 'Балл за просроченную работу';
       default:
         return achievementName ?? 'Достижение';
     }
@@ -64,9 +68,9 @@ class AwardUtils {
   static String getAchievementDescription(String? achievementName) {
     switch (achievementName) {
       case 'ASSESMENT':
-        return 'Получена оценка за учебную работу';
+        return 'За учебную работу';
       case 'EVALUATION_LESSON_MARK':
-        return 'Оценка за работу на уроке';
+        return 'За работу на уроке';
       case 'PAIR_VISIT':
         return 'Посещение учебной пары';
       case 'HOMEWORK':
@@ -83,6 +87,10 @@ class AwardUtils {
         return 'Участие в учебном мероприятии';
       case 'HELP':
         return 'Помощь другим студентам';
+      case 'HOMETASK_INTIME':
+        return 'Сдана до срока';
+      case 'AUTO_MARK_EXPIRED_HOMEWORK':
+        return 'Сдана после срока';
       default:
         return 'Учебное достижение';
     }

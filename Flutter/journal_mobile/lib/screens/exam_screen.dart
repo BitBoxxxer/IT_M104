@@ -4,7 +4,7 @@ import 'package:journal_mobile/models/_widgets/exams/loading_exams.dart';
 
 import '../services/_network/network_service.dart';
 import '../services/api_service.dart';
-import '../services/secure_storage_service.dart';
+import '../services/_account/account_manager_service.dart';
 
 import '../models/_widgets/exams/exam_lists/five_point_exams_list.dart';
 import '../models/_widgets/exams/exam_lists/future_exams_list.dart';
@@ -22,7 +22,7 @@ class ExamScreen extends StatefulWidget {
 class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   final ApiService _apiService = ApiService();
-  final SecureStorageService _secureStorage = SecureStorageService();
+  final AccountManagerService _accountManager = AccountManagerService();
   final NetworkService _networkService = NetworkService();
   
   bool _isLoading = true;
@@ -54,14 +54,15 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
         _debugInfo = 'Начинаем загрузку...';
       });
 
-      final token = await _secureStorage.getToken();
-      if (token == null) {
-        throw Exception('Токен не найден');
+      final account = await _accountManager.getCurrentAccount();
+      if (account == null) {
+        throw Exception('Активный аккаунт не найден');
       }
 
-      setState(() {
-        _debugInfo = 'Токен получен, загружаем экзамены...';
-      });
+      final token = account.token;
+      if (token.isEmpty) {
+        throw Exception('Токен аккаунта пустой');
+      }
 
       final allExams = await _apiService.getExams(token);
       final futureExams = await _apiService.getFutureExams(token);
@@ -83,7 +84,7 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
         _isLoading = false;
         _debugInfo = 'Ошибка: $e';
       });
-      print('Error loading exams: $e');
+      print(e);
     }
   }
 

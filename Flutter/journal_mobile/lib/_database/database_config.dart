@@ -1,6 +1,9 @@
 class DatabaseConfig {
   static const String databaseName = 'app_database.db';
   static const int databaseVersion = 1;
+
+  static const SyncStrategy syncStrategy = SyncStrategy.merge;
+  static const bool cleanupMissingItems = false;
   
   // Названия таблиц - константы (Help me plz... im dying)
   static const String tableMarks = 'marks';
@@ -16,4 +19,11 @@ class DatabaseConfig {
   static const String tableGroupLeaders = 'group_leaders';
   static const String tableStreamLeaders = 'stream_leaders';
   static const String tableCache = 'cache';
+}
+
+/// утилита для выбора стратегии поведения миграций БД
+enum SyncStrategy {
+  replace,   // Удалить всё и вставить новое
+  merge,     // Объединить существующие и новые записи
+  append,    // Добавить новые записи
 }

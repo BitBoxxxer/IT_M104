@@ -1,3 +1,4 @@
+import 'package:journal_mobile/_database/database_config.dart';
 import 'package:journal_mobile/models/_system/account_model.dart';
 import 'package:journal_mobile/models/mark.dart';
 import 'package:journal_mobile/models/user_data.dart';
@@ -23,7 +24,7 @@ import './repositories/leaderboard_repository.dart';
 import './repositories/cache_repository.dart';
 import 'database_service.dart';
 
-///
+/// фасад для CRUD [DatabaseFacade]
 class DatabaseFacade {
   final AccountRepository _accountRepository = AccountRepository();
   final MarkRepository _markRepository = MarkRepository();
@@ -65,7 +66,7 @@ class DatabaseFacade {
   Future<List<Exam>> getExams(String accountId) => _examRepository.getExams(accountId);
   Future<List<Exam>> getFutureExams(String accountId) => _examRepository.getFutureExams(accountId);
 
-  Future<void> saveActivities(List<ActivityRecord> activities, String accountId) => _activityRepository.saveActivities(activities, accountId);
+  Future<void> saveActivities(List<ActivityRecord> activities, String accountId, {required SyncStrategy strategy}) => _activityRepository.saveActivities(activities, accountId);
   Future<List<ActivityRecord>> getActivities(String accountId) => _activityRepository.getActivities(accountId);
 
   Future<void> saveFeedbacks(List<FeedbackReview> feedbacks, String accountId) => _feedbackRepository.saveFeedbacks(feedbacks, accountId);

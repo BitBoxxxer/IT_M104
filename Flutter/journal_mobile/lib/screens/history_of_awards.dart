@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/_account/account_manager_service.dart';
 import '../services/api_service.dart';
-import '../services/secure_storage_service.dart';
 import '../services/_network/network_service.dart';
 
 import '../models/_widgets/awards/award_card.dart';
@@ -22,7 +22,7 @@ class HistoryOfAwardsScreen extends StatefulWidget {
 
 class _HistoryOfAwardsScreenState extends State<HistoryOfAwardsScreen> {
   final ApiService _apiService = ApiService();
-  final SecureStorageService _secureStorage = SecureStorageService();
+  final AccountManagerService _accountManager = AccountManagerService();
   final NetworkService _networkService = NetworkService();
   
   late Future<List<ActivityRecord>> _awardsFuture;
@@ -45,7 +45,12 @@ class _HistoryOfAwardsScreenState extends State<HistoryOfAwardsScreen> {
         _errorMessage = '';
       });
 
-      final token = await _secureStorage.getToken();
+      final account = await _accountManager.getCurrentAccount();
+      if (account == null) {
+        throw Exception('Активный аккаунт не найден');
+      }
+
+      final token = account.token;
       if (token == null) {
         throw Exception('Токен не найден');
       }
