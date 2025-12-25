@@ -79,8 +79,7 @@ class DatabaseService {
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableFeedbackReviews}');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableHomeworks}');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableHomeworkCounters}');
-        await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableGroupLeaders}');
-        await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableStreamLeaders}');
+        await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableLeaders}');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableCache}');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableScheduleNotes}');
         
@@ -158,8 +157,7 @@ class DatabaseService {
       await txn.delete(DatabaseConfig.tableFeedbackReviews);
       await txn.delete(DatabaseConfig.tableHomeworks);
       await txn.delete(DatabaseConfig.tableHomeworkCounters);
-      await txn.delete(DatabaseConfig.tableGroupLeaders);
-      await txn.delete(DatabaseConfig.tableStreamLeaders);
+      await txn.delete(DatabaseConfig.tableLeaders);
       await txn.delete(DatabaseConfig.tableCache);
       await txn.delete(DatabaseConfig.tableScheduleNotes);
 
@@ -203,8 +201,7 @@ class DatabaseService {
       DatabaseConfig.tableFeedbackReviews,
       DatabaseConfig.tableHomeworks,
       DatabaseConfig.tableHomeworkCounters,
-      DatabaseConfig.tableGroupLeaders,
-      DatabaseConfig.tableStreamLeaders,
+      DatabaseConfig.tableLeaders,
       DatabaseConfig.tableCache,
       DatabaseConfig.tableScheduleNotes,
     ];

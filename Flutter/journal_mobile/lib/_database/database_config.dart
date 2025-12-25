@@ -4,6 +4,9 @@ class DatabaseConfig {
 
   static const SyncStrategy syncStrategy = SyncStrategy.merge;
   static const bool cleanupMissingItems = false;
+
+  static const int leaderboardTypeGroup = 0;
+  static const int leaderboardTypeStream = 1;
   
   // Названия таблиц - константы (Help me plz... im dying)
   static const String tableMarks = 'marks';
@@ -16,8 +19,7 @@ class DatabaseConfig {
   static const String tableFeedbackReviews = 'feedback_reviews';
   static const String tableHomeworks = 'homeworks';
   static const String tableHomeworkCounters = 'homework_counters';
-  static const String tableGroupLeaders = 'group_leaders';
-  static const String tableStreamLeaders = 'stream_leaders';
+  static const String tableLeaders = 'leaders';
   static const String tableCache = 'cache';
   static const String tableScheduleNotes = 'schedule_notes'; // практика
 }

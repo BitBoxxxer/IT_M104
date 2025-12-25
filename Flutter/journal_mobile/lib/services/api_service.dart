@@ -1172,35 +1172,82 @@ class ApiService {
   Future<void> syncAllData(String token) async {
     if (_isDisposed) return;
     
-    print('🔄 Полная синхронизация данных в SQLite...');
+    print('🔄 Полная синхронизация всех данных в SQLite...');
     
     try {
       final accountId = await _getCurrentAccountId();
       
-      // Критические данные
-      await syncCriticalDataOnly(token);
-      await Future.delayed(Duration(milliseconds: 200));
+      //(критические -> второстепенные)
       
-      // Второстепенные данные
+      // Критические данные
+      await Future.wait([
+        getUser(token).then((user) async {
+          await _databaseFacade.saveUserData(user, accountId);
+          print('✅ Пользователь синхронизирован');
+        }),
+        getMarks(token).then((marks) async {
+          await _databaseFacade.saveMarks(marks, accountId);
+          print('✅ Оценки синхронизированы: ${marks.length} шт');
+        }),
+      ], eagerError: true);
+      
+      await Future.delayed(Duration(milliseconds: 100));
+      
       final now = DateTime.now();
       final monday = getMonday(now);
       final sunday = getSunday(now);
       
       await getSchedule(token, formatDate(monday), formatDate(sunday)).then((schedule) async {
         await _databaseFacade.saveSchedule(schedule, accountId);
+        print('✅ Расписание синхронизировано: ${schedule.length} шт');
       });
       
-      await Future.delayed(Duration(milliseconds: 200));
+      await Future.delayed(Duration(milliseconds: 100));
       
+      // остальные параллельно
       await Future.wait([
-        getExams(token).then((exams) => _databaseFacade.saveExams(exams, accountId)),
-        getHomeworks(token, type: 0).then((homeworks) => _databaseFacade.saveHomeworks(homeworks, accountId, materialType: 0)),
-        getGroupLeaders(token).then((leaders) => _databaseFacade.saveGroupLeaders(leaders, accountId)),
-        getFeedbackReview(token).then((feedbacks) => _databaseFacade.saveFeedbacks(feedbacks, accountId)),
-        getProgressActivity(token).then((activities) => _databaseFacade.saveActivities(activities, accountId, strategy:  SyncStrategy.append)),
-      ], eagerError: false);
+        getGroupLeaders(token).then((leaders) async {
+          await _databaseFacade.saveGroupLeaders(leaders, accountId);
+          print('✅ Лидеры группы синхронизированы: ${leaders.length} шт');
+        }),
+        getStreamLeaders(token).then((leaders) async {
+          await _databaseFacade.saveStreamLeaders(leaders, accountId);
+          print('✅ Лидеры потока синхронизированы: ${leaders.length} шт');
+        }),
+        
+        getExams(token).then((exams) async {
+          await _databaseFacade.saveExams(exams, accountId);
+          print('✅ Экзамены синхронизированы: ${exams.length} шт');
+        }),
+        
+        getHomeworks(token, type: 0).then((homeworks) async {
+          await _databaseFacade.saveHomeworks(homeworks, accountId, materialType: 0);
+          print('✅ Домашние задания синхронизированы: ${homeworks.length} шт');
+        }),
+        
+        getHomeworks(token, type: 1).then((homeworks) async {
+          await _databaseFacade.saveHomeworks(homeworks, accountId, materialType: 1);
+          print('✅ Лабораторные работы синхронизированы: ${homeworks.length} шт');
+        }),
+        
+        getHomeworkCounters(token, type: 0).then((counters) async {
+          await _databaseFacade.saveHomeworkCounters(counters, accountId, type: 0);
+          print('✅ Счетчики ДЗ синхронизированы: ${counters.length} шт');
+        }),
+        
+        getProgressActivity(token).then((activities) async {
+          await _databaseFacade.saveActivities(activities, accountId, strategy: SyncStrategy.append);
+          print('✅ Активности синхронизированы: ${activities.length} шт');
+        }),
+        
+        getFeedbackReview(token).then((feedbacks) async {
+          await _databaseFacade.saveFeedbacks(feedbacks, accountId);
+          print('✅ Отзывы синхронизированы: ${feedbacks.length} шт');
+        }),
+      ], eagerError: false); // false - чтобы ошибка в одном не останавливала остальные
       
-      print('✅ Все данные синхронизированы в SQLite');
+      print('✅ ВСЕ данные синхронизированы в SQLite');
+      
     } catch (e) {
       print('❌ Ошибка полной синхронизации: $e');
     }

@@ -216,168 +216,172 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  // В schedule_screen.dart ИЗМЕНИТЕ метод _buildDayPage:
-Widget _buildDayPage(List<ScheduleElement> lessons, String dayKey) {
-  final date = DateTime.parse(dayKey);
-  final dayName = DateFormat('EEEE', 'ru_RU').format(date);
-  final formattedDate = DateFormat('dd.MM.yyyy').format(date);
-  
-  final isToday = _isSameDay(date, DateTime.now());
-  
-  return FutureBuilder<List<ScheduleNote>>(
-    future: ScheduleNoteService().getNotesForDate(date),
-    builder: (context, snapshot) {
-      final notes = snapshot.data ?? [];
-      
-      return Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            // Заголовок дня
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isToday 
-                    ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                    : Theme.of(context).colorScheme.surfaceVariant,
-                borderRadius: BorderRadius.circular(12),
-                border: isToday
-                    ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-                    : null,
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '${dayName[0].toUpperCase()}${dayName.substring(1)}${isToday ? ' (Сегодня)' : ''}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isToday
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formattedDate,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isToday
-                          ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
-                          : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Кнопка добавления заметки И переключатель показа заметок
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.note_add, size: 16),
-                      label: const Text('Добавить заметку'),
-                      onPressed: () => _showAddNoteForDate(context, date),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                  if (notes.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(
-                        _showNotes ? Icons.visibility_off : Icons.visibility,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _showNotes = !_showNotes;
-                        });
-                      },
-                      tooltip: _showNotes ? 'Скрыть заметки' : 'Показать заметки',
-                      style: IconButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            
-            if (notes.isNotEmpty && _showNotes) ...[
-              const SizedBox(height: 8),
-              const Divider(),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildDayPage(List<ScheduleElement> lessons, String dayKey) {
+    final date = DateTime.parse(dayKey);
+    final dayName = DateFormat('EEEE', 'ru_RU').format(date);
+    final formattedDate = DateFormat('dd.MM.yyyy').format(date);
+    
+    final isToday = _isSameDay(date, DateTime.now());
+    
+    return FutureBuilder<List<ScheduleNote>>(
+      future: ScheduleNoteService().getNotesForDate(date),
+      builder: (context, snapshot) {
+        final notes = snapshot.data ?? [];
+        
+        return Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            children: [
+              // Заголовок дня
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isToday 
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                      : Theme.of(context).colorScheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(12),
+                  border: isToday
+                      ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                      : null,
+                ),
+                child: Column(
                   children: [
                     Text(
-                      'Заметки к дню:',
+                      '${dayName[0].toUpperCase()}${dayName.substring(1)}${isToday ? ' (Сегодня)' : ''}',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isToday
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
+                    const SizedBox(height: 4),
                     Text(
-                      '(${notes.length})',
+                      formattedDate,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        color: isToday
+                            ? Theme.of(context).colorScheme.primary.withOpacity(0.8)
+                            : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.8),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              ...notes.map((note) => _buildNoteCard(note)).toList(),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-            ],
-            
-            // Расписание пар
-            Expanded(
-              child: lessons.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.schedule, size: 48, color: Colors.grey),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Пар нет',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
+              
+              // Кнопка добавления заметки И переключатель показа заметок
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.note_add, size: 16),
+                        label: const Text('Добавить заметку'),
+                        onPressed: () => _showAddNoteForDate(context, date),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: lessons.length,
-                      itemBuilder: (context, index) {
-                        return _buildScheduleCard(lessons[index]);
-                      },
                     ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
+                    if (notes.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(
+                          _showNotes ? Icons.visibility_off : Icons.visibility,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _showNotes = !_showNotes;
+                          });
+                        },
+                        tooltip: _showNotes ? 'Скрыть заметки' : 'Показать заметки',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              
+              if (notes.isNotEmpty && _showNotes) ...[
+                const SizedBox(height: 8),
+                const Divider(),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Заметки к дню:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(
+                        '(${notes.length})',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: notes.length,
+                    itemBuilder: (context, index) => _buildNoteCard(notes[index]),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+              ],
+              
+              Expanded(
+                child: lessons.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.schedule, size: 48, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Пар нет',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: lessons.length,
+                        itemBuilder: (context, index) {
+                          return _buildScheduleCard(lessons[index]);
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 // ВЫНЕСТИ
 Widget _buildNoteCard(ScheduleNote note) {
   return Card(

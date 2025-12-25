@@ -165,7 +165,7 @@ class DatabaseMigrations {
     ''');
 
     await db.execute('''
-      CREATE TABLE ${DatabaseConfig.tableGroupLeaders} (
+      CREATE TABLE IF NOT EXISTS ${DatabaseConfig.tableLeaders} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id TEXT NOT NULL,
         student_id INTEGER NOT NULL,
@@ -174,21 +174,9 @@ class DatabaseMigrations {
         photo_path TEXT,
         position INTEGER NOT NULL,
         points INTEGER NOT NULL,
-        UNIQUE(account_id, student_id)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE ${DatabaseConfig.tableStreamLeaders} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        account_id TEXT NOT NULL,
-        student_id INTEGER NOT NULL,
-        full_name TEXT NOT NULL,
-        group_name TEXT NOT NULL,
-        photo_path TEXT,
-        position INTEGER NOT NULL,
-        points INTEGER NOT NULL,
-        UNIQUE(account_id, student_id)
+        leaderboard_type INTEGER NOT NULL DEFAULT 0, -- 0 = группа, 1 = поток
+        UNIQUE(account_id, student_id, leaderboard_type)
+        FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
       )
     ''');
 
