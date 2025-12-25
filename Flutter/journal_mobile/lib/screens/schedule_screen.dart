@@ -42,13 +42,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   late Future<List<ScheduleElement>> _scheduleFuture;
   late PageController _pageController;
   int _initialPageIndex = 0;
+  int _currentPageIndex = 0;
+  bool _showNotes = true;
 
   @override
   void initState() {
     super.initState();
     _calculateInitialPageIndex();
+    _currentPageIndex = _initialPageIndex;
     _pageController = PageController(initialPage: _initialPageIndex);
-    _scheduleFuture = _loadSchedule(); 
+    _scheduleFuture = _loadSchedule();
   }
 
   void _calculateInitialPageIndex() {
@@ -76,6 +79,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       _currentDate = _currentDate.add(Duration(days: delta * 7));
       _scheduleFuture = _loadSchedule(); 
       _calculateInitialPageIndex();
+      _currentPageIndex = _initialPageIndex;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_pageController.hasClients) {
           _pageController.jumpToPage(_initialPageIndex);
@@ -89,6 +93,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       _currentDate = DateTime.now();
       _scheduleFuture = _loadSchedule();
       _calculateInitialPageIndex();
+      _currentPageIndex = _initialPageIndex;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_pageController.hasClients) {
           _pageController.jumpToPage(_initialPageIndex);
@@ -267,7 +272,7 @@ Widget _buildDayPage(List<ScheduleElement> lessons, String dayKey) {
               ),
             ),
             
-            // Кнопка добавления заметки
+            // Кнопка добавления заметки И переключатель показа заметок
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12.0),
               child: Row(
@@ -284,21 +289,53 @@ Widget _buildDayPage(List<ScheduleElement> lessons, String dayKey) {
                       ),
                     ),
                   ),
+                  if (notes.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: Icon(
+                        _showNotes ? Icons.visibility_off : Icons.visibility,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _showNotes = !_showNotes;
+                        });
+                      },
+                      tooltip: _showNotes ? 'Скрыть заметки' : 'Показать заметки',
+                      style: IconButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
             
-            // Список заметок
-            if (notes.isNotEmpty) ...[
+            if (notes.isNotEmpty && _showNotes) ...[
               const SizedBox(height: 8),
               const Divider(),
               const SizedBox(height: 8),
-              Text(
-                'Заметки к дню:',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Заметки к дню:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      '(${notes.length})',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -341,7 +378,7 @@ Widget _buildDayPage(List<ScheduleElement> lessons, String dayKey) {
   );
 }
 
-// Добавьте метод для отображения карточки заметки
+// ВЫНЕСТИ
 Widget _buildNoteCard(ScheduleNote note) {
   return Card(
     margin: const EdgeInsets.symmetric(vertical: 4),
@@ -408,7 +445,6 @@ Widget _buildNoteCard(ScheduleNote note) {
             ),
           ),
           
-          // Кнопка меню
           PopupMenuButton(
             icon: const Icon(Icons.more_vert, size: 20),
             itemBuilder: (context) => [
@@ -444,7 +480,6 @@ Widget _buildNoteCard(ScheduleNote note) {
                 onTap: () async {
                   WidgetsBinding.instance.addPostFrameCallback((_) async {
                     await ScheduleNoteService().deleteNote(note.id);
-                    // Обновляем UI
                     if (mounted) setState(() {});
                   });
                 },
@@ -603,16 +638,17 @@ void _showAddNoteForDate(BuildContext context, DateTime date) {
                           final dayName = DateFormat('E', 'ru_RU').format(date);
                           final hasLessons = groupedSchedule.containsKey(dayKey);
                           final isToday = _isSameDay(date, DateTime.now());
-                          final isSelected = _pageController.hasClients && 
-                                            (_pageController.page?.round() == index || 
-                                             (_pageController.initialPage == index && _pageController.page == null));
+                          final isSelected = index == _currentPageIndex;
                           
                           return GestureDetector(
-                            onTap: () => _pageController.animateToPage(
+                            onTap: () => {_pageController.animateToPage(
                               index,
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.easeInOut,
-                            ),
+                            ),setState(() {
+                              _currentPageIndex = index;
+                            }),},
+                            
                             child: Container(
                               width: 50,
                               margin: const EdgeInsets.symmetric(horizontal: 4),

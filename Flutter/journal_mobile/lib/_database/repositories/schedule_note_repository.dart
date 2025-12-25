@@ -47,14 +47,14 @@ class ScheduleNoteRepository {
   }
 
   Future<List<ScheduleNote>> getNotesForDate(String accountId, DateTime date) async {
-    final dateStr = date.toIso8601String().split('T').first;
+    final dateOnly = DateTime(date.year, date.month, date.day);
     
-    final notesData = await _dbService.query(
-      DatabaseConfig.tableScheduleNotes,
-      where: 'account_id = ? AND date = ?',
-      whereArgs: [accountId, dateStr],
-      orderBy: 'created_at DESC',
-    );
+    final notesData = await _dbService.rawQuery('''
+      SELECT * FROM ${DatabaseConfig.tableScheduleNotes}
+      WHERE account_id = ? 
+        AND date(date) = date(?)
+      ORDER BY created_at DESC
+    ''', [accountId, dateOnly.toIso8601String()]);
 
     return notesData.map((data) => ScheduleNote.fromJson(data)).toList();
   }
