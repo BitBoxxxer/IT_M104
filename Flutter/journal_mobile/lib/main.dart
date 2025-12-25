@@ -11,6 +11,7 @@ import 'services/_account/account_manager_service.dart';
 import 'services/_offline_service/offline_storage_service.dart';
 import 'services/api_service.dart';
 import 'services/_background/background_worker.dart';
+import 'services/schedule_note_service.dart';
 import 'services/theme_service.dart';
 import 'services/main_service_coordinator.dart';
 import 'services/_notification/notification_service.dart';
@@ -38,6 +39,14 @@ void main() async {
   final appInitializer = AppInitializer();
   await appInitializer.initializeApp();
   await appInitializer.checkDataMigration();
+
+  final noteService = ScheduleNoteService();
+  await noteService.initialize();
+  
+  // Перепланируем все напоминания при запуске
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    noteService.scheduleAllReminders();
+  });
   runApp(const MyApp());
 }
 

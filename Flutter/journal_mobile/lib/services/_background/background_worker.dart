@@ -8,6 +8,7 @@ class BackgroundWorker {
   static const String syncTask = "backgroundSyncTask";
   static const String notificationTask = "backgroundNotificationTask";
   static const String noteReminderTask = "noteReminderTask";
+  static const String rescheduleRemindersTask = "rescheduleRemindersTask";
 
   static bool _isInitialized = false;
   
@@ -40,6 +41,8 @@ class BackgroundWorker {
             return await _performBackgroundNotificationCheck();
           case noteReminderTask:
             return await _performNoteReminderCheck();
+          case rescheduleRemindersTask:
+            return await _rescheduleAllNoteReminders();
           default:
             return false;
         }
@@ -48,6 +51,23 @@ class BackgroundWorker {
         return false;
       }
     });
+  }
+
+  static Future<bool> _rescheduleAllNoteReminders() async {
+    try {
+      print('🔄 Перепланирование всех напоминаний заметок...');
+      
+      final scheduleNoteService = ScheduleNoteService();
+      
+      // все заметки с активными напоминаниями
+      await scheduleNoteService.scheduleAllReminders();
+      
+      print('✅ Все напоминания перепланированы');
+      return true;
+    } catch (e) {
+      print('❌ Ошибка перепланирования напоминаний: $e');
+      return false;
+    }
   }
 
   static Future<bool> _performNoteReminderCheck() async {

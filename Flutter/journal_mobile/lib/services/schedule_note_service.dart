@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:journal_mobile/_database/database_facade.dart';
 import 'package:journal_mobile/services/_notification/notification_service.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
 
 import '../models/_system/schedule_note.dart';
 
@@ -15,6 +17,7 @@ class ScheduleNoteService {
   factory ScheduleNoteService() => _instance;
   ScheduleNoteService._internal() {
     _notificationService = NotificationService();
+    tz.initializeTimeZones();
   }
   
   Future<void> initialize() async {
@@ -28,69 +31,6 @@ class ScheduleNoteService {
       final account = await _databaseFacade.getCurrentAccount();
       _currentAccountId = account?.id;
     }
-  }
-  
-  Future<int> saveNote({
-    required DateTime date,
-    required String text,
-    Color? color,
-    DateTime? reminderTime,
-    bool reminderEnabled = false,
-  }) async {
-    await _ensureAccountId();
-    if (_currentAccountId == null) throw Exception('No account selected');
-    
-    // Нормализуем дату (убираем время)
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-    
-    final note = ScheduleNote(
-      accountId: _currentAccountId!,
-      date: normalizedDate,
-      noteText: text,
-      noteColor: color,
-      reminderTime: reminderTime,
-      reminderEnabled: reminderEnabled,
-    );
-    
-    final noteId = await _databaseFacade.saveScheduleNote(note);
-    
-    if (reminderEnabled && reminderTime != null) {
-      await _scheduleNoteReminder(note.copyWith(id: noteId));
-    }
-    
-    print('✅ Заметка сохранена с ID: $noteId');
-    return noteId;
-  }
-  
-  Future<void> updateNoteReminder(int noteId, DateTime? reminderTime, bool enabled) async {
-    await _ensureAccountId();
-    if (_currentAccountId == null) return;
-    
-    final note = await _databaseFacade.getScheduleNoteById(noteId, _currentAccountId!);
-    if (note == null) return;
-    
-    final updatedNote = note.copyWith(
-      reminderTime: reminderTime,
-      reminderEnabled: enabled,
-      updatedAt: DateTime.now(),
-    );
-    
-    await _databaseFacade.saveScheduleNote(updatedNote);
-    
-    if (enabled && reminderTime != null) {
-      await _scheduleNoteReminder(updatedNote);
-    }
-  }
-  
-  Future<void> _scheduleNoteReminder(ScheduleNote note) async {
-    if (note.reminderTime == null || !note.reminderEnabled) return;
-    
-    final now = DateTime.now();
-    if (note.reminderTime!.isBefore(now)) return;
-    
-    await _showNoteReminderNotification(note);
-    
-    print('📅 Напоминание запланировано на ${note.reminderTime} для заметки: ${note.noteText}');
   }
   
   Future<void> _showNoteReminderNotification(ScheduleNote note) async {
@@ -157,14 +97,6 @@ class ScheduleNoteService {
     
     return await _databaseFacade.getScheduleNotesForDate(_currentAccountId!, date);
   }
-  
-  Future<void> deleteNote(int noteId) async {
-    await _ensureAccountId();
-    if (_currentAccountId == null) return;
-    
-    await _databaseFacade.deleteScheduleNote(noteId, _currentAccountId!);
-    print('🗑️ Заметка $noteId удалена');
-  }
 
   Future<void> scheduleNoteRemindersForBackground() async {
     await _ensureAccountId();
@@ -193,5 +125,186 @@ class ScheduleNoteService {
     }
     
     print('⏰ Запланировано фоновое напоминание на ${note.reminderTime}');
+  }
+
+  Future<void> _scheduleNoteReminder(ScheduleNote note) async {
+    if (note.reminderTime == null || !note.reminderEnabled) return;
+    
+    final now = DateTime.now();
+    if (note.reminderTime!.isBefore(now)) return;
+    
+    await _scheduleExactReminder(note);
+    
+    print('📅 Напоминание запланировано на ${note.reminderTime} для заметки: ${note.noteText}');
+  }
+
+  Future<void> _scheduleExactReminder(ScheduleNote note) async {
+    final androidDetails = const AndroidNotificationDetails(
+      'schedule_notes_channel',
+      'Напоминания заметок',
+      channelDescription: 'Уведомления о заметках к расписанию',
+      importance: Importance.high,
+      priority: Priority.high,
+      enableVibration: true,
+      playSound: true,
+      color: Colors.blue,
+    );
+    
+    final details = NotificationDetails(
+      android: androidDetails,
+    );
+    
+    final formattedDate = '${note.date.day}.${note.date.month}.${note.date.year}';
+    
+    await _notificationService.notifications.zonedSchedule(
+      note.id,
+      'Напоминание о заметке',
+      '${note.noteText}\nДата: $formattedDate',
+      _scheduleReminderTime(note.reminderTime!),
+      details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      payload: jsonEncode({
+        'type': 'schedule_note_reminder',
+        'note_id': note.id,
+        'date': note.date.toIso8601String(),
+      }),
+    );
+  }
+
+  tz.TZDateTime _scheduleReminderTime(DateTime reminderTime) {
+    // часовой пояс устройства из новой библиотеки [timezone]
+    return tz.TZDateTime.from(reminderTime, tz.local);
+  }
+
+  Future<int> saveNote({
+    required DateTime date,
+    required String text,
+    Color? color,
+    DateTime? reminderTime,
+    bool reminderEnabled = false,
+  }) async {
+    await _ensureAccountId();
+    if (_currentAccountId == null) throw Exception('No account selected');
+    
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    
+    final note = ScheduleNote(
+      accountId: _currentAccountId!,
+      date: normalizedDate,
+      noteText: text,
+      noteColor: color,
+      reminderTime: reminderTime,
+      reminderEnabled: reminderEnabled,
+    );
+    
+    final noteId = await _databaseFacade.saveScheduleNote(note);
+    
+    if (reminderEnabled && reminderTime != null) {
+      await _cancelScheduledReminder(noteId);
+      await _scheduleNoteReminder(note.copyWith(id: noteId));
+    }
+    
+    print('✅ Заметка сохранена с ID: $noteId');
+    return noteId;
+  }
+
+  Future<void> _cancelScheduledReminder(int noteId) async {
+    try {
+      await _notificationService.notifications.cancel(noteId + 10000);
+    } catch (e) {
+      print('⚠️ Не удалось отменить напоминание для заметки $noteId: $e');
+    }
+  }
+
+  Future<void> updateNoteReminder(int noteId, DateTime? reminderTime, bool enabled) async {
+    await _ensureAccountId();
+    if (_currentAccountId == null) return;
+    
+    final note = await _databaseFacade.getScheduleNoteById(noteId, _currentAccountId!);
+    if (note == null) return;
+    
+    // отменить старое напоминание
+    await _cancelScheduledReminder(noteId);
+    
+    final updatedNote = note.copyWith(
+      reminderTime: reminderTime,
+      reminderEnabled: enabled,
+      updatedAt: DateTime.now(),
+    );
+    
+    await _databaseFacade.saveScheduleNote(updatedNote);
+    
+    if (enabled && reminderTime != null) {
+      await _scheduleNoteReminder(updatedNote);
+    }
+  }
+
+  Future<void> deleteNote(int noteId) async {
+    await _ensureAccountId();
+    if (_currentAccountId == null) return;
+    
+    // отменить напоминание перед удалением
+    await _cancelScheduledReminder(noteId);
+    
+    await _databaseFacade.deleteScheduleNote(noteId, _currentAccountId!);
+    print('🗑️ Заметка $noteId удалена');
+  }
+
+  Future<void> scheduleAllReminders() async {
+    await _ensureAccountId();
+    if (_currentAccountId == null) return;
+    
+    final allNotes = await _databaseFacade.getAllScheduleNotes(_currentAccountId!);
+    final now = DateTime.now();
+    
+    for (final note in allNotes) {
+      if (note.reminderEnabled && 
+          note.reminderTime != null && 
+          note.reminderTime!.isAfter(now)) {
+        
+        await _cancelScheduledReminder(note.id);
+        await _scheduleNoteReminder(note);
+      }
+    }
+    
+    print('✅ Все активные напоминания перепланированы');
+  }
+
+  /// метод для проверки и отправки просроченных напоминаний
+  Future<void> checkOverdueReminders() async {
+    await _ensureAccountId();
+    if (_currentAccountId == null) return;
+    
+    final allNotes = await _databaseFacade.getAllScheduleNotes(_currentAccountId!);
+    final now = DateTime.now();
+    
+    for (final note in allNotes) {
+      if (note.reminderEnabled && 
+          note.reminderTime != null && 
+          note.reminderTime!.isBefore(now) &&
+          note.reminderTime!.isAfter(now.subtract(Duration(days: 1)))) { // Только за последние 24 часа
+        
+        await _showNoteReminderNotification(note);
+        // выполненное
+        final updatedNote = note.copyWith(reminderEnabled: false);
+        await _databaseFacade.saveScheduleNote(updatedNote);
+      }
+    }
+  }
+
+  Future<List<ScheduleNote>> getScheduledReminders() async {
+    await _ensureAccountId();
+    if (_currentAccountId == null) return [];
+    
+    final allNotes = await _databaseFacade.getAllScheduleNotes(_currentAccountId!);
+    final now = DateTime.now();
+    
+    // Фильтруем только те, у которых есть будущие напоминания
+    return allNotes.where((note) => 
+      note.reminderEnabled && 
+      note.reminderTime != null && 
+      note.reminderTime!.isAfter(now)
+    ).toList();
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/_notification/notification_service.dart';
@@ -221,23 +222,24 @@ Card(
         const SizedBox(height: 16),
         
         ElevatedButton.icon(
-          icon: const Icon(Icons.note_add, size: 18),
-          label: const Text('Создать тестовую заметку'),
+          icon: const Icon(Icons.alarm_add, size: 18),
+          label: const Text('Тест напоминания на 1 минуту'),
           onPressed: () async {
             try {
               final noteService = ScheduleNoteService();
               await noteService.saveNote(
                 date: DateTime.now(),
-                text: 'Тестовая заметка от ${DateFormat('HH:mm').format(DateTime.now())}',
+                text: 'Тестовое напоминание на 1 минуту',
                 color: Colors.blue,
                 reminderTime: DateTime.now().add(const Duration(minutes: 1)),
                 reminderEnabled: true,
               );
               
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Тестовая заметка создана с напоминанием через 1 мин'),
-                  backgroundColor: Colors.purple,
+              showTopSnackBar(
+                Overlay.of(context),
+                const CustomSnackBar.success(
+                  message: 'Напоминание запланировано через 1 минуту',
+                  backgroundColor: Colors.green,
                 ),
               );
             } catch (e) {
@@ -246,12 +248,47 @@ Card(
               );
             }
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.purple.shade100,
-            foregroundColor: Colors.purple.shade800,
-          ),
         ),
-        
+
+        /* ElevatedButton.icon(
+          icon: const Icon(Icons.schedule, size: 18),
+          label: const Text('Показать запланированные напоминания'),
+          onPressed: () async {
+            final androidPlugin = FlutterLocalNotificationsPlugin().resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+            if (androidPlugin != null) {
+              final scheduled = await androidPlugin.getScheduledNotifications();
+              
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Запланированные уведомления'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: scheduled.length,
+                      itemBuilder: (context, index) {
+                        final notification = scheduled[index];
+                        return ListTile(
+                          title: Text(notification.title ?? 'Без названия'),
+                          subtitle: Text('ID: ${notification.id}'),
+                          trailing: Text(notification.body ?? ''),
+                        );
+                      },
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Закрыть'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          },
+        ),
+         */
         const SizedBox(height: 12),
         
         ElevatedButton.icon(
