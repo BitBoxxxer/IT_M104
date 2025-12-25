@@ -37,3 +37,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - .dart_tool/sqflite_common_ffi/databases/

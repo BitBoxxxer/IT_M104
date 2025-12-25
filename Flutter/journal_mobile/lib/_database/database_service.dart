@@ -1,6 +1,7 @@
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:async';
 
 import 'database_config.dart';
@@ -45,7 +46,16 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    final path = join(await getDatabasesPath(), DatabaseConfig.databaseName);
+    final databasesPath = await getDatabasesPath();
+    print('Путь к базам данных: $databasesPath');
+    
+    final dir = Directory(databasesPath);
+    if (!await dir.exists()) {
+      print('Создаем директорию: $databasesPath');
+      await dir.create(recursive: true);
+    }
+    
+    final path = join(databasesPath, DatabaseConfig.databaseName);
     
     print('Путь БД: $path');
     
