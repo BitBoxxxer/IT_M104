@@ -19,6 +19,7 @@ class DatabaseConfig {
   static const String tableGroupLeaders = 'group_leaders';
   static const String tableStreamLeaders = 'stream_leaders';
   static const String tableCache = 'cache';
+  static const String tableScheduleNotes = 'schedule_notes'; // практика
 }
 
 /// утилита для выбора стратегии поведения миграций БД

@@ -74,7 +74,6 @@ class MarkRepository extends BaseRepository<Mark> {
   
   /// Получить статистику сохранения
   Future<SaveStats> _getSaveStats(List<Mark> marks, String accountId) async {
-    final db = await dbService.database;
     final existing = await getMarks(accountId);
     
     final existingKeys = existing.map(getUniqueKey).toSet();

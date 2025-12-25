@@ -201,6 +201,27 @@ class DatabaseMigrations {
       )
     ''');
 
+    // практика
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS ${DatabaseConfig.tableScheduleNotes} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        note_text TEXT NOT NULL,
+        note_color INTEGER,
+        reminder_time TEXT,
+        reminder_enabled INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES ${DatabaseConfig.tableAccounts}(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_schedule_notes_account_date 
+      ON ${DatabaseConfig.tableScheduleNotes}(account_id, date);
+    ''');
+
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_marks_account ON ${DatabaseConfig.tableMarks}(account_id);
     ''');

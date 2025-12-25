@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/_notification/notification_service.dart';
 import 'package:top_snackbar_flutter/custom_snack_bar.dart';
 import 'package:top_snackbar_flutter/top_snack_bar.dart';
+
+import '../services/schedule_note_service.dart';
 
 // TODO: Добавить список логинов разработчиков, чтобы не показывать этот экран в продакшн сборке.
 class AreaDevelopScreen extends StatefulWidget {
@@ -205,6 +208,135 @@ class _AreaDevelopScreenState extends State<AreaDevelopScreen> {
                         const SizedBox(height: 50),
                       ],
                     ),
+                    // Добавьте в Column виджетов:
+Card(
+  child: Padding(
+    padding: const EdgeInsets.all(12.0),
+    child: Column(
+      children: [
+        const Text(
+          'Тестирование заметок расписания',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.purple),
+        ),
+        const SizedBox(height: 16),
+        
+        ElevatedButton.icon(
+          icon: const Icon(Icons.note_add, size: 18),
+          label: const Text('Создать тестовую заметку'),
+          onPressed: () async {
+            try {
+              final noteService = ScheduleNoteService();
+              await noteService.saveNote(
+                date: DateTime.now(),
+                text: 'Тестовая заметка от ${DateFormat('HH:mm').format(DateTime.now())}',
+                color: Colors.blue,
+                reminderTime: DateTime.now().add(const Duration(minutes: 1)),
+                reminderEnabled: true,
+              );
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Тестовая заметка создана с напоминанием через 1 мин'),
+                  backgroundColor: Colors.purple,
+                ),
+              );
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Ошибка: $e')),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.purple.shade100,
+            foregroundColor: Colors.purple.shade800,
+          ),
+        ),
+        
+        const SizedBox(height: 12),
+        
+        ElevatedButton.icon(
+          icon: const Icon(Icons.notifications, size: 18),
+          label: const Text('Проверить напоминания заметок'),
+          onPressed: () async {
+            final noteService = ScheduleNoteService();
+            await noteService.checkAndTriggerReminders();
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Проверка напоминаний выполнена')),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.teal.shade100,
+            foregroundColor: Colors.teal.shade800,
+          ),
+        ),
+        
+        const SizedBox(height: 12),
+        
+        ElevatedButton.icon(
+          icon: const Icon(Icons.list, size: 18),
+          label: const Text('Показать предстоящие напоминания'),
+          onPressed: () async {
+            final noteService = ScheduleNoteService();
+            final reminders = await noteService.getUpcomingReminders(limit: 5);
+            
+            if (reminders.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Нет предстоящих напоминаний')),
+              );
+            } else {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Предстоящие напоминания'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: reminders.length,
+                      itemBuilder: (context, index) {
+                        final note = reminders[index];
+                        return ListTile(
+                          leading: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: note.noteColor ?? Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          title: Text(
+                            note.noteText,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '${DateFormat('dd.MM.yyyy HH:mm').format(note.reminderTime!)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Закрыть'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.indigo.shade100,
+            foregroundColor: Colors.indigo.shade800,
+          ),
+        ),
+      ],
+    ),
+  ),
+),
                   ],
                 ),
               ),

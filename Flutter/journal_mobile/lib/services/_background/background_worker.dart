@@ -2,10 +2,12 @@ import 'package:workmanager/workmanager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../api_service.dart';
 import '../_notification/notification_service.dart';
+import '../schedule_note_service.dart';
 
 class BackgroundWorker {
   static const String syncTask = "backgroundSyncTask";
   static const String notificationTask = "backgroundNotificationTask";
+  static const String noteReminderTask = "noteReminderTask";
 
   static bool _isInitialized = false;
   
@@ -36,6 +38,8 @@ class BackgroundWorker {
             return await _performBackgroundSync();
           case notificationTask:
             return await _performBackgroundNotificationCheck();
+          case noteReminderTask:
+            return await _performNoteReminderCheck();
           default:
             return false;
         }
@@ -44,6 +48,24 @@ class BackgroundWorker {
         return false;
       }
     });
+  }
+
+  static Future<bool> _performNoteReminderCheck() async {
+    try {
+      print('🔔 Проверка напоминаний заметок...');
+      
+      final scheduleNoteService = ScheduleNoteService();
+      await scheduleNoteService.checkAndTriggerReminders();
+      
+      final upcoming = await scheduleNoteService.getUpcomingReminders(limit: 3);
+      print('📅 Предстоящие напоминания: ${upcoming.length}');
+      
+      print('✅ Проверка напоминаний завершена');
+      return true;
+    } catch (e) {
+      print('❌ Ошибка проверки напоминаний заметок: $e');
+      return false;
+    }
   }
   
   static Future<bool> _performBackgroundSync() async {
@@ -141,6 +163,13 @@ class BackgroundWorker {
         constraints: Constraints(
           networkType: NetworkType.connected,
         ),
+      );
+
+      await Workmanager().registerPeriodicTask(
+        "notes_reminders",
+        noteReminderTask,
+        frequency: Duration(minutes: 5),
+        initialDelay: Duration(minutes: 1),
       );
       
       print('📅 Фоновые задачи запланированы через Workmanager');

@@ -237,6 +237,12 @@ class NotificationService {
           description: 'Уведомления о пропусках и опозданиях',
           importance: Importance.high,
         ),
+        const AndroidNotificationChannel(
+          'attendance_channel', 
+          'Посещаемость',
+          description: 'Уведомления о пропусках и опозданиях',
+          importance: Importance.high,
+        ),
       ];
     } catch (e) {
       print('❌ Ошибка получения каналов: $e');
@@ -266,6 +272,11 @@ class NotificationService {
             'id': 'attendance_channel', 
             'name': 'Посещаемость',
             'created': true
+          },
+          {
+            'id': 'schedule_notes_channel',
+            'name': 'Напоминания заметок',
+            'created': true,
           }
         ];
       }
@@ -296,11 +307,22 @@ class NotificationService {
       importance: Importance.high,
     );
 
+    // практика
+    const AndroidNotificationChannel notesChannel = AndroidNotificationChannel(
+      'schedule_notes_channel',
+      'Напоминания заметок',
+      description: 'Уведомления о заметках к расписанию',
+      importance: Importance.high,
+    );
+
     await notifications.resolvePlatformSpecificImplementation<
       AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(marksChannel);
     
     await notifications.resolvePlatformSpecificImplementation<
       AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(attendanceChannel);
+
+    await notifications.resolvePlatformSpecificImplementation<
+      AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(notesChannel);
   }
 
   Future<bool> isPollingEnabled() async {

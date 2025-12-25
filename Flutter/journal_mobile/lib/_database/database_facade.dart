@@ -10,6 +10,7 @@ import 'package:journal_mobile/models/activity_record.dart';
 import 'package:journal_mobile/models/_widgets/homework/homework.dart';
 import 'package:journal_mobile/models/_widgets/homework/homework_counter.dart';
 import 'package:journal_mobile/models/_widgets/notifications/notification_item.dart';
+import 'package:journal_mobile/models/_system/schedule_note.dart';
 
 import './repositories/account_repository.dart';
 import './repositories/mark_repository.dart';
@@ -22,6 +23,8 @@ import './repositories/feedback_repository.dart';
 import './repositories/homework_repository.dart';
 import './repositories/leaderboard_repository.dart';
 import './repositories/cache_repository.dart';
+import './repositories/schedule_note_repository.dart';
+
 import 'database_service.dart';
 
 /// фасад для CRUD [DatabaseFacade]
@@ -36,6 +39,7 @@ class DatabaseFacade {
   final FeedbackRepository _feedbackRepository = FeedbackRepository();
   final HomeworkRepository _homeworkRepository = HomeworkRepository();
   final LeaderboardRepository _leaderboardRepository = LeaderboardRepository();
+  final ScheduleNoteRepository _scheduleNoteRepository = ScheduleNoteRepository();
   final CacheRepository _cacheRepository = CacheRepository();
 
   Future<void> saveAccount(Account account) => _accountRepository.saveAccount(account);
@@ -88,6 +92,28 @@ class DatabaseFacade {
   Future<dynamic> getFromCache(String key, {String? accountId}) => _cacheRepository.get(key, accountId: accountId);
   Future<void> removeFromCache(String key, {String? accountId}) => _cacheRepository.remove(key, accountId: accountId);
   Future<void> clearCache({String? accountId}) => _cacheRepository.clear(accountId: accountId);
+
+  Future<int> saveScheduleNote(ScheduleNote note) => _scheduleNoteRepository.saveNote(note); // Практика
+  Future<List<ScheduleNote>> getScheduleNotesForDate(String accountId, DateTime date) => 
+      _scheduleNoteRepository.getNotesForDate(accountId, date);
+  Future<List<ScheduleNote>> getAllScheduleNotes(String accountId) => 
+      _scheduleNoteRepository.getAllNotes(accountId);
+  Future<ScheduleNote?> getScheduleNoteById(int noteId, String accountId) => 
+      _scheduleNoteRepository.getNoteById(noteId, accountId);
+  Future<List<ScheduleNote>> getNotesWithReminders(String accountId) => 
+      _scheduleNoteRepository.getNotesWithReminders(accountId);
+  Future<List<ScheduleNote>> getUpcomingReminders(String accountId, {int limit = 10}) => 
+      _scheduleNoteRepository.getUpcomingReminders(accountId, limit: limit);
+  Future<int> deleteScheduleNote(int noteId, String accountId) => 
+      _scheduleNoteRepository.deleteNote(noteId, accountId);
+  Future<int> deleteScheduleNotesForDate(String accountId, DateTime date) => 
+      _scheduleNoteRepository.deleteNotesForDate(accountId, date);
+  Future<int> clearAllScheduleNotes(String accountId) => 
+      _scheduleNoteRepository.clearAllNotes(accountId);
+  Stream<List<ScheduleNote>> watchScheduleNotesForDate(String accountId, DateTime date) => 
+      _scheduleNoteRepository.watchNotesForDate(accountId, date);
+
+
 
   Future<List<Homework>> getExpiredHomeworks(String accountId, {int? materialType}) => 
       _homeworkRepository.getExpiredHomeworks(accountId, materialType: materialType);

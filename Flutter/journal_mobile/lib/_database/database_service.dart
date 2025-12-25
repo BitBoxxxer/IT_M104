@@ -82,6 +82,7 @@ class DatabaseService {
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableGroupLeaders}');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableStreamLeaders}');
         await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableCache}');
+        await db.execute('DROP TABLE IF EXISTS ${DatabaseConfig.tableScheduleNotes}');
         
         await DatabaseMigrations.createTables(db, newVersion);
       },
@@ -148,18 +149,19 @@ class DatabaseService {
   Future<void> clearAllForAccount(String accountId) async {
     final db = await database;
     await db.transaction((txn) async {
-      await txn.delete(DatabaseConfig.tableMarks, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableUsers, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableSchedule, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableNotifications, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableExams, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableActivityRecords, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableFeedbackReviews, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableHomeworks, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableHomeworkCounters, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableGroupLeaders, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableStreamLeaders, where: 'account_id = ?', whereArgs: [accountId]);
-      await txn.delete(DatabaseConfig.tableCache, where: 'account_id = ?', whereArgs: [accountId]);
+      await txn.delete(DatabaseConfig.tableMarks);
+      await txn.delete(DatabaseConfig.tableUsers);
+      await txn.delete(DatabaseConfig.tableSchedule);
+      await txn.delete(DatabaseConfig.tableNotifications);
+      await txn.delete(DatabaseConfig.tableExams);
+      await txn.delete(DatabaseConfig.tableActivityRecords);
+      await txn.delete(DatabaseConfig.tableFeedbackReviews);
+      await txn.delete(DatabaseConfig.tableHomeworks);
+      await txn.delete(DatabaseConfig.tableHomeworkCounters);
+      await txn.delete(DatabaseConfig.tableGroupLeaders);
+      await txn.delete(DatabaseConfig.tableStreamLeaders);
+      await txn.delete(DatabaseConfig.tableCache);
+      await txn.delete(DatabaseConfig.tableScheduleNotes);
 
       await txn.rawDelete('DELETE FROM sqlite_sequence');
     });
@@ -204,6 +206,7 @@ class DatabaseService {
       DatabaseConfig.tableGroupLeaders,
       DatabaseConfig.tableStreamLeaders,
       DatabaseConfig.tableCache,
+      DatabaseConfig.tableScheduleNotes,
     ];
 
     for (var table in tables) {
