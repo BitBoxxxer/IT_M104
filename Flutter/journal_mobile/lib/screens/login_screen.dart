@@ -45,16 +45,29 @@ class _LoginScreenState extends State<LoginScreen> {
   List<Account> _savedAccounts = [];
   bool _showAccountSelection = false;
   bool _loadingAccounts = true;
+  bool _isConnected = true;
 
   @override
   void initState() {
     super.initState();
     _loadSavedAccounts();
+    _initNetworkListener();
     if (!widget.skipAutoLogin) {
       _checkAutoLogin();
     } else {
       _checkingAutoLogin = false;
     }
+  }
+
+  void _initNetworkListener() {
+    // Проверяем текущее состояние подключения
+    _networkService.connectionStream.listen((isConnected) {
+      if (mounted) {
+        setState(() {
+          _isConnected = isConnected;
+        });
+      }
+    });
   }
 
   /// Загрузка сохраненных аккаунтов из БД
@@ -748,69 +761,73 @@ Future<String?> _requestPasswordForAccount(Account account) async {
 
   /// Виджет для отображения одного аккаунта
   Widget _buildAccountItem(Account account) {
-    return Card(
-      color: Colors.white.withOpacity(0.1),
-      margin: EdgeInsets.symmetric(vertical: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Colors.white.withOpacity(0.2),
-          child: account.photoPath.isNotEmpty
-              ? ClipOval(
-                  child: Image.network(
-                    account.photoPath,
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.person,
-                        color: Colors.white,
-                      );
-                    },
-                  ),
-                )
-              : Icon(
-                  Icons.person,
-                  color: Colors.white,
-                ),
-        ),
-        title: Text(
-          account.fullName,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-          ),
-        ),
-        subtitle: Text(
-          '${account.groupName} • ${account.username}',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 12,
-          ),
-        ),
-        trailing: account.isActive
-            ? Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green),
-                ),
-                child: Text(
-                  'Активен',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.green,
-                  ),
+  final canLogin = _isConnected || account.isActive;
+  
+  return Card(
+    color: Colors.white.withOpacity(0.1),
+    margin: EdgeInsets.symmetric(vertical: 4),
+    child: ListTile(
+      leading: CircleAvatar(
+        backgroundColor: Colors.white.withOpacity(0.2),
+        child: account.photoPath.isNotEmpty
+            ? ClipOval(
+                child: Image.network(
+                  account.photoPath,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.person,
+                      color: Colors.white,
+                    );
+                  },
                 ),
               )
-            : null,
-        onTap: () {
-          _loginWithAccount(account);
-        },
+            : Icon(
+                Icons.person,
+                color: Colors.white,
+              ),
       ),
-    );
-  }
+      title: Text(
+        account.fullName,
+        style: TextStyle(
+          color: canLogin ? Colors.white : Colors.white.withOpacity(0.5),
+          fontSize: 14,
+        ),
+      ),
+      subtitle: Text(
+        '${account.groupName} • ${account.username}',
+        style: TextStyle(
+          color: canLogin ? 
+            Colors.white.withOpacity(0.7) : 
+            Colors.white.withOpacity(0.3),
+          fontSize: 12,
+        ),
+      ),
+      trailing: account.isActive
+          ? Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green),
+              ),
+              child: Text(
+                'Активен',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.green,
+                ),
+              ),
+            )
+          : null,
+      onTap: canLogin ? () {
+        _loginWithAccount(account);
+      } : null,
+    ),
+  );
+}
 
   @override
   void dispose() {
@@ -1048,13 +1065,17 @@ Future<String?> _requestPasswordForAccount(Account account) async {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _login,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white.withOpacity(0.2),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: _isConnected ? 
+                                    Colors.white.withOpacity(0.2) : 
+                                    Colors.grey.withOpacity(0.5),
+                                  foregroundColor: _isConnected ? Colors.white : Colors.white.withOpacity(0.5),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     side: BorderSide(
-                                      color: Colors.white.withOpacity(0.3),
+                                      color: _isConnected ? 
+                                        Colors.white.withOpacity(0.3) : 
+                                        Colors.grey.withOpacity(0.3),
                                     ),
                                   ),
                                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1069,7 +1090,7 @@ Future<String?> _requestPasswordForAccount(Account account) async {
                                         ),
                                       )
                                     : Text(
-                                        'Войти',
+                                        _isConnected ? 'Войти' : 'Нет подключения',
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,

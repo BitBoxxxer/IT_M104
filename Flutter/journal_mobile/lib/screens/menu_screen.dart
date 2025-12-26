@@ -1235,7 +1235,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 ),
               ),
 
-              Card(
+              /* Card(
                 elevation: 4,
                 margin: const EdgeInsets.all(8),
                 child: Padding(
@@ -1270,7 +1270,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                     ),
                   ),
                 ),
-              ),
+              ), */
             ],
           );
         },
@@ -1315,7 +1315,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               builder: (context, snapshot) {
                 final isConnected = snapshot.data ?? true;
                 
-                if (!isConnected && _selectedIndex == 2) {
+                if (!isConnected) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: Icon(

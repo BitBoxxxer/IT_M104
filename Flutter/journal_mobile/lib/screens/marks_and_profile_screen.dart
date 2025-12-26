@@ -132,13 +132,13 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
     );
   }
 
-  void _openSubjectSelectionDrawer(BuildContext context) {
+  /* void _openSubjectSelectionDrawer(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => _buildSubjectSelectionDrawerContent(),
     );
-  }
+  } */
 
   Widget _buildFilterDrawerContent() {
     return FutureBuilder<List<Mark>>(
@@ -282,7 +282,7 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
     );
   }
 
-  Widget _buildSubjectSelectionDrawerContent() {
+ /*  Widget _buildSubjectSelectionDrawerContent() {
     return FutureBuilder<List<Mark>>(
       future: _marksFuture,
       builder: (context, snapshot) {
@@ -311,14 +311,14 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  /* const Text(
                     'Выбор предметов',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   IconButton(
                     icon: Icon(Icons.close),
                     onPressed: () => Navigator.pop(context),
-                  ),
+                  ), */
                 ],
               ),
               const SizedBox(height: 10),
@@ -398,7 +398,7 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
       },
     );
   }
-
+ */
   Widget _buildStatusIcon(int? statusWas) {
     if (statusWas == null) return const SizedBox.shrink();
 
@@ -569,13 +569,13 @@ class _HomeScreenState extends State<MarksAndProfileScreen> {
                     ),
                     onPressed: () => _openFilterDrawer(context),
                   ),                  
-                  IconButton(
+                  /* IconButton(
                     icon: Icon(
                       Icons.menu,
                       color: Theme.of(context).primaryColor,
                     ),
                     onPressed: () => _openSubjectSelectionDrawer(context),
-                  ),
+                  ), */
                   
                   Expanded(
                     child: TextField(
