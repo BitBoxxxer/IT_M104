@@ -85,27 +85,24 @@ class _NoteDialogState extends State<NoteDialog> {
     
     try {
       if (widget.existingNote != null) {
-        // Обновление существующей заметки
-        final updatedNote = widget.existingNote!.copyWith(
-          noteText: _textController.text,
-          noteColor: _selectedColor,
-          reminderTime: _reminderTime,
-          reminderEnabled: _reminderEnabled,
-        );
+        final DateTime? reminderTime = _reminderEnabled ? _reminderTime : null;
+        
         await _noteService.saveNote(
+          noteId: widget.existingNote!.id,
           date: widget.date,
           text: _textController.text,
           color: _selectedColor,
-          reminderTime: _reminderTime,
+          reminderTime: reminderTime,
           reminderEnabled: _reminderEnabled,
         );
       } else {
-        // Создание новой заметки
+        final DateTime? reminderTime = _reminderEnabled ? _reminderTime : null;
+        
         await _noteService.saveNote(
           date: widget.date,
           text: _textController.text,
           color: _selectedColor,
-          reminderTime: _reminderTime,
+          reminderTime: reminderTime,
           reminderEnabled: _reminderEnabled,
         );
       }

@@ -11,17 +11,19 @@ import '../models/_system/schedule_note.dart';
 
 class ScheduleNoteService {
   final DatabaseFacade _databaseFacade = DatabaseFacade();
-  late final NotificationService _notificationService;
+  NotificationService? _notificationService;
   
   static final ScheduleNoteService _instance = ScheduleNoteService._internal();
   factory ScheduleNoteService() => _instance;
   ScheduleNoteService._internal() {
-    _notificationService = NotificationService();
     tz.initializeTimeZones();
   }
   
   Future<void> initialize() async {
-    await _notificationService.initialize();
+    if (_notificationService == null) {
+      _notificationService = NotificationService();
+      await _notificationService!.initialize();
+    }
   }
   
   String? _currentAccountId;
@@ -32,8 +34,19 @@ class ScheduleNoteService {
       _currentAccountId = account?.id;
     }
   }
+
+  NotificationService get _safeNotificationService {
+    if (_notificationService == null) {
+      print('⚠️ NotificationService не инициализирован, создаем экземпляр');
+      _notificationService = NotificationService();
+      _notificationService!.initialize();
+    }
+    return _notificationService!;
+  }
   
   Future<void> _showNoteReminderNotification(ScheduleNote note) async {
+    await initialize();
+    
     final formattedDate = '${note.date.day}.${note.date.month}.${note.date.year}';
     
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -51,7 +64,7 @@ class ScheduleNoteService {
       android: androidDetails,
     );
     
-    await _notificationService.notifications.show(
+    await _safeNotificationService.notifications.show(
       note.id + 10000,
       '📝 Напоминание о заметке',
       '${note.noteText}\nДата: $formattedDate',
@@ -139,6 +152,8 @@ class ScheduleNoteService {
   }
 
   Future<void> _scheduleExactReminder(ScheduleNote note) async {
+    await initialize();
+    
     final androidDetails = const AndroidNotificationDetails(
       'schedule_notes_channel',
       'Напоминания заметок',
@@ -156,7 +171,7 @@ class ScheduleNoteService {
     
     final formattedDate = '${note.date.day}.${note.date.month}.${note.date.year}';
     
-    await _notificationService.notifications.zonedSchedule(
+    await _safeNotificationService.notifications.zonedSchedule(
       note.id,
       'Напоминание о заметке',
       '${note.noteText}\nДата: $formattedDate',
@@ -183,6 +198,7 @@ class ScheduleNoteService {
     Color? color,
     DateTime? reminderTime,
     bool reminderEnabled = false,
+    int? noteId,
   }) async {
     await _ensureAccountId();
     if (_currentAccountId == null) throw Exception('No account selected');
@@ -190,6 +206,7 @@ class ScheduleNoteService {
     final normalizedDate = DateTime(date.year, date.month, date.day);
     
     final note = ScheduleNote(
+      id: noteId ?? 0,
       accountId: _currentAccountId!,
       date: normalizedDate,
       noteText: text,
@@ -198,20 +215,20 @@ class ScheduleNoteService {
       reminderEnabled: reminderEnabled,
     );
     
-    final noteId = await _databaseFacade.saveScheduleNote(note);
+    final savedNoteId = await _databaseFacade.saveScheduleNote(note);
     
     if (reminderEnabled && reminderTime != null) {
-      await _cancelScheduledReminder(noteId);
-      await _scheduleNoteReminder(note.copyWith(id: noteId));
+      await _cancelScheduledReminder(savedNoteId);
+      await _scheduleNoteReminder(note.copyWith(id: savedNoteId));
     }
     
-    print('✅ Заметка сохранена с ID: $noteId');
-    return noteId;
+    print('✅ Заметка ${noteId != null ? 'обновлена' : 'сохранена'} с ID: $savedNoteId');
+    return savedNoteId;
   }
 
   Future<void> _cancelScheduledReminder(int noteId) async {
     try {
-      await _notificationService.notifications.cancel(noteId + 10000);
+      await _safeNotificationService.notifications.cancel(noteId + 10000);
     } catch (e) {
       print('⚠️ Не удалось отменить напоминание для заметки $noteId: $e');
     }
@@ -227,8 +244,10 @@ class ScheduleNoteService {
     // отменить старое напоминание
     await _cancelScheduledReminder(noteId);
     
+    final DateTime? finalReminderTime = enabled ? reminderTime : null;
+    
     final updatedNote = note.copyWith(
-      reminderTime: reminderTime,
+      reminderTime: finalReminderTime,
       reminderEnabled: enabled,
       updatedAt: DateTime.now(),
     );

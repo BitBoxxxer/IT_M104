@@ -11,10 +11,6 @@ class CacheRepository {
     String? accountId,
     Duration? expiry,
   }) async {
-    final expiryTimestamp = expiry != null 
-      ? DateTime.now().add(expiry).millisecondsSinceEpoch 
-      : null;
-
     await _dbService.insert(DatabaseConfig.tableCache, {
       'key': key,
       'account_id': accountId,
@@ -23,7 +19,6 @@ class CacheRepository {
   }
 
   Future<T?> get<T>(String key, {String? accountId}) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
     
     final cacheData = await _dbService.query(
       DatabaseConfig.tableCache,

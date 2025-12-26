@@ -72,7 +72,8 @@ class ScheduleNote {
       date: date ?? this.date,
       noteText: noteText ?? this.noteText,
       noteColor: noteColor ?? this.noteColor,
-      reminderTime: reminderTime ?? this.reminderTime,
+      reminderTime: (reminderEnabled ?? this.reminderEnabled) ? 
+          (reminderTime ?? this.reminderTime) : null,
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
