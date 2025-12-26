@@ -175,7 +175,7 @@ class DatabaseMigrations {
         position INTEGER NOT NULL,
         points INTEGER NOT NULL,
         leaderboard_type INTEGER NOT NULL DEFAULT 0, -- 0 = группа, 1 = поток
-        UNIQUE(account_id, student_id, leaderboard_type)
+        UNIQUE(account_id, student_id, leaderboard_type),
         FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
       )
     ''');

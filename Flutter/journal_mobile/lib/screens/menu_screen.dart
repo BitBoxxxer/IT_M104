@@ -195,51 +195,117 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           centerTitle: true,
         ),
         Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 300,
-                child: ElevatedButton.icon(
-                  icon: Icon(Icons.book),
-                  label: Text('Домашние задания'),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => HomeworkListScreen(
-                          token: widget.token,
-                          isLabWork: false,
+          child: StreamBuilder<bool>(
+            stream: _networkService.connectionStream,
+            initialData: _networkService.isConnected,
+            builder: (context, snapshot) {
+              final isConnected = snapshot.data ?? true;
+              
+              if (!isConnected) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.wifi_off,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Доступно только в онлайн-режиме',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                        child: Text(
+                          'Пожалуйста, подключитесь к интернету для доступа к заданиям',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
                         ),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16),
+                    ],
                   ),
-                ),
-              ),
-              SizedBox(height: 20),
-              SizedBox(
-                width: 300,
-                child: ElevatedButton.icon(
-                  icon: Icon(Icons.computer),
-                  label: Text('Лабораторные задания'),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => HomeworkListScreen(
-                          token: widget.token,
-                          isLabWork: true,
+                );
+              }
+              
+              // Онлайн режим - показываем обычные кнопки
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  isConnected ? Container(
+                  padding: EdgeInsets.all(16),
+                  color: Colors.orange.withOpacity(0.1),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Colors.orange.shade700,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Предупреждение: В Offline режиме невозможно просматривать Задания',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange.shade700,
+                          ),
                         ),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16),
+                    ],
                   ),
-                ),
-              ),
-            ],
+                ): SizedBox.shrink(),
+                SizedBox(height: 20),
+                  SizedBox(
+                    width: 300,
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.book),
+                      label: Text('Домашние задания'),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => HomeworkListScreen(
+                              token: widget.token,
+                              isLabWork: false,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  SizedBox(
+                    width: 300,
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.computer),
+                      label: Text('Лабораторные задания'),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => HomeworkListScreen(
+                              token: widget.token,
+                              isLabWork: true,
+                            ),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ],
