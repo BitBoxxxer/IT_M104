@@ -117,33 +117,6 @@ class ApiService {
     return account.token;
   }
 
-  /// Попытаться перелогиниться при 401 ошибке
-  Future<String?> _reauthenticate() async {
-    try {
-      final account = await _accountManager.getCurrentAccount();
-      if (account == null) return null;
-      
-      final credentials = await _accountManager.getAccountCredentials(account.id);
-      final username = credentials['username'];
-      final password = credentials['password'];
-
-      if (username == null || password == null) {
-        return null;
-      }
-
-      final newToken = await login(username, password);
-      
-      if (newToken != null) {
-        final updatedAccount = account.copyWith(token: newToken);
-        await _accountManager.updateAccount(updatedAccount);
-      }
-      return newToken;
-    } catch (e) {
-      print('❌ Ошибка переаутентификации: $e');
-      return null;
-    }
-  }
-
   /// Основной метод запроса с обработкой 401
   Future<http.Response> _makeRequest(
   String url, {

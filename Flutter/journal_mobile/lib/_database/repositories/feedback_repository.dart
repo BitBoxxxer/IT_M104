@@ -8,8 +8,7 @@ class FeedbackRepository extends BaseRepository<FeedbackReview> {
   
   @override
   String getUniqueKey(FeedbackReview feedback) {
-    // Отзывы уникальны по учителю, предмету и дате
-    return '${feedback.teacherName}_${feedback.subject}_${feedback.date}_${feedback.feedbackText.substring(0, min(50, feedback.feedbackText.length))}';
+    return '${feedback.teacherName}_${feedback.date}';
   }
   
   @override
@@ -37,9 +36,7 @@ class FeedbackRepository extends BaseRepository<FeedbackReview> {
   Map<String, dynamic> getUniqueWhereClause(FeedbackReview feedback) {
     return {
       'teacher': feedback.teacherName,
-      'spec': feedback.subject,
       'date': feedback.date,
-      'message': feedback.feedbackText,
     };
   }
   
@@ -47,8 +44,8 @@ class FeedbackRepository extends BaseRepository<FeedbackReview> {
   Future<void> saveFeedbacks(
     List<FeedbackReview> feedbacks, 
     String accountId, {
-    SyncStrategy strategy = SyncStrategy.append,
-    bool cleanupMissing = false,
+    SyncStrategy strategy = SyncStrategy.merge,
+    bool cleanupMissing = true,
   }) async {
     await saveItems(
       feedbacks, 

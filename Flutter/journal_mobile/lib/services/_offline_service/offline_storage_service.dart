@@ -28,8 +28,8 @@ class OfflineStorageService {
   static const int _maxMarks = 2000;
   static const int _maxSchedule = 500;
   static const int _maxActivities = 500;
-  static const int _maxHomeworks = 500;
-  static const int _maxLeaders = 100;
+  static const int _maxHomeworks = 500; //TODO: Допилить хранение заданий
+  //с ограничениями действий на проверку состояния сети.
 
   Future<String> _getCurrentAccountId() async {
     if (_currentAccountId == null) {
@@ -185,8 +185,6 @@ class OfflineStorageService {
   Future<void> cleanupOldData() async {
     try {
       print('🧹 Начинаем очистку устаревших данных...');
-      
-      final accountId = await _getCurrentAccountId();
       
       final allMarks = await getMarks();
       if (allMarks.length > _maxMarks) {
@@ -345,8 +343,6 @@ class OfflineStorageService {
   Future<void> syncLabWorks(String token) async {
   try {
     print('🔄 Принудительная синхронизация лабораторных работ...');
-    
-    final accountId = await _getCurrentAccountId();
     
     // Используем ApiService через ServiceLocator или внедрение зависимостей
     final apiService = ApiService();

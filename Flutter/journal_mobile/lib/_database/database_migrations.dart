@@ -120,6 +120,7 @@ class DatabaseMigrations {
         spec TEXT NOT NULL,
         message TEXT NOT NULL,
         date TEXT,
+        UNIQUE(account_id, teacher, date),
         FOREIGN KEY (account_id) REFERENCES ${DatabaseConfig.tableAccounts}(id) ON DELETE CASCADE
       )
     ''');
@@ -224,6 +225,9 @@ class DatabaseMigrations {
     ''');
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_homeworks_account_type ON ${DatabaseConfig.tableHomeworks}(account_id, material_type);
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_feedback_unique ON ${DatabaseConfig.tableFeedbackReviews}(account_id, teacher, date);
     ''');
   }
 
