@@ -72,13 +72,10 @@ class ExamRepository extends BaseRepository<Exam> {
   
   /// Получить будущие экзамены
   Future<List<Exam>> getFutureExams(String accountId) async {
-    final now = DateTime.now();
-    final today = now.toIso8601String().split('T').first;
-    
     final examsData = await dbService.query(
       tableName,
-      where: 'account_id = ? AND date >= ? AND (mark IS NULL OR mark = ?)',
-      whereArgs: [accountId, today, ''],
+      where: 'account_id = ? AND (mark IS NULL OR mark = ? OR mark = 0)',
+      whereArgs: [accountId, '0'],
       orderBy: 'date ASC',
     );
     

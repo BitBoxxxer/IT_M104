@@ -83,7 +83,7 @@ class FutureExamCard extends StatelessWidget {
                       ],
                     ),
                   
-                  const SizedBox(height: 4),
+                  /* const SizedBox(height: 4),
                   
                   Row(
                     children: [
@@ -98,11 +98,11 @@ class FutureExamCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                  ),
+                  ), */ //TODO: Разорбраться с Датой Предстоящих экзаменов
                   
                   const SizedBox(height: 8),
                   Text(
-                    '📅 Предстоящий экзамен',
+                    '📅 Ожидание получения оценки',
                     style: TextStyle(
                       color: Colors.blue[600],
                       fontWeight: FontWeight.w500,

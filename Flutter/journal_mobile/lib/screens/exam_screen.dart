@@ -62,20 +62,19 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
 
       final token = account.token;
       final isConnected = await _networkService.isConnected;
+      final offlineService = OfflineStorageService();
       
       List<Exam> allExams;
-      List<Exam> futureExams;
+      List<Exam> futureExams = await offlineService.getFutureExams();
       List<Exam> pastExams;
       
       if (isConnected) {
-        // Онлайн режим - загружаем с API
         allExams = await _apiService.getExams(token);
-        futureExams = await _apiService.getFutureExams(token);
         pastExams = allExams.where((exam) => exam.isPast).toList();
       } else {
         // Оффлайн режим - загружаем из SQLite с правильной фильтрацией
-        final offlineService = OfflineStorageService();
-        futureExams = await offlineService.getFutureExams();
+        
+        
         pastExams = await offlineService.getPastExams();
         allExams = [...futureExams, ...pastExams];
         
