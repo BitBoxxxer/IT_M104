@@ -6,97 +6,58 @@ import '../database_config.dart';
 class ActivityRepository {
   final DatabaseService _dbService = DatabaseService();
 
-  /// Сохранить активности с выбором стратегии
   Future<void> saveActivities(
     List<ActivityRecord> activities, 
     String accountId, {
-    SyncStrategy strategy = SyncStrategy.append, // По умолчанию append
+    SyncStrategy strategy = SyncStrategy.merge,
   }) async {
     final db = await _dbService.database;
     await db.transaction((txn) async {
       switch (strategy) {
         case SyncStrategy.replace:
-          // Удаляем старые активности
           await txn.delete(
             DatabaseConfig.tableActivityRecords,
             where: 'account_id = ?',
             whereArgs: [accountId],
           );
           
-          // Вставляем новые
           for (final activity in activities) {
-            await txn.insert(DatabaseConfig.tableActivityRecords, {
-              'account_id': accountId,
-              'date': activity.date,
-              'action': activity.action,
-              'current_point': activity.currentPoint,
-              'point_types_id': activity.pointTypesId,
-              'point_types_name': activity.pointTypesName,
-              'achievements_id': activity.achievementsId,
-              'achievements_name': activity.achievementsName,
-              'achievements_type': activity.achievementsType,
-              'badge': activity.badge,
-              'old_competition': activity.oldCompetition ? 1 : 0,
-            }, conflictAlgorithm: ConflictAlgorithm.replace,);
+            await txn.insert(
+              DatabaseConfig.tableActivityRecords,
+              _toMap(activity, accountId),
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
           }
           break;
           
         case SyncStrategy.merge:
-          // Получаем существующие записи
-          final existing = await _getExistingItems(txn, accountId);
+          final existing = await _getExistingItemsForDates(
+            txn, 
+            accountId, 
+            activities.map((a) => a.date).toList(),
+          );
           final existingKeys = existing.map((a) => _getUniqueKey(a)).toSet();
-          
-          // Разделяем на обновляемые и новые
-          final toUpdate = <ActivityRecord>[];
-          final toInsert = <ActivityRecord>[];
           
           for (final activity in activities) {
             if (existingKeys.contains(_getUniqueKey(activity))) {
-              toUpdate.add(activity);
+              await _updateItem(txn, activity, accountId);
             } else {
-              toInsert.add(activity);
+              await txn.insert(
+                DatabaseConfig.tableActivityRecords,
+                _toMap(activity, accountId),
+                conflictAlgorithm: ConflictAlgorithm.replace,
+              );
             }
-          }
-          
-          // Обновляем существующие
-          for (final activity in toUpdate) {
-            await _updateItem(txn, activity, accountId);
-          }
-          
-          // Вставляем новые
-          for (final activity in toInsert) {
-            await txn.insert(DatabaseConfig.tableActivityRecords, {
-              'account_id': accountId,
-              'date': activity.date,
-              'action': activity.action,
-              'current_point': activity.currentPoint,
-              'point_types_id': activity.pointTypesId,
-              'point_types_name': activity.pointTypesName,
-              'achievements_id': activity.achievementsId,
-              'achievements_name': activity.achievementsName,
-              'achievements_type': activity.achievementsType,
-              'badge': activity.badge,
-              'old_competition': activity.oldCompetition ? 1 : 0,
-            }, conflictAlgorithm: ConflictAlgorithm.replace,);
           }
           break;
           
         case SyncStrategy.append:
-          // Только добавляем новые, не удаляем и не обновляем
           for (final activity in activities) {
-            await txn.insert(DatabaseConfig.tableActivityRecords, {
-              'account_id': accountId,
-              'date': activity.date,
-              'action': activity.action,
-              'current_point': activity.currentPoint,
-              'point_types_id': activity.pointTypesId,
-              'point_types_name': activity.pointTypesName,
-              'achievements_id': activity.achievementsId,
-              'achievements_name': activity.achievementsName,
-              'achievements_type': activity.achievementsType,
-              'badge': activity.badge,
-              'old_competition': activity.oldCompetition ? 1 : 0,
-            }, conflictAlgorithm: ConflictAlgorithm.ignore,); // Используем ignore, чтобы не перезаписывать
+            await txn.insert(
+              DatabaseConfig.tableActivityRecords,
+              _toMap(activity, accountId),
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
           }
           break;
       }
@@ -113,18 +74,7 @@ class ActivityRepository {
       orderBy: 'date DESC',
     );
 
-    return activitiesData.map((data) => ActivityRecord(
-      date: data['date'] as String,
-      action: data['action'] as int,
-      currentPoint: data['current_point'] as int,
-      pointTypesId: data['point_types_id'] as int,
-      pointTypesName: data['point_types_name'] as String,
-      achievementsId: data['achievements_id'] as int?,
-      achievementsName: data['achievements_name'] as String?,
-      achievementsType: data['achievements_type'] as int?,
-      badge: data['badge'] as int,
-      oldCompetition: data['old_competition'] == 1,
-    )).toList();
+    return activitiesData.map(_fromMap).toList();
   }
 
   Future<List<ActivityRecord>> getRecentActivities(String accountId, int limit) async {
@@ -136,18 +86,7 @@ class ActivityRepository {
       limit: limit,
     );
 
-    return activitiesData.map((data) => ActivityRecord(
-      date: data['date'] as String,
-      action: data['action'] as int,
-      currentPoint: data['current_point'] as int,
-      pointTypesId: data['point_types_id'] as int,
-      pointTypesName: data['point_types_name'] as String,
-      achievementsId: data['achievements_id'] as int?,
-      achievementsName: data['achievements_name'] as String?,
-      achievementsType: data['achievements_type'] as int?,
-      badge: data['badge'] as int,
-      oldCompetition: data['old_competition'] == 1,
-    )).toList();
+    return activitiesData.map(_fromMap).toList();
   }
 
   Future<int> getActivitiesCount(String accountId) async {
@@ -158,51 +97,76 @@ class ActivityRepository {
     return result.first['count'] as int;
   }
   
-  // ====== Вспомогательные методы для merge стратегии ======
+  // ====== Вспомогательные методы ======
   
-  Future<List<ActivityRecord>> _getExistingItems(Transaction txn, String accountId) async {
+  Map<String, dynamic> _toMap(ActivityRecord activity, String accountId) {
+    return {
+      'account_id': accountId,
+      'date': activity.date,
+      'action': activity.action,
+      'current_point': activity.currentPoint,
+      'point_types_id': activity.pointTypesId,
+      'point_types_name': activity.pointTypesName,
+      'achievements_id': activity.achievementsId,
+      'achievements_name': activity.achievementsName,
+      'achievements_type': activity.achievementsType,
+      'badge': activity.badge,
+      'old_competition': activity.oldCompetition ? 1 : 0,
+    };
+  }
+  
+  ActivityRecord _fromMap(Map<String, dynamic> map) {
+    return ActivityRecord(
+      date: map['date'] as String,
+      action: map['action'] as int,
+      currentPoint: map['current_point'] as int,
+      pointTypesId: map['point_types_id'] as int,
+      pointTypesName: map['point_types_name'] as String,
+      achievementsId: map['achievements_id'] as int?,
+      achievementsName: map['achievements_name'] as String?,
+      achievementsType: map['achievements_type'] as int?,
+      badge: map['badge'] as int,
+      oldCompetition: map['old_competition'] == 1,
+    );
+  }
+  
+  Future<List<ActivityRecord>> _getExistingItemsForDates(
+    Transaction txn, 
+    String accountId,
+    List<String> dates,
+  ) async {
+    if (dates.isEmpty) return [];
+    
+    final placeholders = List.filled(dates.length, '?').join(',');
     final maps = await txn.query(
       DatabaseConfig.tableActivityRecords,
-      where: 'account_id = ?',
-      whereArgs: [accountId],
+      where: 'account_id = ? AND date IN ($placeholders)',
+      whereArgs: [accountId, ...dates],
     );
-    return maps.map((data) => ActivityRecord(
-      date: data['date'] as String,
-      action: data['action'] as int,
-      currentPoint: data['current_point'] as int,
-      pointTypesId: data['point_types_id'] as int,
-      pointTypesName: data['point_types_name'] as String,
-      achievementsId: data['achievements_id'] as int?,
-      achievementsName: data['achievements_name'] as String?,
-      achievementsType: data['achievements_type'] as int?,
-      badge: data['badge'] as int,
-      oldCompetition: data['old_competition'] == 1,
-    )).toList();
+    
+    return maps.map(_fromMap).toList();
   }
   
   String _getUniqueKey(ActivityRecord activity) {
-    return '${activity.date}_${activity.pointTypesId}_${activity.achievementsId}_${activity.action}';
+    return activity.date;
   }
   
   Future<void> _updateItem(Transaction txn, ActivityRecord activity, String accountId) async {
     await txn.update(
       DatabaseConfig.tableActivityRecords,
       {
+        'action': activity.action,
         'current_point': activity.currentPoint,
+        'point_types_id': activity.pointTypesId,
         'point_types_name': activity.pointTypesName,
+        'achievements_id': activity.achievementsId,
         'achievements_name': activity.achievementsName,
         'achievements_type': activity.achievementsType,
         'badge': activity.badge,
         'old_competition': activity.oldCompetition ? 1 : 0,
       },
-      where: 'account_id = ? AND date = ? AND point_types_id = ? AND achievements_id = ? AND action = ?',
-      whereArgs: [
-        accountId, 
-        activity.date, 
-        activity.pointTypesId, 
-        activity.achievementsId, 
-        activity.action
-      ],
+      where: 'account_id = ? AND date = ?',
+      whereArgs: [accountId, activity.date],
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
@@ -210,5 +174,20 @@ class ActivityRepository {
   /// Бэквард-совместимость: старый метод с replace стратегией
   Future<void> saveActivitiesLegacy(List<ActivityRecord> activities, String accountId) async {
     await saveActivities(activities, accountId, strategy: SyncStrategy.replace);
+  }
+  
+  Future<void> cleanupDuplicates(String accountId) async {
+    final db = await _dbService.database;
+    await db.execute('''
+      DELETE FROM ${DatabaseConfig.tableActivityRecords}
+      WHERE id NOT IN (
+        SELECT MIN(id)
+        FROM ${DatabaseConfig.tableActivityRecords}
+        WHERE account_id = ?
+        GROUP BY date
+      ) AND account_id = ?
+    ''', [accountId, accountId]);
+    
+    print('🧹 Очищены дубликаты активностей для аккаунта: $accountId');
   }
 } // tableActivityRecords

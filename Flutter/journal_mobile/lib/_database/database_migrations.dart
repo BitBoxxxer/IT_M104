@@ -108,6 +108,7 @@ class DatabaseMigrations {
         achievements_type INTEGER,
         badge INTEGER DEFAULT 0,
         old_competition INTEGER DEFAULT 0,
+        UNIQUE(account_id, date),
         FOREIGN KEY (account_id) REFERENCES ${DatabaseConfig.tableAccounts}(id) ON DELETE CASCADE
       )
     ''');
@@ -228,6 +229,9 @@ class DatabaseMigrations {
     ''');
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_feedback_unique ON ${DatabaseConfig.tableFeedbackReviews}(account_id, teacher, date);
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_activity_unique ON ${DatabaseConfig.tableActivityRecords}(account_id, date);
     ''');
   }
 
