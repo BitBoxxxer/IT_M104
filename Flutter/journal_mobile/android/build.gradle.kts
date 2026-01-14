@@ -5,10 +5,15 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.android.tools.build:gradle:8.9.1")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0")
+        classpath("com.android.tools.build:gradle:8.13.0")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.0")
     }
 }
+
+val compileSdkVersion by extra(36)
+val targetSdkVersion by extra(36)
+val minSdkVersion by extra(21)
+val kotlinVersion by extra("2.3.0")
 
 allprojects {
     repositories {

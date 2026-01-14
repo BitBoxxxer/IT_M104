@@ -1,5 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../core/bug_report/email_service.dart';
+import '../core/bug_report/logging_service.dart';
 
 import '../services/_network/network_service.dart';
 import '../services/theme_service.dart';
@@ -26,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final NotificationService _notificationService = NotificationService();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final NetworkService _networkService = NetworkService();
+  final LoggingService _loggingService = LoggingService();
 
   String? _selectedTheme;
   bool _notificationsEnabled = true;
@@ -36,6 +44,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _initializeData();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loggingService.initialize();
+      await _loggingService.logAction('SETTINGS_OPENED', 'Пользователь открыл настройки');
+    });
   }
 
   Future<void> _initializeData() async {
@@ -264,6 +276,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.bug_report, color: Colors.purple),
+                  title: Text('Система отчетов'),
+                  subtitle: Text('Логирование и отправка ошибок разработчику'),
+                ),
+                Divider(height: 1),
+                ListTile(
+                  leading: Icon(Icons.analytics, color: Colors.blue),
+                  title: Text('Статистика логов'),
+                  subtitle: FutureBuilder<Map<String, dynamic>>(
+                    future: _loggingService.getLogStats(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData) {
+                        final stats = snapshot.data!;
+                        return Text(
+                          'Записей: ${stats['entries']} | ${stats['size']} байт',
+                          maxLines: 2,
+                        );
+                      }
+                      return Text('Загрузка...');
+                    },
+                  ),
+                  trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: _viewLogStats,
+                ),
+                ListTile(
+                  leading: Icon(Icons.email, color: Colors.green),
+                  title: Text('Отправить отчет'),
+                  subtitle: Text('На почту: sodagrdp@gmail.com'),
+                  trailing: Icon(Icons.send),
+                  onTap: _handleSendReport,
+                ),
+                ListTile(
+                  leading: Icon(Icons.security, color: Colors.orange),
+                  title: Text('Информация о шифровании'),
+                  subtitle: Text('AES-256-CBC | Ключ в коде'),
+                  trailing: Icon(Icons.info_outline),
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Информация о шифровании'),
+                        content: Text(
+                          'Все логи шифруются алгоритмом AES-256-CBC.\n\n'
+                          'Ключ шифрования: "sodagrdp_it_top_college_2024_test_key"\n\n'
+                          'Формат записей:\n'
+                          '(Время)_(Тип_Действия)_(Описание || JSON данные)\n\n'
+                          'Разработчик может дешифровать файл с помощью\n'
+                          'WPF приложения на C#.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete, color: Colors.red),
+                  title: Text('Очистить все логи'),
+                  subtitle: Text('Удалить все записи'),
+                  trailing: Icon(Icons.clean_hands),
+                  onTap: _loggingService.clearLogs,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -567,4 +653,241 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
   }
+// Метод для экспорта и отправки логов
+Future<void> _handleSendReport() async {
+  try {
+    // Показываем индикатор загрузки
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Подготовка отчета'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 20),
+            Text('Собираем логи и создаем отчет...'),
+          ],
+        ),
+      ),
+    );
+
+    // Создаем читаемый отчет
+    final reportFile = await _loggingService.createReadableReport();
+    
+    // Закрываем диалог загрузки
+    if (context.mounted) {
+      Navigator.of(context).pop();
+      
+      // Предлагаем способ отправки
+      await _showSendOptions(reportFile);
+    }
+    
+  } catch (e) {
+    if (context.mounted) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка подготовки отчета: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+
+// Диалог выбора способа отправки
+Future<void> _showSendOptions(File reportFile) async {
+  final option = await showDialog<int>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: Text('Отправить отчет'),
+      children: [
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, 1),
+          child: Row(
+            children: [
+              Icon(Icons.email, color: Colors.blue),
+              SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Через Email', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text('sodagrdp@gmail.com', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, 2),
+          child: Row(
+            children: [
+              Icon(Icons.share, color: Colors.green),
+              SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Поделиться файлом'),
+                  Text('Сохранить или отправить в мессенджер', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, 3),
+          child: Row(
+            children: [
+              Icon(Icons.preview, color: Colors.purple),
+              SizedBox(width: 10),
+              Text('Предварительный просмотр'),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
+  switch (option) {
+    case 1: // Email
+      await EmailService.sendReportWithComment(context, reportFile);
+      break;
+    case 2: // Поделиться
+      await _shareReportFile(reportFile);
+      break;
+    case 3: // Просмотр
+      await _previewReport(reportFile);
+      break;
+  }
+}
+
+// Поделиться файлом
+Future<void> _shareReportFile(File file) async {
+  try {
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: 'Отчет об ошибках IT Top College Journal\nОтправьте этот файл на sodagrdp@gmail.com',
+      subject: 'Ошибка в приложении IT Top College',
+    );
+    
+    await _loggingService.logAction('REPORT_SHARED', 'Пользователь поделился файлом отчета');
+    
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Ошибка при отправке: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+// Предварительный просмотр
+Future<void> _previewReport(File file) async {
+  try {
+    final content = await file.readAsString();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Предварительный просмотр отчета'),
+        content: Container(
+          width: double.maxFinite,
+          height: 400,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              content,
+              style: TextStyle(fontFamily: 'Monospace', fontSize: 10),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Закрыть'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showSendOptions(file);
+            },
+            child: Text('Отправить'),
+          ),
+        ],
+      ),
+    );
+    
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Ошибка чтения файла: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+// Просмотр статистики логов
+Future<void> _viewLogStats() async {
+  final stats = await _loggingService.getLogStats();
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Статистика логов'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildStatItem('📁 Размер файла', '${stats['size']} байт'),
+            _buildStatItem('📝 Количество записей', '${stats['entries']}'),
+            _buildStatItem('🔐 Статус', stats['status'] ?? 'unknown'),
+            if (stats['path'] != null) 
+              _buildStatItem('📍 Путь', stats['path'].toString().split('/').last),
+            if (stats['last_modified'] != null)
+              _buildStatItem('⏰ Последнее изменение', 
+                DateFormat('dd.MM.yyyy HH:mm').format(DateTime.parse(stats['last_modified']))),
+            SizedBox(height: 20),
+            Text(
+              'Файл зашифрован методом AES-256-CBC\nКлюч: sodagrdp_it_top_college_2024_test_key',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Закрыть'),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            await _testLogging();
+          },
+          child: Text('Тест записи'),
+        ),
+      ],
+    ),
+  );
+}
+
+// Тестовая запись в логи
+Future<void> _testLogging() async {
+  await _loggingService.logAction('TEST', 'Тестовая запись из настроек', extraInfo: {
+    'test_id': DateTime.now().millisecondsSinceEpoch,
+    'screen': 'settings',
+    'user_action': 'test_logging',
+  });
+  
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Тестовая запись добавлена в логи'),
+      backgroundColor: Colors.green,
+    ),
+  );
+}
 }

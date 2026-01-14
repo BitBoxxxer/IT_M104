@@ -15,7 +15,7 @@ dependencies:
   flutter_secure_storage: ^9.1.1
   flutter_local_notifications: ^17.0.0
   top_snackbar_flutter: ^3.3.0
-  app_settings: ^5.1.1
+  app_settings: ^7.0.0
   path_provider: ^2.1.1
   dio: ^5.9.0
   open_file: ^3.5.10
@@ -29,6 +29,9 @@ dependencies:
   sqflite_common_ffi: ^2.3.0
   flutter_colorpicker: ^1.0.3
   timezone: ^0.9.2
+  encrypt: ^5.0.3
+  share_plus: ^12.0.1
+  mailto: ^2.0.0
 
 dev_dependencies:
   flutter_test:

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -6,6 +8,7 @@ import 'app_initializer.dart';
 import '_database/database_health_check.dart';
 import '_database/sqflite_init.dart';
 
+import 'core/bug_report/logging_service.dart';
 import 'screens/login_screen.dart';
 import 'services/_account/account_manager_service.dart';
 import 'services/_offline_service/offline_storage_service.dart';
@@ -23,6 +26,24 @@ import 'screens/menu_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Тест системы логирования
+  final loggingService = LoggingService();
+  await loggingService.initialize();
+  
+  // Тестовые логи при запуске
+  await loggingService.logAction('APP_INIT', 'Запуск main()', extraInfo: {
+    'timestamp': DateTime.now().toIso8601String(),
+    'flutter_version': '3.16.0',
+    'platform': Platform.operatingSystem,
+  });
+  
+  try {
+    await SqfliteInitializer.initialize();
+    await loggingService.logAction('DATABASE_INIT', 'База данных инициализирована');
+  } catch (e, stack) {
+    await loggingService.logError('DATABASE_ERROR', 'Ошибка инициализации БД: $e', stack);
+  }
 
    await SqfliteInitializer.initialize();
   await initializeDateFormatting('ru', null);
