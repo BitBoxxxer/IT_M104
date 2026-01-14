@@ -68,7 +68,12 @@ class DatabaseFacade {
 
   Future<void> saveExams(List<Exam> exams, String accountId) => _examRepository.saveExams(exams, accountId);
   Future<List<Exam>> getExams(String accountId) => _examRepository.getExams(accountId);
-  Future<List<Exam>> getFutureExams(String accountId) => _examRepository.getFutureExams(accountId);
+  Future<List<Exam>> getFutureExams(String accountId) async {
+    return await _examRepository.getFutureExams(accountId);}
+  Future<List<Exam>> getPastExams(String accountId) async {
+    return await _examRepository.getPastExams(accountId);}
+  Future<List<Exam>> getExamsWithGrades(String accountId) async {
+    return await _examRepository.getExamsWithGrades(accountId);}
 
   Future<void> saveActivities(List<ActivityRecord> activities, String accountId, {required SyncStrategy strategy}) => _activityRepository.saveActivities(activities, accountId);
   Future<List<ActivityRecord>> getActivities(String accountId) => _activityRepository.getActivities(accountId);

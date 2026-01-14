@@ -49,18 +49,22 @@ class Exam {
 
   bool get isFuture {
     try {
-      if (date.isEmpty || date == 'null') return true;
-      
       final examDate = DateTime.parse(date);
       final now = DateTime.now();
-      return examDate.isAfter(now);
+      return examDate.isAfter(now) || examDate.isAtSameMomentAs(now);
     } catch (e) {
-      return true;
+      return false;
     }
   }
 
   bool get isPast {
-    return !isFuture;
+    try {
+      final examDate = DateTime.parse(date);
+      final now = DateTime.now();
+      return examDate.isBefore(now);
+    } catch (e) {
+      return false;
+    }
   }
 
   String get displayGrade {
@@ -110,21 +114,7 @@ class Exam {
   }
 
   bool get hasGrade {
-    if (isFuture) return false;
-    
-    final gradeValue = grade ?? value;
-    if (gradeValue == null) return false;
-    
-    if (gradeValue is num) {
-      return gradeValue > 0;
-    }
-    
-    if (gradeValue is String) {
-      final gradeStr = gradeValue.toString().trim();
-      return gradeStr.isNotEmpty && gradeStr != 'null' && gradeStr != '0';
-    }
-    
-    return false;
+    return grade != null && grade!.isNotEmpty && grade != '0' && grade != 0;
   }
 
   int? get numericGrade {

@@ -119,6 +119,16 @@ class OfflineStorageService {
     return await _databaseFacade.getFutureExams(accountId);
   }
 
+  Future<List<Exam>> getPastExams() async {
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getPastExams(accountId);
+  }
+
+  Future<List<Exam>> getExamsWithGrades() async {
+    final accountId = await _getCurrentAccountId();
+    return await _databaseFacade.getExamsWithGrades(accountId);
+  }
+
   Future<void> saveFeedbackReviews(List<FeedbackReview> feedbacks) async {
     final accountId = await _getCurrentAccountId();
     await _databaseFacade.saveFeedbacks(feedbacks, accountId);

@@ -77,9 +77,36 @@ class ExamRepository extends BaseRepository<Exam> {
     
     final examsData = await dbService.query(
       tableName,
-      where: 'account_id = ? AND date >= ?',
-      whereArgs: [accountId, today],
+      where: 'account_id = ? AND date >= ? AND (mark IS NULL OR mark = ?)',
+      whereArgs: [accountId, today, ''],
       orderBy: 'date ASC',
+    );
+    
+    return examsData.map(fromMap).toList();
+  }
+
+  /// Получить прошедшие экзамены (с оценкой)
+  Future<List<Exam>> getPastExams(String accountId) async {
+    final now = DateTime.now();
+    final today = now.toIso8601String().split('T').first;
+    
+    final examsData = await dbService.query(
+      tableName,
+      where: 'account_id = ? AND date < ? AND mark IS NOT NULL AND mark != ?',
+      whereArgs: [accountId, today, ''],
+      orderBy: 'date DESC',
+    );
+    
+    return examsData.map(fromMap).toList();
+  }
+
+  /// Получить все экзамены с оценкой
+  Future<List<Exam>> getExamsWithGrades(String accountId) async {
+    final examsData = await dbService.query(
+      tableName,
+      where: 'account_id = ? AND mark IS NOT NULL AND mark != ?',
+      whereArgs: [accountId, ''],
+      orderBy: 'date DESC',
     );
     
     return examsData.map(fromMap).toList();

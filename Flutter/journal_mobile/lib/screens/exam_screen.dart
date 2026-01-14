@@ -3,6 +3,7 @@ import 'package:journal_mobile/models/_widgets/exams/error_exams.dart';
 import 'package:journal_mobile/models/_widgets/exams/loading_exams.dart';
 
 import '../services/_network/network_service.dart';
+import '../services/_offline_service/offline_storage_service.dart';
 import '../services/api_service.dart';
 import '../services/_account/account_manager_service.dart';
 
@@ -60,14 +61,26 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
       }
 
       final token = account.token;
-      if (token.isEmpty) {
-        throw Exception('Токен аккаунта пустой');
+      final isConnected = await _networkService.isConnected;
+      
+      List<Exam> allExams;
+      List<Exam> futureExams;
+      List<Exam> pastExams;
+      
+      if (isConnected) {
+        // Онлайн режим - загружаем с API
+        allExams = await _apiService.getExams(token);
+        futureExams = await _apiService.getFutureExams(token);
+        pastExams = allExams.where((exam) => exam.isPast).toList();
+      } else {
+        // Оффлайн режим - загружаем из SQLite с правильной фильтрацией
+        final offlineService = OfflineStorageService();
+        futureExams = await offlineService.getFutureExams();
+        pastExams = await offlineService.getPastExams();
+        allExams = [...futureExams, ...pastExams];
+        
+        _debugInfo = 'Оффлайн режим: ${allExams.length} всех экзаменов, ${futureExams.length} предстоящих, ${pastExams.length} прошедших';
       }
-
-      final allExams = await _apiService.getExams(token);
-      final futureExams = await _apiService.getFutureExams(token);
-
-      final pastExams = allExams.where((exam) => exam.isPast).toList();
       
       final twelvePointExams = pastExams.where((exam) => exam.isTwelvePointSystem && exam.hasGrade).toList();
       final fivePointExams = pastExams.where((exam) => !exam.isTwelvePointSystem && exam.hasGrade).toList();
@@ -76,7 +89,9 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
 
       setState(() {
         _isLoading = false;
-        _debugInfo = 'Загружено: ${allExams.length} всех экзаменов, ${futureExams.length} предстоящих, ${pastExams.length} прошедших (${twelvePointExams.length} 12-балльных, ${fivePointExams.length} 5-балльных)';
+        _debugInfo = isConnected 
+          ? 'Онлайн: ${allExams.length} всех экзаменов, ${futureExams.length} предстоящих, ${pastExams.length} прошедших (${twelvePointExams.length} 12-балльных, ${fivePointExams.length} 5-балльных)'
+          : _debugInfo;
       });
     } catch (e) {
       setState(() {
