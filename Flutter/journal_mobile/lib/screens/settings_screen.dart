@@ -673,15 +673,12 @@ Future<void> _handleSendReport() async {
       ),
     );
 
-    // Создаем читаемый отчет
     final reportFile = await _loggingService.createReadableReport();
     
     // Закрываем диалог загрузки
     if (context.mounted) {
       Navigator.of(context).pop();
-      
-      // Предлагаем способ отправки
-      await _showSendOptions(reportFile);
+      await EmailService.sendReportWithComment(context, reportFile);
     }
     
   } catch (e) {
