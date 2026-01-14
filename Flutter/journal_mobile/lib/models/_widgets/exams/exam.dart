@@ -114,7 +114,22 @@ class Exam {
   }
 
   bool get hasGrade {
-    return grade != null && grade!.isNotEmpty && grade != '0' && grade != 0;
+    if (grade == null) return false;
+    
+    if (grade is int) {
+      return grade > 0;
+    }
+    
+    if (grade is double) {
+      return grade > 0;
+    }
+    
+    if (grade is String) {
+      final gradeStr = grade.toString().trim();
+      return gradeStr.isNotEmpty && gradeStr != 'null' && gradeStr != '0';
+    }
+    
+    return false;
   }
 
   int? get numericGrade {
