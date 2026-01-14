@@ -25,11 +25,11 @@ class OfflineStorageService {
   
   String? _currentAccountId;
 
-  static const int _maxMarks = 2000;
+  static const int _maxMarks = 5000;
   static const int _maxSchedule = 500;
   static const int _maxActivities = 500;
   static const int _maxHomeworks = 500; //TODO: Допилить хранение заданий
-  //с ограничениями действий на проверку состояния сети.
+  // с ограничениями действий на проверку состояния сети.
 
   Future<String> _getCurrentAccountId() async {
     if (_currentAccountId == null) {

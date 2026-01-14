@@ -5,6 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../_database/database_facade.dart';
 import '../../models/_system/account_model.dart';
 import '../_offline_service/offline_storage_service.dart';
+import '../api_service.dart';
+import '../secure_storage_service.dart';
 import 'account_id_generator.dart';
 
 class AccountManagerService {
@@ -300,6 +302,83 @@ class AccountManagerService {
     } catch (e) {
       print('❌ Ошибка updateAccountToken: $e');
       rethrow;
+    }
+  }
+
+  /// Получить валидный токен для текущего аккаунта (с перелогином при необходимости)
+  Future<String?> getValidTokenForCurrentAccount() async {
+    try {
+      final currentAccount = await getCurrentAccount();
+      if (currentAccount == null) {
+        print('❌ Нет активного аккаунта для получения токена');
+        return null;
+      }
+      
+      print('🔄 Получение валидного токена для аккаунта: ${currentAccount.username}');
+      
+      // 1. Проверяем текущий токен
+      final apiService = ApiService();
+      try {
+        final isValid = await apiService.validateToken(currentAccount.token);
+        if (isValid && currentAccount.token.isNotEmpty) {
+          print('✅ Токен аккаунта ${currentAccount.username} валиден');
+          return currentAccount.token;
+        }
+      } catch (e) {
+        print('⚠️ Ошибка проверки токена: $e');
+      }
+      
+      // 2. Пробуем перелогин с сохраненными учетными данными
+      final credentials = await getAccountCredentials(currentAccount.id);
+      final username = credentials['username'];
+      final password = credentials['password'];
+      
+      if (username != null && password != null) {
+        print('🔄 Пробуем перелогин для аккаунта: $username');
+        try {
+          final newToken = await apiService.login(username, password);
+          if (newToken != null) {
+            print('✅ Перелогин успешен, получен новый токен');
+            
+            // Обновляем токен в аккаунте
+            final updatedAccount = currentAccount.copyWith(token: newToken);
+            await updateAccount(updatedAccount);
+            
+            return newToken;
+          }
+        } catch (e) {
+          print('❌ Ошибка перелогина: $e');
+        }
+      } else {
+        print('⚠️ Нет сохраненных учетных данных для перелогина');
+      }
+      
+      // 3. Проверяем токен из SecureStorage (legacy)
+      final secureStorage = SecureStorageService();
+      final legacyToken = await secureStorage.getToken();
+      if (legacyToken != null && legacyToken.isNotEmpty) {
+        try {
+          final isValid = await apiService.validateToken(legacyToken);
+          if (isValid) {
+            print('✅ Легаси токен из SecureStorage валиден');
+            
+            // Обновляем токен в аккаунте
+            final updatedAccount = currentAccount.copyWith(token: legacyToken);
+            await updateAccount(updatedAccount);
+            
+            return legacyToken;
+          }
+        } catch (e) {
+          print('⚠️ Легаси токен невалиден: $e');
+        }
+      }
+      
+      print('❌ Не удалось получить валидный токен для аккаунта ${currentAccount.username}');
+      return null;
+      
+    } catch (e) {
+      print('❌ Ошибка получения валидного токена: $e');
+      return null;
     }
   }
 

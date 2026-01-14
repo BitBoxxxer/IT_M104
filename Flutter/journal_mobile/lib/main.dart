@@ -154,54 +154,39 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         final bool isOnline = _networkService.isConnected;
         
         if (hasMinimumOfflineData || isOnline) {
-          print('🚀 Есть активный аккаунт и ${isOnline ? 'интернет' : 'оффлайн данные'} - запускаем меню');
+          print('🚀 Есть активный аккаунт и ${isOnline ? 'интернет' : 'оффлайн данные'}');
+          
+          String? validToken;
+          bool isOfflineMode = false;
           
           if (isOnline) {
-            // валидность токена онлайн
-            try {
-              final isValid = await _apiService.validateToken(currentAccount.token);
-              if (isValid) {
-                return {
-                  'screen': 'menu',
-                  'token': currentAccount.token,
-                  'isOffline': false,
-                  'accountId': currentAccount.id
-                };
-              } else {
-                // Токен невалиден, но есть оффлайн данные
-                if (hasMinimumOfflineData) {
-                  print('⚠️ Токен невалиден, но есть оффлайн данные - запускаем в оффлайн режиме');
-                  return {
-                    'screen': 'menu',
-                    'token': currentAccount.token,
-                    'isOffline': true,
-                    'accountId': currentAccount.id
-                  };
-                }
-              }
-            } catch (e) {
-              // Ошибка проверки токена, но есть оффлайн данные
-              if (hasMinimumOfflineData) {
-                print('⚠️ Ошибка проверки токена, но есть оффлайн данные - запускаем в оффлайн режиме');
-                return {
-                  'screen': 'menu',
-                  'token': currentAccount.token,
-                  'isOffline': true,
-                  'accountId': currentAccount.id
-                };
-              }
+            // Попытка получить валидный токен с перелогином
+            print('🔄 Попытка получить валидный токен для аккаунта: ${currentAccount.username}');
+            validToken = await accountManager.getValidTokenForCurrentAccount();
+            
+            if (validToken != null) {
+              print('✅ Получен валидный токен через re-authenticate');
+            } else if (hasMinimumOfflineData) {
+              print('⚠️ Не удалось получить валидный токен, но есть оффлайн данные');
+              isOfflineMode = true;
+              validToken = currentAccount.token; // Используем старый токен для оффлайн режима
             }
           } else {
-            // Нет интернета, но есть оффлайн данные
+            // Нет интернета, используем оффлайн режим
             if (hasMinimumOfflineData) {
-              print('📱 Нет интернета, но есть оффлайн данные - запускаем в оффлайн режиме');
-              return {
-                'screen': 'menu',
-                'token': currentAccount.token,
-                'isOffline': true,
-                'accountId': currentAccount.id
-              };
+              print('📱 Нет интернета, но есть оффлайн данные');
+              isOfflineMode = true;
+              validToken = currentAccount.token;
             }
+          }
+          
+          if (validToken != null) {
+            return {
+              'screen': 'menu',
+              'token': validToken,
+              'isOffline': isOfflineMode,
+              'accountId': currentAccount.id
+            };
           }
         }
       }
@@ -320,18 +305,35 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
           if (screenType == 'menu' && token != null) {
             if (!isOffline) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                try {
+                  await _apiService.syncCriticalDataOnly(token);
+                  print('✅ Критические данные синхронизированы');
+                } catch (e) {
+                  print('⚠️ Синхронизация критических данных не удалась: $e');
+                }
+                
                 _serviceCoordinator.startBackgroundServices(token);
                 
-                _serviceCoordinator.manualSync(token).catchError((e) {
-                  print('Автосинхронизация не удалась: $e');
+                Future.delayed(Duration(seconds: 2), () {
+                  _serviceCoordinator.manualSync(token).catchError((e) {
+                    print('Автосинхронизация не удалась: $e');
+                  });
                 });
               });
             } else {
               print('📱 Запуск в оффлайн режиме для аккаунта $accountId');
-
+              
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 print('⚠️ Приложение работает в оффлайн режиме');
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Работаем в оффлайн режиме'),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
               });
             }
             
