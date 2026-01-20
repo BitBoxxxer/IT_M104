@@ -27,8 +27,6 @@ class CustomBottomNavBar extends StatelessWidget {
           _buildPulsatingNavItem(context, 0, Icons.school, 'Оценки'),
           _buildPulsatingNavItem(context, 1, Icons.assignment, 'Задания'),
           _buildCenterNavItem(context),
-          _buildPulsatingNavItem(context, 3, Icons.library_books, 'Экзамены'),
-          _buildPulsatingNavItem(context, 4, Icons.leaderboard, 'Лидеры'),
         ],
       ),
     );

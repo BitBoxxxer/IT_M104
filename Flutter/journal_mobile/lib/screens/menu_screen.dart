@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../_database/database_facade.dart';
 
+import '../models/_system/schedule_note.dart';
 import '../services/_account/account_manager_service.dart';
 import '../services/_offline_service/offline_storage_service.dart';
 import '../services/data_manager.dart';
@@ -15,8 +17,6 @@ import '../models/user_data.dart';
 import '../models/mark.dart';
 import '../models/_widgets/notifications/notification_item.dart';
 import '../models/_widgets/navigation/custom_bottom_nav_bar.dart';
-import '../models/_widgets/charts/pie_chart_widget.dart';
-import '../models/_widgets/charts/bar_chart_widget.dart';
 
 import '_account/account_selection_screen.dart';
 import 'marks_and_profile_screen.dart';
@@ -59,10 +59,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   int _selectedIndex = 0;
   
   final List<Widget> _screens = [];
-
-  // Для обработки свайпов
-  double _dragStartX = 0.0;
-  bool _isDragging = false;
+  late PageController _pageController;
 
   @override
   void initState() {
@@ -77,7 +74,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     _initializeNetworkService();
 
     _selectedIndex = 2;
-    
+    _pageController = PageController(initialPage: _selectedIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _networkService.dispose();
+    super.dispose();
   }
 
   void _initializeScreens() {
@@ -86,8 +90,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       _buildMarksAndScheduleScreen(),
       _buildHomeworkScreen(),
       _buildMainMenuScreen(),
-      _buildExamScreen(),
-      _buildLeaderboardScreen(),
     ]);
   }
 
@@ -106,84 +108,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Widget _buildMainMenuScreen() {
     return SingleChildScrollView(
       child: _buildMainContent(),
-    );
-  }
-
-  Widget _buildLeaderboardScreen() {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _dataFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        }
-        
-        if (snapshot.hasError || !snapshot.hasData) {
-          return Center(child: Text('Ошибка загрузки данных'));
-        }
-        
-        final UserData userData = snapshot.data!['user'];
-        
-        return Column(
-          children: [
-            AppBar(
-              title: Text('Рейтинги'),
-              centerTitle: true,
-            ),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 300,
-                    child: ElevatedButton.icon(
-                      icon: Icon(Icons.leaderboard),
-                      label: Text('Лидеры группы'),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => LeaderboardScreen(
-                              token: widget.token,
-                              isGroupLeaderboard: true,
-                              currentUserId: userData.studentId,
-                              currentUserName: userData.fullName,
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  SizedBox(
-                    width: 300,
-                    child: ElevatedButton.icon(
-                      icon: Icon(Icons.leaderboard_outlined),
-                      label: Text('Лидеры потока'),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => LeaderboardScreen(
-                              token: widget.token,
-                              isGroupLeaderboard: false,
-                              currentUserId: userData.studentId,
-                              currentUserName: userData.fullName,
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -303,6 +227,24 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                       ),
                     ),
                   ),
+                  SizedBox(height: 60),
+                  SizedBox(
+                  width: 300,
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.library_books),
+                    label: Text('Экзамены'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ExamScreen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
                 ],
               );
             },
@@ -367,55 +309,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  Widget _buildExamScreen() {
-    return Column(
-      children: [
-        AppBar(
-          title: Text('Экзамены'),
-          centerTitle: true,
-        ),
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 300,
-                  child: ElevatedButton.icon(
-                    icon: Icon(Icons.library_books),
-                    label: Text('Экзамены'),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ExamScreen(),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Future<void> _initializeNetworkService() async {
     try {
       await _networkService.initialize();
     } catch (e) {
       print('❌ Ошибка инициализации NetworkService: $e');
     }
-  }
-
-  @override
-  void dispose() {
-    _networkService.dispose();
-    super.dispose();
   }
 
   Future<Map<String, dynamic>> _loadData(String token) async {
@@ -509,52 +408,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         _dataFuture = _loadData(cleanToken);
       });
     }
-
-  void _handleHorizontalSwipe(DragUpdateDetails details) {
-    if (!_isDragging) {
-      _dragStartX = details.globalPosition.dx;
-      _isDragging = true;
-      return;
-    }
-    
-    final dragDistance = details.globalPosition.dx - _dragStartX;
-    
-    final sensitivity = 50.0;
-    
-    if (dragDistance.abs() > sensitivity) {
-      if (dragDistance > 0) {
-        _changeTab(-1);
-      } else {
-        _changeTab(1);
-      }
-      _isDragging = false;
-    }
-  }
-
-  void _handleVerticalSwipe(DragUpdateDetails details) {
-    if (!_isDragging) {
-      _dragStartX = details.globalPosition.dy;
-      _isDragging = true;
-      return;
-    }
-    
-    final dragDistance = details.globalPosition.dy - _dragStartX;
-    
-    if (dragDistance < -50 && _panelController.isPanelClosed) {
-      _panelController.open();
-      _isDragging = false;
-    }
-  }
-
-  void _changeTab(int direction) {
-    int newIndex = _selectedIndex + direction;
-    
-    if (newIndex >= 0 && newIndex <= 4) {
-      setState(() {
-        _selectedIndex = newIndex;
-      });
-    }
-  }
 
   Map<String, double> _calculateAverages(List<Mark> marks) {
     final filteredMarks = _filterTwelvePointMarks(marks);
@@ -766,10 +619,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Widget _buildMainContent() {
-    final coverHeight = MediaQuery.of(context).size.height * 0.25;
-    final profileHeight = 100.0;
-    
-    return Column(
+  final coverHeight = MediaQuery.of(context).size.height * 0.25;
+  final profileHeight = 100.0;
+  
+  return SingleChildScrollView(
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Stack(
@@ -918,8 +772,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           ],
         ),
       
-      SizedBox(height: profileHeight / 2),
-      
       StreamBuilder<bool>(
         stream: _networkService.connectionStream,
         initialData: _networkService.isConnected,
@@ -927,99 +779,51 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           final isConnected = snapshot.data ?? true;
           
           if (!isConnected) {
-            return Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(8),
-                  color: Colors.orange,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.wifi_off, size: 16, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text('Offline режим', style: TextStyle(color: Colors.white)),
-                      SizedBox(width: 16),
-                      GestureDetector(
-                        onTap: _refreshData,
-                        child: Row(
-                          children: [
-                            Icon(Icons.refresh, size: 16, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text('Обновить', style: TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+            return Icon(Icons.wifi_off, size: 16, color: Colors.orange);
               }
             return SizedBox.shrink();
         },
       ),
+      const SizedBox(height: 4),
       
       Container(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        child: FutureBuilder<Map<String, dynamic>>(
-          future: _dataFuture,
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              final UserData userData = snapshot.data!['user'];
-              
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                    Text(
-                      userData.fullName,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: FutureBuilder<Map<String, dynamic>>(
+            future: _dataFuture,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final UserData userData = snapshot.data!['user'];
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center( // ✅ Центрируем текст
+                      child: Text(
+                        extractFirstName(userData.fullName),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Группа: ${userData.groupName}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[700],
+                    Center( // ✅ Центрируем текст
+                      child: Text(
+                        'ТопMoney: ${_getPointsByType(userData.pointsInfo, 1) + _getPointsByType(userData.pointsInfo, 2)}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[700],
+                        ),
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                    'ТопMoney: ${_getPointsByType(userData.pointsInfo, 1) + _getPointsByType(userData.pointsInfo, 2)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[700],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'ТопКоины: ${_getPointsByType(userData.pointsInfo, 1)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[700],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'ТопГемы: ${_getPointsByType(userData.pointsInfo, 2)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[700],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              );
-            }
-            
-            return SizedBox.shrink();
-          },
+                  ],
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
         ),
-      ),
-      const Divider(indent: 16, endIndent: 16),
+        const Divider(indent: 16, endIndent: 16),
 
       FutureBuilder<Map<String, dynamic>>(
         future: _dataFuture,
@@ -1044,6 +848,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               child: const Center(child: Text("Нет данных для отображения")),
             );
           }
+          final UserData userData = snapshot.data!['user'];
 
           final List<Mark> marks = snapshot.data!['marks'];
 
@@ -1069,13 +874,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                    const Padding(
-                      padding: EdgeInsets.only(left: 12.0, bottom: 8.0, top: 8.0),
-                      child: Text(
-                        'Статистика',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ),
                     if (hasTwelvePointMarks)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -1118,190 +916,382 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                               ),
                             ),
                           ),
-                    
-                          Card(
-                            elevation: 4,
-                            margin: const EdgeInsets.all(8),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Посещаемость (%)',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    height: 150,
-                                    child: AttendancePieChart(attendance: attendance),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          IntrinsicHeight(
+                          child: Row(
+                            children: [
+                              Card(
+                                elevation: 4,
+                                margin: const EdgeInsets.all(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
                                     children: [
-                                      _buildAttendanceLegendItem(
-                                        Colors.green, 
-                                        'Посещено', 
-                                        attendance['attended']?.toInt() ?? 0, 
-                                        attendance['attended_percent'] ?? 0.0
+                                      const Text(
+                                        'Посещение',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                      _buildAttendanceLegendItem(
-                                        Colors.orange, 
-                                        'Опоздания', 
-                                        attendance['late']?.toInt() ?? 0, 
-                                        attendance['late_percent'] ?? 0.0
-                                      ),
-                                      _buildAttendanceLegendItem(
-                                        Colors.red, 
-                                        'Пропуски', 
-                                        attendance['missed']?.toInt() ?? 0, 
-                                        attendance['missed_percent'] ?? 0.0
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          Column(
+                                            spacing: 10,
+                                            children: [
+                                                _buildAttendanceLegendItem(
+                                              const Color.fromARGB(255, 0, 0, 0), 
+                                              'Всего', 
+                                              attendance['total']?.toInt() ?? 0
+                                              ),
+                                              Row(
+                                                spacing: 25,
+                                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                children: [
+                                                  _buildAttendanceLegendItem(
+                                                    Colors.green, 
+                                                    'Посещено', 
+                                                    attendance['attended']?.toInt() ?? 0
+                                                  ),
+                                                  _buildAttendanceLegendItem(
+                                                    Colors.orange, 
+                                                    'Опоздания', 
+                                                    attendance['late']?.toInt() ?? 0
+                                                  ),
+                                                  _buildAttendanceLegendItem(
+                                                    Colors.red, 
+                                                    'Пропуски', 
+                                                    attendance['missed']?.toInt() ?? 0
+                                                  ),
+                                                ],
+                                              )
+                                            ],
+                                          )
+                                        ],
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    margin: EdgeInsets.symmetric(horizontal: 4.0),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-              const SizedBox(height: 8),
-              
-              Card(
-                elevation: 4,
-                margin: const EdgeInsets.all(8),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Средние оценки',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _showAverageMarksLegend(context),
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.help_outline,
-                                  size: 14,
-                                  color: Colors.blue,
                                 ),
                               ),
-                            ),
+                              Card(
+                                elevation: 4,
+                                margin: const EdgeInsets.all(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    children: [
+                                      const Text(
+                                        'Ср. Оценка',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 35),
+                                      Row(
+                                        children: [
+                                          _buildLegendItemWithValue(Colors.blue, 'Общая', averages['overall'] ?? 0.0),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                              ),
+                            ]
                           ),
-                        ],
+                          ),
+                          const SizedBox(height: 8),
+              // В методе _buildMainContent() заменить текущую карточку "Главное" на:
+
+Card(
+  elevation: 4,
+  margin: EdgeInsets.all(8),
+  child: Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Сегодня',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                return Row(
+                  children: [
+                    Icon(
+                      isConnected ? Icons.wifi : Icons.wifi_off,
+                      size: 16,
+                      color: isConnected ? Colors.green : Colors.orange,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      isConnected ? 'Online' : 'Offline',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isConnected ? Colors.green : Colors.orange,
                       ),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 100,
-                        child: AverageMarksBarChart(averages: averages),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 5,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          _buildLegendItemWithValue(Colors.red, 'Д/Р', averages['home'] ?? 0.0),
-                          _buildLegendItemWithValue(Colors.green, 'К/Р', averages['control'] ?? 0.0),
-                          _buildLegendItemWithValue(Colors.purple, 'Л/Р', averages['lab'] ?? 0.0),
-                          _buildLegendItemWithValue(Colors.orange, 'П/Р', averages['practical'] ?? 0.0),
-                          _buildLegendItemWithValue(Colors.grey, 'И/Р', averages['final'] ?? 0.0),
-                          _buildLegendItemWithValue(Colors.blue, 'Общая', averages['overall'] ?? 0.0),
-                        ],
-                      ),
-                    ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        
+        // Уведомления на сегодня
+        FutureBuilder<List<ScheduleNote>>(
+          future: _getTodayReminders(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+            
+            if (snapshot.hasError) {
+              return Text('Ошибка загрузки: ${snapshot.error}');
+            }
+            
+            final reminders = snapshot.data ?? [];
+            
+            if (reminders.isEmpty) {
+              return Column(
+                children: [
+                  Icon(
+                    Icons.notifications_none,
+                    size: 40,
+                    color: Colors.grey.withOpacity(0.5),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Нет напоминаний на сегодня',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              );
+            }
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Напоминания (${reminders.length}):',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
                   ),
                 ),
-              ),
-
-              /* Card(
-                elevation: 4,
-                margin: const EdgeInsets.all(8),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 30),
-                        const Text(
-                          'DEBUG:',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                SizedBox(height: 8),
+                ...reminders.map((note) => _buildReminderItem(note)).toList(),
+              ],
+            );
+          },
+        ),
+        
+        SizedBox(height: 16),
+        Divider(),
+        SizedBox(height: 8),
+        
+        // Быстрые действия
+        Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.calendar_today),
+                    label: Text('Расписание'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ScheduleScreen(token: widget.token),
                         ),
-                        
-                        const SizedBox(height: 30),
-                        SizedBox(
-                          width: 250,
-                          child: FloatingActionButton(
-                            backgroundColor: Colors.red,
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => AreaDevelopScreen(),
-                                ),
-                              );
-                            },
-                            child: Icon(Icons.bug_report, color: Colors.white),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                      ],
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
-              ), */
+                SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.assignment),
+                    label: Text('Задания'),
+                    onPressed: () {
+                      setState(() {
+                        _selectedIndex = 1;
+                        _pageController.animateToPage(
+                          1,
+                          duration: Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            StreamBuilder<bool>(
+              stream: _networkService.connectionStream,
+              initialData: _networkService.isConnected,
+              builder: (context, snapshot) {
+                final isConnected = snapshot.data ?? true;
+                return ElevatedButton.icon(
+                  icon: Icon(Icons.sync),
+                  label: Text('Синхронизировать'),
+                  onPressed: isConnected ? _syncAllData : null,
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    minimumSize: Size(double.infinity, 50),
+                    backgroundColor: isConnected 
+                      ? Theme.of(context).primaryColor
+                      : Colors.grey,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    ),
+  ),
+),
+              const SizedBox(height: 8),
+              Card(
+  elevation: 4,
+  margin: const EdgeInsets.all(8),
+  child: Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Заголовок с информацией
+        Container(
+          padding: EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ваше место в рейтингах',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Нажмите для просмотра полного списка',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Кнопка лидеров группы с позицией
+        _buildLeaderboardButtonWithPosition(
+          title: 'Лидеры группы',
+          icon: Icons.leaderboard,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => LeaderboardScreen(
+                  token: widget.token,
+                  isGroupLeaderboard: true,
+                  currentUserId: userData.studentId,
+                  currentUserName: userData.fullName,
+                ),
+              ),
+            );
+          },
+          positionFuture: _getUserGroupPosition(),
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Кнопка лидеров потока с позицией
+        _buildLeaderboardButtonWithPosition(
+          title: 'Лидеры потока',
+          icon: Icons.leaderboard_outlined,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => LeaderboardScreen(
+                  token: widget.token,
+                  isGroupLeaderboard: false,
+                  currentUserId: userData.studentId,
+                  currentUserName: userData.fullName,
+                ),
+              ),
+            );
+          },
+          positionFuture: _getUserStreamPosition(),
+        ),
+      ],
+    ),
+  ),
+)
             ],
           );
         },
       ),
+      SizedBox(height: 90),
       
-      SizedBox(height: 90), // кастомный bottom drawer сошел с ума - 17.12.25
       ],
-    );
+    )
+  );
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (_screens.isEmpty) {
-      _initializeScreens();
-    }
+Widget build(BuildContext context) {
+  if (_screens.isEmpty) {
+    _initializeScreens();
+  }
 
-    return SlidingUpPanel(
-      controller: _panelController,
-      minHeight: 0,
-      maxHeight: MediaQuery.of(context).size.height * 0.6, // 60%
-      parallaxEnabled: true,
-      parallaxOffset: 0.5,
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(24.0),
-        topRight: Radius.circular(24.0),
-      ),
-      panelBuilder: (sc) => _buildPanelContent(sc),
-      body: GestureDetector(
-        onHorizontalDragUpdate: _handleHorizontalSwipe,
-        onVerticalDragUpdate: _handleVerticalSwipe,
-        child: Scaffold(
+  return SlidingUpPanel(
+    controller: _panelController,
+    minHeight: 0,
+    maxHeight: MediaQuery.of(context).size.height * 0.6,
+    parallaxEnabled: true,
+    parallaxOffset: 0.5,
+    borderRadius: BorderRadius.only(
+      topLeft: Radius.circular(24.0),
+      topRight: Radius.circular(24.0),
+    ),
+    panelBuilder: (sc) => _buildPanelContent(sc),
+    body: NotificationListener<ScrollNotification>(
+      onNotification: (ScrollNotification notification) {
+        // Отключаем вертикальные свайпы в PageView, если панель открыта
+        if (notification is UserScrollNotification) {
+          if (_panelController.isPanelOpen || 
+              _panelController.isPanelAnimating) {
+            return true; // Предотвращаем прокрутку PageView
+          }
+        }
+        return false;
+      },
+      child: Scaffold(
         extendBodyBehindAppBar: true,
         extendBody: true,
         appBar: AppBar(
@@ -1339,8 +1329,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             ),
           ],
         ),
-        body: Container(
-          child: _screens[_selectedIndex],
+        body: PageView(
+          controller: _pageController,
+          onPageChanged: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          // Добавьте этот параметр:
+          scrollDirection: Axis.horizontal,
+          // Отключите вертикальные свайпы:
+          physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
+          children: _screens,
         ),
         bottomNavigationBar: CustomBottomNavBar(
           selectedIndex: _selectedIndex,
@@ -1348,12 +1348,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             setState(() {
               _selectedIndex = index;
             });
+            _pageController.animateToPage(
+              index,
+              duration: Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
           },
-          ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildPanelContent(ScrollController sc) {
     return Material(
@@ -1688,7 +1693,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  Widget _buildAttendanceLegendItem(Color color, String text, int count, double percent) {
+  Widget _buildAttendanceLegendItem(Color color, String text, int count) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1717,78 +1722,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             fontSize: 14,
             fontWeight: FontWeight.bold,
           ),
-        ),
-        Text(
-          '(${percent.toStringAsFixed(1)}%)',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-        ),
+        )
       ],
     );
   }
 
-  // TODO: вынести позже. 18.12.25
-  void _showAverageMarksLegend(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.info, color: Colors.blue),
-            SizedBox(width: 12),
-            Text('Расшифровка сокращений',style: const TextStyle(fontSize: 22),)
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildLegendItem('Д/Р', 'Домашняя работа'),
-            _buildLegendItem('К/Р', 'Контрольная работа'),
-            _buildLegendItem('Л/Р', 'Лабораторная работа'),
-            _buildLegendItem('П/Р', 'Практическая работа'),
-            _buildLegendItem('И/Р', 'Итоговая работа'),
-            _buildLegendItem('Общая', 'Общая средняя оценка'),
-            _buildLegendItem('---', ''),
-            _buildLegendItem('Н/Д', 'Нет оценок'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Понятно'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLegendItem(String abbreviation, String description) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 70,
-            child: Text(
-              abbreviation,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-              ),
-            ),
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(description),
-          ),
-        ],
-      ),
-    );
-  }
 
   List<Mark> _filterTwelvePointMarks(List<Mark> marks) {
   return marks.where((mark) {
@@ -1805,5 +1743,333 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       return true;
     }
   }).toList();
+}
+
+  String extractFirstName(String fullName) {
+    if (fullName.isEmpty) return '';
+    
+    final parts = fullName.split(' ');
+    if (parts.isNotEmpty) {
+      return parts[1]; // получить имя из userdata.fullname - 
+      //TODO: запомнить и потом вынести в утилиты.
+    }
+    
+    return fullName;
+  }
+
+  Future<List<ScheduleNote>> _getTodayReminders() async {
+  try {
+    final databaseFacade = DatabaseFacade();
+    final currentAccount = await databaseFacade.getCurrentAccount();
+    
+    if (currentAccount == null) {
+      return [];
+    }
+    
+    return await databaseFacade.getTodayReminders(currentAccount.id);
+  } catch (e) {
+    print('❌ Ошибка загрузки напоминаний: $e');
+    return [];
+  }
+}
+
+Widget _buildReminderItem(ScheduleNote note) {
+  final time = note.reminderTime != null 
+    ? DateFormat('HH:mm').format(note.reminderTime!)
+    : 'Без времени';
+  
+  return Card(
+    margin: EdgeInsets.symmetric(vertical: 4),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+      side: BorderSide(
+        color: note.noteColor?.withOpacity(0.3) ?? Colors.blue.withOpacity(0.3),
+        width: 1,
+      ),
+    ),
+    child: ListTile(
+      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      leading: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: note.noteColor ?? Colors.blue,
+          shape: BoxShape.circle,
+        ),
+      ),
+      title: Text(
+        note.noteText,
+        style: TextStyle(fontSize: 14),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Row(
+        children: [
+          Icon(Icons.notifications, size: 12, color: Colors.orange),
+          SizedBox(width: 4),
+          Text(
+            time,
+            style: TextStyle(fontSize: 12, color: Colors.orange),
+          ),
+        ],
+      ),
+      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: () {
+        // При нажатии можно открыть редактирование или детали
+        _showReminderDetails(context, note);
+      },
+    ),
+  );
+}
+
+void _showReminderDetails(BuildContext context, ScheduleNote note) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Напоминание'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: note.noteColor ?? Colors.blue,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  note.noteText,
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          if (note.reminderTime != null)
+            Row(
+              children: [
+                Icon(Icons.access_time, size: 16, color: Colors.blue),
+                SizedBox(width: 8),
+                Text(
+                  'Время: ${DateFormat('HH:mm').format(note.reminderTime!)}',
+                  style: TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.calendar_today, size: 16, color: Colors.green),
+              SizedBox(width: 8),
+              Text(
+                'Дата: ${DateFormat('dd.MM.yyyy').format(note.date)}',
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('Закрыть'),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            // Реализовать переход к расписанию с открытием заметки
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ScheduleScreen(token: widget.token),
+              ),
+            ).then((_) {
+              // Обновить список напоминаний после возвращения
+              setState(() {});
+            });
+          },
+          child: Text('Открыть в расписании'),
+        ),
+      ],
+    ),
+  );
+}
+
+// В class _MainMenuScreenState добавляем новые методы:
+
+Future<int?> _getUserGroupPosition() async {
+  try {
+    final databaseFacade = DatabaseFacade();
+    final currentAccount = await databaseFacade.getCurrentAccount();
+    
+    if (currentAccount == null) return null;
+    
+    final userDataFuture = await _dataFuture;
+    if (!userDataFuture.containsKey('user')) return null;
+    
+    final UserData userData = userDataFuture['user'];
+    
+    // Получаем позицию пользователя в групповом лидерборде
+    return await databaseFacade.getUserLeaderboardPosition(
+      currentAccount.id,
+      userData.studentId,
+      true, // isGroupLeaders
+    );
+  } catch (e) {
+    print('❌ Ошибка получения групповой позиции: $e');
+    return null;
+  }
+}
+
+Future<int?> _getUserStreamPosition() async {
+  try {
+    final databaseFacade = DatabaseFacade();
+    final currentAccount = await databaseFacade.getCurrentAccount();
+    
+    if (currentAccount == null) return null;
+    
+    final userDataFuture = await _dataFuture;
+    if (!userDataFuture.containsKey('user')) return null;
+    
+    final UserData userData = userDataFuture['user'];
+    
+    // Получаем позицию пользователя в потоковом лидерборде
+    return await databaseFacade.getUserLeaderboardPosition(
+      currentAccount.id,
+      userData.studentId,
+      false, // isGroupLeaders
+    );
+  } catch (e) {
+    print('❌ Ошибка получения потоковой позиции: $e');
+    return null;
+  }
+}
+
+Widget _buildPositionBadge(int position) {
+  return Container(
+    width: 28,
+    height: 28,
+    margin: EdgeInsets.only(left: 8),
+    decoration: BoxDecoration(
+      color: _getPositionColor(position),
+      shape: BoxShape.circle,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.2),
+          blurRadius: 3,
+          offset: Offset(0, 1),
+        ),
+      ],
+    ),
+    child: Center(
+      child: Text(
+        position.toString(),
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+    ),
+  );
+}
+
+Color _getPositionColor(int position) {
+  if (position == 1) {
+    return Color(0xFFFFD700); // Золотой
+  } else if (position == 2) {
+    return Color(0xFFC0C0C0); // Серебряный
+  } else if (position == 3) {
+    return Color(0xFFCD7F32); // Бронзовый
+  } else if (position <= 10) {
+    return Colors.blue.shade600;
+  } else if (position <= 50) {
+    return Colors.green.shade600;
+  } else {
+    return Colors.grey.shade600;
+  }
+}
+
+String _getPositionSuffix(int position) {
+  if (position % 10 == 1 && position % 100 != 11) return 'место';
+  if (position % 10 >= 2 && position % 10 <= 4 && (position % 100 < 10 || position % 100 >= 20)) {
+    return 'места';
+  }
+  return 'место';
+}
+
+Widget _buildLeaderboardButtonWithPosition({
+  required String title,
+  required IconData icon,
+  required VoidCallback onPressed,
+  required Future<int?> positionFuture,
+}) {
+  return SizedBox(
+    width: double.infinity,
+    child: FutureBuilder<int?>(
+      future: positionFuture,
+      builder: (context, snapshot) {
+        final isLoading = snapshot.connectionState == ConnectionState.waiting;
+        final hasPosition = snapshot.hasData && snapshot.data != null;
+        final position = snapshot.data;
+        
+        return ElevatedButton.icon(
+          icon: icon != Icons.leaderboard_outlined 
+            ? Icon(icon)
+            : isLoading
+              ? SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : Icon(icon),
+          label: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+              if (isLoading) ...[
+                SizedBox(width: 8),
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                ),
+              ] else if (hasPosition && position != null) ...[
+                _buildPositionBadge(position),
+                SizedBox(width: 8),
+                Text(
+                  '${_getPositionSuffix(position)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            backgroundColor: isLoading ? Colors.grey.shade700 : null,
+          ),
+        );
+      },
+    ),
+  );
 }
 }

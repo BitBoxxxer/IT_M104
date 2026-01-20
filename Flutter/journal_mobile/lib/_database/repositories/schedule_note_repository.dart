@@ -152,4 +152,25 @@ class ScheduleNoteRepository {
     
     return controller.stream;
   }
+
+  Future<List<ScheduleNote>> getTodayReminders(String accountId) async {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayEnd = todayStart.add(const Duration(days: 1));
+    
+    final notesData = await _dbService.rawQuery('''
+      SELECT * FROM ${DatabaseConfig.tableScheduleNotes}
+      WHERE account_id = ? 
+        AND reminder_enabled = 1
+        AND datetime(reminder_time) >= datetime(?)
+        AND datetime(reminder_time) < datetime(?)
+      ORDER BY reminder_time ASC
+    ''', [
+      accountId,
+      todayStart.toIso8601String(),
+      todayEnd.toIso8601String()
+    ]);
+
+    return notesData.map((data) => ScheduleNote.fromJson(data)).toList();
+  }
 }

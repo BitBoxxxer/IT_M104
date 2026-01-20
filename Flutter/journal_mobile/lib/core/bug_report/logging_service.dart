@@ -14,7 +14,7 @@ class LoggingService {
   LoggingService._internal();
 
   static const String _logFileName = 'student_journal_logs.enc';
-  // Ключ для теста - в реальном приложении должен храниться безопасно
+  // Ключ для теста - создать сервис генерации из данных пользователя.
   static const String _encryptionKeyStr = 'sodagrdp_it_top_college_2024_test_key';
   static late encrypt.Key _encryptionKey;
   static late encrypt.Encrypter _encrypter;

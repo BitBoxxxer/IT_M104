@@ -92,13 +92,22 @@ class DatabaseFacade {
   Future<List<LeaderboardUser>> getGroupLeaders(String accountId) => _leaderboardRepository.getGroupLeaders(accountId);
   Future<void> saveStreamLeaders(List<LeaderboardUser> leaders, String accountId) => _leaderboardRepository.saveStreamLeaders(leaders, accountId);
   Future<List<LeaderboardUser>> getStreamLeaders(String accountId) => _leaderboardRepository.getStreamLeaders(accountId);
+  Future<int?> getUserLeaderboardPosition(String accountId, int studentId, bool isGroupLeaders) async {
+    try {
+      final userPosition = await _leaderboardRepository.getUserPosition(accountId, studentId, isGroupLeaders);
+      return userPosition?.position;
+    } catch (e) {
+      print('❌ Ошибка получения позиции пользователя: $e');
+      return null;
+    }
+  }
 
   Future<void> saveToCache(String key, dynamic value, {String? accountId, Duration? expiry}) => _cacheRepository.save(key, value, accountId: accountId, expiry: expiry);
   Future<dynamic> getFromCache(String key, {String? accountId}) => _cacheRepository.get(key, accountId: accountId);
   Future<void> removeFromCache(String key, {String? accountId}) => _cacheRepository.remove(key, accountId: accountId);
   Future<void> clearCache({String? accountId}) => _cacheRepository.clear(accountId: accountId);
 
-  Future<int> saveScheduleNote(ScheduleNote note) => _scheduleNoteRepository.saveNote(note); // Практика
+  Future<int> saveScheduleNote(ScheduleNote note) => _scheduleNoteRepository.saveNote(note);
   Future<List<ScheduleNote>> getScheduleNotesForDate(String accountId, DateTime date) => 
       _scheduleNoteRepository.getNotesForDate(accountId, date);
   Future<List<ScheduleNote>> getAllScheduleNotes(String accountId) => 
@@ -115,6 +124,8 @@ class DatabaseFacade {
       _scheduleNoteRepository.deleteNotesForDate(accountId, date);
   Future<int> clearAllScheduleNotes(String accountId) => 
       _scheduleNoteRepository.clearAllNotes(accountId);
+  Future<List<ScheduleNote>> getTodayReminders(String accountId) async =>
+      _scheduleNoteRepository.getTodayReminders(accountId);
   Stream<List<ScheduleNote>> watchScheduleNotesForDate(String accountId, DateTime date) => 
       _scheduleNoteRepository.watchNotesForDate(accountId, date);
 
