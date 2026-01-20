@@ -198,51 +198,91 @@ class LoggingService {
   Future<File> createReadableReport() async {
     try {
       final directory = await getTemporaryDirectory();
-      final reportFile = File('${directory.path}/error_report_${DateTime.now().millisecondsSinceEpoch}.txt');
+      final reportFile = File('${directory.path}/error_report_${DateTime.now().millisecondsSinceEpoch}.enc');
       
       // Получаем логи
       final logFile = await exportLogFile();
       if (logFile == null || !await logFile.exists()) {
-        await reportFile.writeAsString('Логи не найдены\n');
+        // Создаем пустой зашифрованный файл с сообщением
+        final emptyMessage = 'Логи не найдены\n';
+        final encryptedEmpty = _encryptAES(utf8.encode(emptyMessage));
+        await reportFile.writeAsBytes(encryptedEmpty);
         return reportFile;
       }
       
+      // Читаем зашифрованные данные из исходного файла
       final encryptedData = await logFile.readAsBytes();
+      
+      // Декодируем для создания отчета
       String decryptedLogs = 'Не удалось дешифровать логи\n';
+      int entryCount = 0;
       
       try {
         decryptedLogs = _decryptAES(encryptedData);
+        entryCount = decryptedLogs.split('\n').where((e) => e.isNotEmpty).length;
       } catch (e) {
         decryptedLogs = 'Ошибка дешифровки: $e\nДанные (base64): ${base64Encode(encryptedData)}';
       }
       
-      // Создаем отчет
+      // Создаем отчет в читаемом формате
       final report = '''
-=== ОТЧЕТ ОБ ОШИБКАХ IT TOP JOURNAL ===
-Сгенерировано: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}
-Приложение: Student Journal
-Версия: 1.0.0
-Устройство: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
-Email разработчика: sodagrdp@gmail.com
+  === ОТЧЕТ ОБ ОШИБКАХ IT TOP JOURNAL ===
+  Сгенерировано: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}
+  Приложение: Student Journal
+  Версия: 1.0.0
+  Устройство: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}
+  Email разработчика: sodagrdp@gmail.com
 
-=== ПОСЛЕДНИЕ 50 ЗАПИСЕЙ ===
-${decryptedLogs.split('\n').reversed.take(50).join('\n')}
+  === ПОСЛЕДНИЕ 100 ЗАПИСЕЙ ===
+  ${decryptedLogs.split('\n').reversed.take(100).join('\n')}
 
-=== ИНФОРМАЦИЯ ДЛЯ РАЗРАБОТЧИКА ===
-Файл зашифрован: AES-256-CBC
-Ключ: $_encryptionKeyStr
-Размер файла: ${encryptedData.length} байт
-Кол-во записей: ${decryptedLogs.split('\n').where((e) => e.isNotEmpty).length}
+  === ИНФОРМАЦИЯ ДЛЯ РАЗРАБОТЧИКА ===
+  Файл зашифрован: AES-256-CBC
+  Ключ: $_encryptionKeyStr
+  Исходный размер файла: ${encryptedData.length} байт
+  Кол-во записей: $entryCount
+  Формат записей: (Время)_(Тип_Действия)_(Описание действия || JSON доп. информация)
 
-=== КОНЕЦ ОТЧЕТА ===
-''';
+  === КОНЕЦ ОТЧЕТА ===
+  ''';
       
-      await reportFile.writeAsString(report);
+      // Шифруем отчет
+      final encryptedReport = _encryptAES(utf8.encode(report));
+      
+      // Сохраняем зашифрованный отчет
+      await reportFile.writeAsBytes(encryptedReport);
+      
+      // Логируем создание отчета
+      await logAction('REPORT_CREATED', 'Создан зашифрованный отчет', extraInfo: {
+        'report_size': encryptedReport.length,
+        'entry_count': entryCount,
+        'filename': reportFile.path.split('/').last,
+      });
+      
       return reportFile;
       
     } catch (e) {
       debugPrint('❌ Ошибка создания отчета: $e');
-      rethrow;
+      
+      // В случае ошибки создаем минимальный зашифрованный отчет
+      try {
+        final directory = await getTemporaryDirectory();
+        final reportFile = File('${directory.path}/error_report_fallback_${DateTime.now().millisecondsSinceEpoch}.enc');
+        
+        final errorReport = '''
+  === ОШИБКА СОЗДАНИЯ ОТЧЕТА ===
+  Время: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}
+  Ошибка: $e
+  ''';
+        
+        final encryptedErrorReport = _encryptAES(utf8.encode(errorReport));
+        await reportFile.writeAsBytes(encryptedErrorReport);
+        
+        return reportFile;
+      } catch (e2) {
+        debugPrint('❌ Критическая ошибка при создании fallback отчета: $e2');
+        rethrow;
+      }
     }
   }
   
