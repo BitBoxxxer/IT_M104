@@ -772,18 +772,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           ],
         ),
       
-      StreamBuilder<bool>(
-        stream: _networkService.connectionStream,
-        initialData: _networkService.isConnected,
-        builder: (context, snapshot) {
-          final isConnected = snapshot.data ?? true;
-          
-          if (!isConnected) {
-            return Icon(Icons.wifi_off, size: 16, color: Colors.orange);
-              }
-            return SizedBox.shrink();
-        },
-      ),
       const SizedBox(height: 4),
       
       Container(

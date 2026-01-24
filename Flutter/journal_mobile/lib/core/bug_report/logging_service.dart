@@ -146,15 +146,12 @@ class LoggingService {
   // Шифрование AES-256-CBC
   List<int> _encryptAES(List<int> data) {
     try {
-      // Генерируем случайный IV для каждого шифрования
       final iv = encrypt.IV.fromSecureRandom(16);
       final encrypted = _encrypter.encryptBytes(data, iv: iv);
       
-      // Сохраняем IV + зашифрованные данные
       return [...iv.bytes, ...encrypted.bytes];
     } catch (e) {
       debugPrint('❌ Ошибка шифрования: $e');
-      // В случае ошибки возвращаем оригинал с меткой
       return [...utf8.encode('[UNENCRYPTED:${e.toString().substring(0, 50)}]'), ...data];
     }
   }
