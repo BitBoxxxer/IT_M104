@@ -6,6 +6,7 @@ import '../models/days_element.dart';
 import '../models/mark.dart';
 import '../models/user_data.dart';
 import '_offline_service/offline_storage_service.dart';
+import '../core/schedule_date_utils.dart';
 
 /// Единый менеджер данных с приоритетом SQLite
 class DataManager {
@@ -108,14 +109,23 @@ class DataManager {
     required String dateTo,
     bool forceRefresh = false,
   }) async {
+    final rangeStart = DateTime.parse(dateFrom);
+    final rangeEnd = DateTime.parse(dateTo);
+
     return await fetchData<List<ScheduleElement>>(
       dataType: 'schedule',
       onlineFetch: () async {
         final token = await _apiService.getCurrentToken();
         return await _apiService.getSchedule(token, dateFrom, dateTo);
       },
-      offlineFetch: () => _offlineStorage.getSchedule(),
-      saveToStorage: (schedule) => _offlineStorage.saveSchedule(schedule),
+      // Раньше тут забиралось ВСЁ расписание аккаунта из SQLite (все недели
+      // вперемешку), теперь — только запрошенный диапазон дат.
+      offlineFetch: () => _offlineStorage.getScheduleByDateRange(rangeStart, rangeEnd),
+      saveToStorage: (schedule) => _offlineStorage.saveSchedule(
+        schedule,
+        weekStart: rangeStart,
+        weekEnd: rangeEnd,
+      ),
       forceRefresh: forceRefresh,
     );
   }

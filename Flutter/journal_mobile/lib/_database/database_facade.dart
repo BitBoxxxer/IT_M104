@@ -56,9 +56,16 @@ class DatabaseFacade {
   Future<void> saveUserData(UserData user, String accountId) => _userRepository.saveUserData(user, accountId);
   Future<UserData?> getUserData(String accountId) => _userRepository.getUserData(accountId);
 
-  Future<void> saveSchedule(List<ScheduleElement> schedule, String accountId) => _scheduleRepository.saveSchedule(schedule, accountId);
+  Future<void> saveSchedule(
+    List<ScheduleElement> schedule,
+    String accountId, {
+    DateTime? weekStart,
+    DateTime? weekEnd,
+  }) =>
+      _scheduleRepository.saveSchedule(schedule, accountId, weekStart: weekStart, weekEnd: weekEnd);
   Future<List<ScheduleElement>> getSchedule(String accountId) => _scheduleRepository.getSchedule(accountId);
   Future<List<ScheduleElement>> getScheduleByDateRange(String accountId, DateTime start, DateTime end) => _scheduleRepository.getScheduleByDateRange(accountId, start, end);
+  Future<int> deleteScheduleBefore(String accountId, DateTime before) => _scheduleRepository.deleteScheduleBefore(accountId, before);
 
   Future<void> saveNotification(NotificationItem notification, String accountId) => _notificationRepository.saveNotification(notification, accountId);
   Future<List<NotificationItem>> getNotifications(String accountId) => _notificationRepository.getNotifications(accountId);

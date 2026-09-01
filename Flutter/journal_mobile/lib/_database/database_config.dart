@@ -1,6 +1,6 @@
 class DatabaseConfig {
   static const String databaseName = 'app_database.db';
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 2;
 
   static const SyncStrategy syncStrategy = SyncStrategy.merge;
   static const bool cleanupMissingItems = false;

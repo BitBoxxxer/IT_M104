@@ -187,6 +187,7 @@ class DatabaseMigrations {
         key TEXT PRIMARY KEY,
         account_id TEXT,
         value TEXT NOT NULL,
+        expires_at INTEGER,
         FOREIGN KEY (account_id) REFERENCES ${DatabaseConfig.tableAccounts}(id) ON DELETE CASCADE
       )
     ''');
@@ -241,7 +242,26 @@ class DatabaseMigrations {
         case 1:
           await createTables(db, version);
           break;
+        case 2:
+          // Добавляем поддержку TTL в кэше: раньше параметр `expiry` в
+          // CacheRepository.save() принимался, но никуда не сохранялся —
+          // кэш по факту никогда не истекал.
+          await _addColumnIfMissing(db, DatabaseConfig.tableCache, 'expires_at', 'INTEGER');
+          break;
       }
+    }
+  }
+
+  static Future<void> _addColumnIfMissing(
+    Database db,
+    String table,
+    String column,
+    String type,
+  ) async {
+    final info = await db.rawQuery('PRAGMA table_info($table)');
+    final exists = info.any((row) => row['name'] == column);
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
     }
   }
 }

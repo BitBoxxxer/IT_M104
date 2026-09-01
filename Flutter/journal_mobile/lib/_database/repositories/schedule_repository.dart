@@ -6,14 +6,51 @@ import '../database_config.dart';
 class ScheduleRepository {
   final DatabaseService _dbService = DatabaseService();
 
-  Future<void> saveSchedule(List<ScheduleElement> schedule, String accountId) async {
+  /// Сохранить расписание.
+  ///
+  /// ВАЖНО: раньше этот метод удалял ВСЁ расписание аккаунта (`WHERE account_id = ?`)
+  /// перед вставкой новых данных. Из-за этого при сохранении, например, следующей
+  /// недели — текущая неделя стиралась (и наоборот), потому что каждый вызов
+  /// перетирал весь стол целиком, а не только те дни, которые реально пришли
+  /// с сервера.
+  ///
+  /// Теперь можно (и нужно) передавать [weekStart]/[weekEnd] — диапазон дат,
+  /// за который реально запрашивались данные. Тогда чистятся только записи
+  /// внутри этого диапазона (это заодно правильно убирает пары, которые
+  /// пропали/перенеслись на сервере), а все остальные недели остаются нетронутыми.
+  ///
+  /// Если диапазон не передан — он определяется по минимальной/максимальной
+  /// дате в самом списке [schedule] (на случай старых вызовов без диапазона).
+  /// Если список пустой и диапазон не передан — ничего не удаляем и не трогаем БД,
+  /// чтобы случайно не стереть всё расписание пустым ответом с сервера.
+  Future<void> saveSchedule(
+    List<ScheduleElement> schedule,
+    String accountId, {
+    DateTime? weekStart,
+    DateTime? weekEnd,
+  }) async {
     final db = await _dbService.database;
+
+    String? startDate;
+    String? endDate;
+
+    if (weekStart != null && weekEnd != null) {
+      startDate = _formatDate(weekStart);
+      endDate = _formatDate(weekEnd);
+    } else if (schedule.isNotEmpty) {
+      final dates = schedule.map((e) => e.date).toList()..sort();
+      startDate = dates.first;
+      endDate = dates.last;
+    }
+
     await db.transaction((txn) async {
-      await txn.delete(
-        DatabaseConfig.tableSchedule,
-        where: 'account_id = ?',
-        whereArgs: [accountId],
-      );
+      if (startDate != null && endDate != null) {
+        await txn.delete(
+          DatabaseConfig.tableSchedule,
+          where: 'account_id = ? AND date BETWEEN ? AND ?',
+          whereArgs: [accountId, startDate, endDate],
+        );
+      }
 
       for (final element in schedule) {
         await txn.insert(DatabaseConfig.tableSchedule, {
@@ -28,6 +65,25 @@ class ScheduleRepository {
         }, conflictAlgorithm: ConflictAlgorithm.replace,);
       }
     });
+  }
+
+  /// Удалить записи расписания старше [before] (используется для чистки старых
+  /// данных). В отличие от saveSchedule, это explicit удаление по дате, а не
+  /// побочный эффект сохранения новой недели.
+  Future<int> deleteScheduleBefore(String accountId, DateTime before) async {
+    final db = await _dbService.database;
+    return await db.delete(
+      DatabaseConfig.tableSchedule,
+      where: 'account_id = ? AND date < ?',
+      whereArgs: [accountId, _formatDate(before)],
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 
   Future<List<ScheduleElement>> getSchedule(String accountId) async {

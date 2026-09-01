@@ -76,9 +76,18 @@ class OfflineStorageService {
     return await _databaseFacade.getUserData(accountId);
   }
 
-  Future<void> saveSchedule(List<ScheduleElement> schedule) async {
+  Future<void> saveSchedule(
+    List<ScheduleElement> schedule, {
+    DateTime? weekStart,
+    DateTime? weekEnd,
+  }) async {
     final accountId = await _getCurrentAccountId();
-    await _databaseFacade.saveSchedule(schedule, accountId);
+    await _databaseFacade.saveSchedule(
+      schedule,
+      accountId,
+      weekStart: weekStart,
+      weekEnd: weekEnd,
+    );
     print('✅ Расписание сохранено в SQLite: ${schedule.length} шт');
   }
 
@@ -203,11 +212,21 @@ class OfflineStorageService {
         print('🗑️ Очищены оценки: ${allMarks.length} -> ${marksToKeep.length}');
       }
       
+      // ВАЖНО: раньше здесь вызывался saveSchedule(scheduleToKeep), который
+      // (до фикса) перезаписывал ВСЮ таблицу целиком — это работало только
+      // потому что saveSchedule стирал всё. Теперь saveSchedule чистит только
+      // диапазон дат, который ему передан, поэтому для чистки старых записей
+      // используем отдельный явный метод удаления по дате.
+      final accountId = await _getCurrentAccountId();
       final allSchedule = await getSchedule();
       if (allSchedule.length > _maxSchedule) {
-        final scheduleToKeep = allSchedule.sublist(allSchedule.length - _maxSchedule);
-        await saveSchedule(scheduleToKeep);
-        print('🗑️ Очищено расписание: ${allSchedule.length} -> ${scheduleToKeep.length}');
+        final sortedDates = allSchedule.map((e) => e.date).toList()..sort();
+        // Дата, начиная с которой оставляем данные (оставляем самые свежие _maxSchedule записей)
+        final cutoffIndex = allSchedule.length - _maxSchedule;
+        final cutoffDateStr = sortedDates[cutoffIndex];
+        final cutoffDate = DateTime.parse(cutoffDateStr);
+        final deleted = await _databaseFacade.deleteScheduleBefore(accountId, cutoffDate);
+        print('🗑️ Очищено расписание: удалено $deleted старых записей (было ${allSchedule.length})');
       }
       
       final allActivities = await getActivityRecords();

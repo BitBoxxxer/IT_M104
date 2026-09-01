@@ -4,6 +4,7 @@ import '../models/mark.dart';
 import '../models/user_data.dart';
 import '../screens/schedule_screen.dart';
 import 'data_manager.dart';
+import '../core/schedule_date_utils.dart';
 
 class DataProvider extends ChangeNotifier {
   final DataManager _dataManager = DataManager();

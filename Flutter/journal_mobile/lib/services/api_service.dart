@@ -21,6 +21,7 @@ import '../models/activity_record.dart';
 import '../models/_widgets/homework/homework.dart';
 import '../models/_widgets/homework/homework_counter.dart';
 import 'download_service.dart';
+import '../core/schedule_date_utils.dart';
 
 class CacheKeys {
   static const String marks = 'marks_cache';
@@ -385,6 +386,12 @@ class ApiService {
       () async {
         final accountId = await _getCurrentAccountId();
         final cacheKey = CacheKeys.getScheduleCacheKey(accountId, dateFrom, dateTo);
+
+        // Диапазон дат, за который реально запрашиваем расписание.
+        // Нужен, чтобы: 1) при сохранении чистить только эти дни (а не всю таблицу),
+        // 2) при офлайн-фолбэке брать только эти дни, а не вперемешку все недели.
+        final rangeStart = DateTime.parse(dateFrom);
+        final rangeEnd = DateTime.parse(dateTo);
         
         try {
           final response = await _makeRequest(
@@ -397,8 +404,14 @@ class ApiService {
                 .map((json) => ScheduleElement.fromJson(json as Map<String, dynamic>))
                 .toList();
             
-            // Сохраняем в SQLite
-            await _databaseFacade.saveSchedule(schedule, accountId);
+            // Сохраняем в SQLite, чистим только диапазон [dateFrom; dateTo],
+            // остальные ранее сохранённые недели не трогаем
+            await _databaseFacade.saveSchedule(
+              schedule,
+              accountId,
+              weekStart: rangeStart,
+              weekEnd: rangeEnd,
+            );
             
             // Кэшируем
             await _cacheRepository.save(
@@ -414,8 +427,13 @@ class ApiService {
           } else {
             print("Failed to load schedule: ${response.statusCode}");
             
-            // Пробуем из SQLite (все расписание)
-            final offlineSchedule = await _databaseFacade.getSchedule(accountId);
+            // Пробуем из SQLite, но только за запрошенный диапазон,
+            // а не всё расписание аккаунта разом
+            final offlineSchedule = await _databaseFacade.getScheduleByDateRange(
+              accountId,
+              rangeStart,
+              rangeEnd,
+            );
             if (offlineSchedule.isNotEmpty) {
               print('📱 Используем расписание из SQLite: ${offlineSchedule.length} шт');
               return offlineSchedule;
@@ -437,8 +455,12 @@ class ApiService {
             return cachedSchedule;
           }
           
-          // Пробуем из SQLite
-          final offlineSchedule = await _databaseFacade.getSchedule(accountId);
+          // Пробуем из SQLite за нужный диапазон
+          final offlineSchedule = await _databaseFacade.getScheduleByDateRange(
+            accountId,
+            rangeStart,
+            rangeEnd,
+          );
           if (offlineSchedule.isNotEmpty) {
             print('🗄️ Используем расписание из SQLite: ${offlineSchedule.length} шт');
             return offlineSchedule;
@@ -1171,7 +1193,9 @@ class ApiService {
       final sunday = getSunday(now);
       
       await getSchedule(token, formatDate(monday), formatDate(sunday)).then((schedule) async {
-        await _databaseFacade.saveSchedule(schedule, accountId);
+        // getSchedule() уже сохраняет расписание сам (с правильным диапазоном дат),
+        // повторное сохранение здесь было лишним и раньше маскировало баг
+        // (заодно затирало недели без диапазона) — убрано.
         print('✅ Расписание синхронизировано: ${schedule.length} шт');
       });
       
@@ -1319,19 +1343,5 @@ Future<File?> downloadStudentHomeworkFile(String token, Homework homework) async
 }
 }
 
-// Вспомогательные функции (оставить как есть)
-DateTime getMonday(DateTime date) {
-  final d = DateTime(date.year, date.month, date.day);
-  final day = d.weekday;
-  final diff = day - 1; 
-  return d.subtract(Duration(days: diff));
-}
-
-DateTime getSunday(DateTime date) {
-  final d = getMonday(date);
-  return d.add(const Duration(days: 6));
-}
-
-String formatDate(DateTime date) {
-  return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-}
+// Утилиты дат вынесены в core/schedule_date_utils.dart (см. импорт вверху файла),
+// чтобы не плодить рассинхронизирующиеся копии getMonday/getSunday/formatDate.

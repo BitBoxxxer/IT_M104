@@ -51,7 +51,15 @@ class AccountManagerService {
         }
       }
       
-      final existingIndex = allAccounts.indexWhere((a) => a.username == account.username);
+      // ВАЖНО: раньше сравнение было `existingAccount.username == account.username`
+      // (регистрозависимое). Но сервер, судя по всему, не различает регистр логина,
+      // а cleanupDuplicateAccounts() ниже уже считает "Ivan" и "ivan" дублями.
+      // Из-за этого расхождения при повторном логине с другим регистром букв
+      // создавался новый аккаунт вместо обновления существующего — отсюда и дубли,
+      // под которые потом пришлось городить cleanupDuplicateAccounts().
+      final existingIndex = allAccounts.indexWhere(
+        (a) => a.username.toLowerCase() == account.username.toLowerCase(),
+      );
       
       if (existingIndex >= 0) {
         final updatedAccount = account.copyWith(

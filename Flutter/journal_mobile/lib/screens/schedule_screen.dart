@@ -4,27 +4,14 @@ import 'package:intl/intl.dart';
 import '../models/_system/schedule_note.dart';
 import '../models/_widgets/note_dialog.dart';
 import '../services/_network/network_service.dart';
-import '../services/api_service.dart';
+import '../core/schedule_date_utils.dart';
 
 import '../models/days_element.dart';
 import '../services/schedule_note_service.dart';
+import '../services/data_manager.dart';
 
-DateTime getMonday(DateTime date) {
-  final d = DateTime(date.year, date.month, date.day);
-  final day = d.weekday;
-  final diff = day - 1; 
-  return d.subtract(Duration(days: diff));
-}
-
-DateTime getSunday(DateTime date) {
-  final d = getMonday(date);
-  return d.add(const Duration(days: 6));
-}
-
-// API (YYYY-MM-DD)
-String formatDate(DateTime date) {
-  return DateFormat('yyyy-MM-dd').format(date);
-}
+// getMonday/getSunday/formatDate теперь в core/schedule_date_utils.dart —
+// раньше тут была отдельная копия этих же функций.
 
 class ScheduleScreen extends StatefulWidget {
   final String token;
@@ -35,7 +22,12 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  final ApiService _apiService = ApiService();
+  // Раньше экран сам ходил в ApiService напрямую (network-first, без единого
+  // офлайн-слоя), из-за чего вёл себя иначе, чем остальное приложение,
+  // которое обновляется через DataManager (SQLite-first + фоновая синхронизация).
+  // Теперь расписание тоже идёт через DataManager — и по свежести данных,
+  // и по офлайн-логике экран одинаков с остальными.
+  final DataManager _dataManager = DataManager();
   final NetworkService _networkService = NetworkService();
   
   DateTime _currentDate = DateTime.now(); 
@@ -67,10 +59,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final monday = getMonday(_currentDate);
     final sunday = getSunday(_currentDate);
     
-    return _apiService.getSchedule(
-        widget.token,
-        formatDate(monday),
-        formatDate(sunday),
+    return _dataManager.getSchedule(
+        dateFrom: formatDate(monday),
+        dateTo: formatDate(sunday),
     );
   }
 
