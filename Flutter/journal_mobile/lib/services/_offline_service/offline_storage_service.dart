@@ -175,13 +175,25 @@ class OfflineStorageService {
     int? limit,
   }) async {
     final accountId = await _getCurrentAccountId();
-    return await _databaseFacade.getHomeworks(
+    final homeworks = await _databaseFacade.getHomeworks(
       accountId,
       materialType: type,
-      status: status,
-      page: page,
-      limit: limit,
+      limit: 10,
     );
+
+    final filtered = status == null
+        ? homeworks
+        : homeworks
+              .where((homework) => homework.getDisplayStatus() == status)
+              .toList();
+    if (page == null || limit == null) return filtered;
+
+    final start = (page - 1) * limit;
+    if (start >= filtered.length) return [];
+    final end = (start + limit) > filtered.length
+        ? filtered.length
+        : start + limit;
+    return filtered.sublist(start, end);
   }
 
   Future<void> saveHomeworkCounters(

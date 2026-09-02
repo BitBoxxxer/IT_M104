@@ -81,10 +81,18 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     _tabController = TabController(length: _tabs.length, vsync: this);
     _initializeTabStates();
     _tabController.addListener(_handleTabSelection);
-    _loadCounters();
+    _initializeAndLoadData();
+  }
 
-    String initialStatus = _tabs[_currentTabIndex]['status'];
-    _loadHomeworksForTab(initialStatus);
+  Future<void> _initializeAndLoadData() async {
+    await _networkService.checkConnection();
+    if (!mounted) return;
+
+    await _loadCounters();
+    if (!mounted) return;
+
+    final initialStatus = _tabs[_currentTabIndex]['status'];
+    await _loadHomeworksForTab(initialStatus);
   }
 
   @override
@@ -141,12 +149,12 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
 
       await Future.delayed(const Duration(milliseconds: 300));
 
-      final homeworks = !_networkService.isConnected
+      final isOffline = !_networkService.isConnected;
+      final homeworks = isOffline
           ? await _offlineStorageService.getHomeworks(
               type: type,
               status: statusParam,
-              page: _tabCurrentPages[tabStatus]!,
-              limit: 6,
+              limit: 10,
             )
           : await _apiService.getHomeworks(
               widget.token,
@@ -155,7 +163,12 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
               status: statusParam,
             );
 
-      _updateHomeworksState(tabStatus, homeworks, loadMore);
+      _updateHomeworksState(
+        tabStatus,
+        homeworks,
+        isOffline ? false : loadMore,
+        isOffline: isOffline,
+      );
     } catch (e) {
       _setErrorState(tabStatus, e.toString());
     }
@@ -182,7 +195,8 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
         final currentLoaded = _tabHomeworks[currentTabStatus]?.length ?? 0;
         final totalCount = _getTotalCountByStatus(currentTabStatus);
 
-        _tabHasMoreData[currentTabStatus] = currentLoaded < totalCount;
+        _tabHasMoreData[currentTabStatus] =
+            _networkService.isConnected && currentLoaded < totalCount;
 
         print(
           '📊 Счетчики обновлены: $currentTabStatus - загружено $currentLoaded из $totalCount, hasMore: ${_tabHasMoreData[currentTabStatus]}',
@@ -225,6 +239,10 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
   }
 
   Future<void> _loadMoreData(String tabStatus) async {
+    if (!_networkService.isConnected) {
+      return;
+    }
+
     print(
       '🔄 loadMoreData для $tabStatus, currentPage: ${_tabCurrentPages[tabStatus]}, hasMore: ${_tabHasMoreData[tabStatus]}, isLoadingMore: ${_tabIsLoadingMore[tabStatus]}',
     );
@@ -306,14 +324,22 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
   void _updateHomeworksState(
     String tabStatus,
     List<Homework> homeworks,
-    bool loadMore,
-  ) {
+    bool loadMore, {
+    bool isOffline = false,
+  }) {
     setState(() {
       final totalCountByStatus = _getTotalCountByStatus(tabStatus);
 
       if (!loadMore) {
         _tabHomeworks[tabStatus] = homeworks;
         _tabCurrentPages[tabStatus] = 1;
+
+        if (isOffline) {
+          _tabHasMoreData[tabStatus] = false;
+          _tabIsLoading[tabStatus] = false;
+          _tabIsLoadingMore[tabStatus] = false;
+          return;
+        }
 
         final loadedCount = homeworks.length;
         final totalCount = totalCountByStatus;

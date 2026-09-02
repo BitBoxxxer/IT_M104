@@ -147,11 +147,27 @@ class HomeworkRepository extends BaseRepository<Homework> {
           AND row_id NOT IN (
             SELECT row_id FROM $tableName
             WHERE account_id = ? AND material_type = ?
-            ORDER BY completion_time DESC, id DESC
+            ORDER BY
+              CASE
+                WHEN completion_time < ?
+                  AND (homework_stud IS NULL OR homework_stud = '')
+                  AND status NOT IN (1, 2, 5)
+                  AND common_status NOT IN (1, 2, 5)
+                THEN 0
+                ELSE 1
+              END,
+              completion_time DESC,
+              id DESC
             LIMIT 10
           )
       ''',
-        [accountId, materialType, accountId, materialType],
+        [
+          accountId,
+          materialType,
+          accountId,
+          materialType,
+          DateTime.now().millisecondsSinceEpoch,
+        ],
       );
     }
 

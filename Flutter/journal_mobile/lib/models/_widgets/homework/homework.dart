@@ -54,22 +54,24 @@ class Homework {
     return Homework(
       id: json['id'] ?? 0,
       teacherWorkId: json['teacher'] ?? json['id'] ?? 0,
-      subjectName: json['name_spec'] ??'Не указано',
+      subjectName: json['name_spec'] ?? 'Не указано',
       theme: json['theme'] ?? 'Без темы',
       description: json['comment']?.toString(),
       creationTime: parseDate(json['creation_time']),
       completionTime: parseDate(json['completion_time']),
-      overdueTime: json['overdue_time'] != null ? parseDate(json['overdue_time']) : null,
+      overdueTime: json['overdue_time'] != null
+          ? parseDate(json['overdue_time'])
+          : null,
       filename: json['filename']?.toString(),
       filePath: json['file_path']?.toString(),
       comment: json['comment']?.toString(),
       status: json['status'] ?? 0,
       commonStatus: json['common_status'] ?? 0,
-      homeworkStud: json['homework_stud'] != null 
-          ? HomeworkStud.fromJson(json['homework_stud']) 
+      homeworkStud: json['homework_stud'] != null
+          ? HomeworkStud.fromJson(json['homework_stud'])
           : null,
-      homeworkComment: json['homework_comment'] != null 
-          ? HomeworkComment.fromJson(json['homework_comment']) 
+      homeworkComment: json['homework_comment'] != null
+          ? HomeworkComment.fromJson(json['homework_comment'])
           : null,
       coverImage: json['cover_image']?.toString(),
       teacherName: json['fio_teach'] ?? 'Не указан',
@@ -85,8 +87,9 @@ class Homework {
   bool get isDeletedStatus => getRealStatus() == 5;
 
   bool get hasAttachment => filename != null && filename!.isNotEmpty;
-  String? get downloadUrl => filePath != null ? _buildDownloadUrl(filePath!) : null;
-  
+  String? get downloadUrl =>
+      filePath != null ? _buildDownloadUrl(filePath!) : null;
+
   String _buildDownloadUrl(String filePath) {
     if (filePath.startsWith('http')) {
       return filePath;
@@ -95,33 +98,39 @@ class Homework {
     }
   }
 
-String? get studentDownloadUrl {
-  if (homeworkStud?.filePath != null && homeworkStud!.filePath!.isNotEmpty) {
-    return _buildDownloadUrl(homeworkStud!.filePath!);
+  String? get studentDownloadUrl {
+    if (homeworkStud?.filePath != null && homeworkStud!.filePath!.isNotEmpty) {
+      return _buildDownloadUrl(homeworkStud!.filePath!);
+    }
+    return null;
   }
-  return null;
-}
 
-String? get studentFilename => homeworkStud?.filename;
+  String? get studentFilename => homeworkStud?.filename;
 
   int getRealStatus() {
     if (isDeleted == true) {
       return 5; // DELETED
     }
-    
+
     if (status == 5 || commonStatus == 5) {
       return 5;
     }
-    
-    if (theme.toLowerCase().contains('удален') || 
+
+    if (theme.toLowerCase().contains('удален') ||
         (description?.toLowerCase().contains('удален') == true)) {
       return 5;
+    }
+
+    // The API status is authoritative. Without this, a submitted file on an
+    // overdue assignment incorrectly moves it to the inspection/done tab.
+    if (status >= 0 && status <= 3) {
+      return status;
     }
 
     if (homeworkStud?.mark != null) {
       return 1;
     }
-    
+
     if (homeworkStud != null) {
       return 2;
     }
@@ -129,10 +138,10 @@ String? get studentFilename => homeworkStud?.filename;
     if (DateTime.now().isAfter(completionTime)) {
       return 0;
     }
-    
+
     return 3;
   }
-  
+
   int getDisplayStatus() {
     final realStatus = getRealStatus();
     if (realStatus == 5) {
@@ -143,12 +152,18 @@ String? get studentFilename => homeworkStud?.filename;
 
   String get statusString {
     switch (getRealStatus()) {
-      case 0: return 'expired';
-      case 1: return 'done';
-      case 2: return 'inspection';
-      case 3: return 'opened';
-      case 5: return 'deleted';
-      default: return 'unknown';
+      case 0:
+        return 'expired';
+      case 1:
+        return 'done';
+      case 2:
+        return 'inspection';
+      case 3:
+        return 'opened';
+      case 5:
+        return 'deleted';
+      default:
+        return 'unknown';
     }
   }
 
@@ -181,7 +196,7 @@ String? get studentFilename => homeworkStud?.filename;
     if (filename != null && filename!.isNotEmpty) {
       return filename;
     }
-    
+
     if (filePath != null && filePath!.isNotEmpty) {
       final uri = Uri.parse(filePath!);
       final pathSegments = uri.pathSegments;
@@ -189,7 +204,7 @@ String? get studentFilename => homeworkStud?.filename;
         return pathSegments.last;
       }
     }
-    
+
     return 'homework_$id';
   }
 
@@ -197,7 +212,7 @@ String? get studentFilename => homeworkStud?.filename;
     if (homeworkStud?.filename != null && homeworkStud!.filename!.isNotEmpty) {
       return homeworkStud!.filename;
     }
-    
+
     if (homeworkStud?.filePath != null && homeworkStud!.filePath!.isNotEmpty) {
       final uri = Uri.parse(homeworkStud!.filePath!);
       final pathSegments = uri.pathSegments;
@@ -205,7 +220,7 @@ String? get studentFilename => homeworkStud?.filename;
         return pathSegments.last;
       }
     }
-    
+
     return homeworkStud != null ? 'student_work_$id' : null;
   }
 }
@@ -238,9 +253,13 @@ class HomeworkStud {
       answerText: json['stud_answer']?.toString(),
       filePath: json['file_path']?.toString(),
       tmpfile: json['tmp_file']?.toString(),
-      mark: json['mark'] != null ? double.tryParse(json['mark'].toString()) : null,
+      mark: json['mark'] != null
+          ? double.tryParse(json['mark'].toString())
+          : null,
       autoMark: json['auto_mark'] == true,
-      creationTime: DateTime.parse(json['creation_time'] ?? DateTime.now().toString()),
+      creationTime: DateTime.parse(
+        json['creation_time'] ?? DateTime.now().toString(),
+      ),
     );
   }
 
@@ -276,7 +295,9 @@ class HomeworkComment {
       textComment: json['text_comment'] ?? '',
       attachment: json['attachment']?.toString(),
       attachmentPath: json['attachment_path']?.toString(),
-      dateUpdated: DateTime.parse(json['date_updated'] ?? DateTime.now().toString()),
+      dateUpdated: DateTime.parse(
+        json['date_updated'] ?? DateTime.now().toString(),
+      ),
     );
   }
 
