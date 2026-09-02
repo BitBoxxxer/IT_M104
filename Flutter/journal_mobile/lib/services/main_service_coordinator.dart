@@ -3,18 +3,34 @@ import 'package:journal_mobile/services/data_manager.dart';
 
 import 'api_service.dart';
 import '_notification/notification_service.dart';
+import '_network/network_service.dart';
 
 class ServiceCoordinator {
   final NotificationService _notificationService = NotificationService();
   final ApiService _apiService = ApiService();
   final DataManager _dataManager = DataManager();
+  final NetworkService _networkService = NetworkService();
   
   Timer? _syncTimer;
+  StreamSubscription<void>? _reconnectSubscription;
   bool _servicesRunning = false;
   String? _currentToken;
   
   Future<void> startBackgroundServices(String token) async {
-    if (_servicesRunning) return;
+    if (_servicesRunning) {
+      // ВАЖНО: раньше повторный вызов при уже "запущенных" сервисах просто
+      // игнорировался — даже если токен принадлежит ДРУГОМУ (только что
+      // выбранному/добавленному) аккаунту. Из-за этого после переключения
+      // между аккаунтами без полного перезапуска приложения фоновая
+      // синхронизация и hot-refresh при восстановлении сети продолжали
+      // тихо работать с токеном СТАРОГО аккаунта, а токен нового аккаунта
+      // никогда не подхватывался — это одна из причин "не может зайти
+      // во второй аккаунт" (по факту заходит, но фон продолжает жить
+      // прошлым аккаунтом).
+      if (_currentToken == token) return;
+      print('🔁 Токен сменился — перезапускаем фоновые сервисы для другого аккаунта');
+      await stopBackgroundServices();
+    }
     
     _servicesRunning = true;
     _currentToken = token;
@@ -30,12 +46,29 @@ class ServiceCoordinator {
       }
       
       _startBackgroundSync(token);
+      _listenForReconnect(token);
       
       print('✅ Сервисы запущены (SQLite готов)');
     } catch (e) {
       print('❌ Ошибка запуска сервисов: $e');
       _servicesRunning = false;
     }
+  }
+
+  /// "Hot refresh": раньше при восстановлении сети приложение просто молча
+  /// ждало следующего таймера фоновой синхронизации (до 30 минут) или
+  /// возврата пользователя из фона. Теперь NetworkService реально проверяет
+  /// доступность сервера (не только интерфейс), и в момент подтверждённого
+  /// перехода offline -> online мы сразу подтягиваем свежие данные.
+  void _listenForReconnect(String token) {
+    _reconnectSubscription?.cancel();
+    _reconnectSubscription = _networkService.onReconnected.listen((_) {
+      if (!_servicesRunning || _currentToken == null) return;
+      print('🌐 Сеть восстановлена — hot refresh данных');
+      manualSync(_currentToken!).catchError((e) {
+        print('⚠️ Hot refresh после восстановления сети не удался: $e');
+      });
+    });
   }
   
    void _startBackgroundSync(String token) {
@@ -60,6 +93,8 @@ class ServiceCoordinator {
     
     _syncTimer?.cancel();
     _syncTimer = null;
+    _reconnectSubscription?.cancel();
+    _reconnectSubscription = null;
     
     _servicesRunning = false;
     _currentToken = null;

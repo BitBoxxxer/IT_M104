@@ -8,6 +8,7 @@ import '../services/_network/network_service.dart';
 import '../services/api_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/url_launcher_service.dart';
+import '../services/main_service_coordinator.dart';
 
 import 'menu_screen.dart';
 
@@ -33,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _urlLauncher = UrlLauncherService();
   final NetworkService _networkService = NetworkService();
   final AccountManagerService _accountManager = AccountManagerService();
+  final ServiceCoordinator _serviceCoordinator = ServiceCoordinator();
 
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -401,7 +403,19 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
       
-      final credentials = await _secureStorage.getAccountCredentials(account.id);
+      // ВАЖНО: раньше здесь читали через SecureStorageService.getAccountCredentials(),
+      // а сохраняются учётки через AccountManagerService.saveAccountCredentials() —
+      // это ДВА РАЗНЫХ сервиса с ДВУМЯ РАЗНЫМИ схемами ключей в secure storage
+      // ('username_$id'/'password_$id' vs 'acc_${id}_username'/'acc_${id}_password').
+      // Из-за этого сохранённый пароль для аккаунта никогда не находился здесь —
+      // всегда приходили null/null. Для основного аккаунта это не так заметно
+      // (токен обновляется при обычном логине), а вот при переключении на ВТОРОЙ,
+      // не так часто используемый аккаунт, когда его токен успевал протухнуть,
+      // тихий перелогин по сохранённому паролю просто не мог найти пароль и
+      // либо падал, либо неожиданно требовал ввести пароль заново — это и
+      // выглядело как "не могу зайти во второй аккаунт". Теперь читаем через
+      // тот же сервис, который их сохраняет.
+      final credentials = await _accountManager.getAccountCredentials(account.id);
       final username = credentials['username'];
       final password = credentials['password'];
       
@@ -609,6 +623,14 @@ Future<String?> _requestPasswordForAccount(Account account) async {
               );
             }
           });
+
+          // ВАЖНО: раньше фоновые сервисы (периодическая синхронизация,
+          // hot-refresh при восстановлении сети) запускались только один
+          // раз при холодном старте приложения (см. main.dart). При входе
+          // в другой аккаунт БЕЗ перезапуска приложения они никогда не
+          // подхватывали токен нового аккаунта. Теперь перезапускаем их
+          // явно с актуальным токеном сразу после успешного логина.
+          _serviceCoordinator.startBackgroundServices(token);
 
           _navigateToMainMenu(token, isOffline: false);
         } else {

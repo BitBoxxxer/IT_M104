@@ -157,7 +157,17 @@ class HomeworkRepository extends BaseRepository<Homework> {
       whereArgs.add(status);
     }
 
-    queryBuilder.write(' AND (is_deleted IS NULL OR is_deleted = 0)');
+    // ВАЖНО: раньше это условие стояло безусловно и исключало удалённые
+    // задания из ЛЮБОЙ офлайн-выборки — в том числе когда сам экран явно
+    // просил status=5 (вкладка "Удалённые" в homework_list_screen.dart,
+    // см. _getStatusParam). Из-за этого вкладка "Удалённые" в офлайн-режиме
+    // была гарантированно пустой всегда. Теперь исключаем удалённые только
+    // если явно не запрашивали именно их (5 = статус "удалено", тот же код,
+    // что и в _getStatusParam на экране).
+    const deletedStatus = 5;
+    if (status != deletedStatus) {
+      queryBuilder.write(' AND (is_deleted IS NULL OR is_deleted = 0)');
+    }
 
     String orderBy = 'completion_time ASC';
     String limitClause = '';

@@ -6,11 +6,13 @@ import 'homework.dart';
 class HomeworkCard extends StatelessWidget {
   final Homework homework;
   final Function(Homework, bool)? onDownloadRequested;
+  final bool isOffline;
 
   const HomeworkCard({
     super.key,
     required this.homework,
     this.onDownloadRequested,
+    this.isOffline = false,
   });
 
   @override
@@ -300,15 +302,18 @@ class HomeworkCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: OutlinedButton.icon(
-        onPressed: () {
+        // Раньше в офлайне кнопка выглядела как рабочая, но по нажатию либо
+        // молча ничего не делала, либо падала на попытке реального сетевого
+        // запроса. Теперь честно отключаем её и объясняем почему.
+        onPressed: isOffline ? null : () {
           _downloadStudentFile();
         },
-        icon: const Icon(Icons.download_done, size: 16),
-        label: Text(_getStudentDownloadButtonText()),
+        icon: Icon(isOffline ? Icons.cloud_off : Icons.download_done, size: 16),
+        label: Text(isOffline ? 'Скачивание недоступно офлайн' : _getStudentDownloadButtonText()),
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.teal,
-          side: const BorderSide(color: Colors.teal),
-          backgroundColor: Colors.teal.withOpacity(0.05),
+          foregroundColor: isOffline ? Colors.grey : Colors.teal,
+          side: BorderSide(color: isOffline ? Colors.grey : Colors.teal),
+          backgroundColor: isOffline ? Colors.grey.withOpacity(0.05) : Colors.teal.withOpacity(0.05),
         ),
       ),
     );
@@ -318,14 +323,14 @@ class HomeworkCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: OutlinedButton.icon(
-        onPressed: () {
+        onPressed: isOffline ? null : () {
           _downloadTeacherFile();
         },
-        icon: const Icon(Icons.download, size: 16),
-        label: Text(_getDownloadButtonText()),
+        icon: Icon(isOffline ? Icons.cloud_off : Icons.download, size: 16),
+        label: Text(isOffline ? 'Скачивание недоступно офлайн' : _getDownloadButtonText()),
         style: OutlinedButton.styleFrom(
-          foregroundColor: statusColor,
-          side: BorderSide(color: statusColor),
+          foregroundColor: isOffline ? Colors.grey : statusColor,
+          side: BorderSide(color: isOffline ? Colors.grey : statusColor),
         ),
       ),
     );

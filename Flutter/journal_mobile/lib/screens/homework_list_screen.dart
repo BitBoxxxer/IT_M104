@@ -400,30 +400,38 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: _tabs.asMap().entries.map((entry) {
-          final tabIndex = entry.key;
-          final tabStatus = entry.value['status'];
-          
-          return HomeworkContent(
-            tabStatus: tabStatus,
-            homeworks: _tabHomeworks[tabStatus] ?? [],
-            isLoading: _tabIsLoading[tabStatus]!,
-            isLoadingMore: _tabIsLoadingMore[tabStatus]!,
-            hasMoreData: _tabHasMoreData[tabStatus]!,
-            errorMessage: _tabErrorMessages[tabStatus]!,
-            currentPage: _tabCurrentPages[tabStatus]!,
-            getCounterByStatus: _getCounterByStatus,
-            getCounterForDeletedTab: _getCounterForDeletedTab,
-            onRefresh: _refreshData,
-            onLoadMore: () => _loadMoreData(tabStatus),
-            tabData: _tabs[tabIndex],
-            onDownloadRequested: (homework, isStudentFile) {
-              _downloadHomeworkFile(homework, isStudentFile);
-            },
+      body: StreamBuilder<bool>(
+        stream: _networkService.connectionStream,
+        initialData: _networkService.isConnected,
+        builder: (context, connSnapshot) {
+          final isOffline = !(connSnapshot.data ?? true);
+          return TabBarView(
+            controller: _tabController,
+            children: _tabs.asMap().entries.map((entry) {
+              final tabIndex = entry.key;
+              final tabStatus = entry.value['status'];
+              
+              return HomeworkContent(
+                tabStatus: tabStatus,
+                homeworks: _tabHomeworks[tabStatus] ?? [],
+                isLoading: _tabIsLoading[tabStatus]!,
+                isLoadingMore: _tabIsLoadingMore[tabStatus]!,
+                hasMoreData: _tabHasMoreData[tabStatus]!,
+                errorMessage: _tabErrorMessages[tabStatus]!,
+                currentPage: _tabCurrentPages[tabStatus]!,
+                getCounterByStatus: _getCounterByStatus,
+                getCounterForDeletedTab: _getCounterForDeletedTab,
+                onRefresh: _refreshData,
+                onLoadMore: () => _loadMoreData(tabStatus),
+                tabData: _tabs[tabIndex],
+                isOffline: isOffline,
+                onDownloadRequested: isOffline ? null : (homework, isStudentFile) {
+                  _downloadHomeworkFile(homework, isStudentFile);
+                },
+              );
+            }).toList(),
           );
-        }).toList(),
+        },
       ),
     );
   }

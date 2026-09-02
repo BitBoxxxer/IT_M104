@@ -906,86 +906,127 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                           ),
                           IntrinsicHeight(
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Card(
-                                elevation: 4,
-                                margin: const EdgeInsets.all(8),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    children: [
-                                      const Text(
-                                        'Посещение',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                        children: [
-                                          Column(
-                                            spacing: 10,
-                                            children: [
-                                                _buildAttendanceLegendItem(
-                                              const Color.fromARGB(255, 0, 0, 0), 
-                                              'Всего', 
-                                              attendance['total']?.toInt() ?? 0
+                              // ВАЖНО: раньше обе карточки сидели в обычном Row без Expanded,
+                              // и лезли за границы экрана, потому что внутренний Row с
+                              // spacing: 25 требовал больше ширины, чем есть у экрана
+                              // ("СР. ОЦЕНКИ" на самом деле — вот эта карточка справа).
+                              // Expanded гарантирует, что обе карточки честно делят ширину
+                              // экрана пополам и никогда не вылезут за края.
+                              Expanded(
+                                child: Card(
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  margin: const EdgeInsets.all(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.event_available_outlined, size: 16, color: Colors.grey.shade700),
+                                            const SizedBox(width: 6),
+                                            const Text(
+                                              'Посещение',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
                                               ),
-                                              Row(
-                                                spacing: 25,
-                                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                                children: [
-                                                  _buildAttendanceLegendItem(
-                                                    Colors.green, 
-                                                    'Посещено', 
-                                                    attendance['attended']?.toInt() ?? 0
-                                                  ),
-                                                  _buildAttendanceLegendItem(
-                                                    Colors.orange, 
-                                                    'Опоздания', 
-                                                    attendance['late']?.toInt() ?? 0
-                                                  ),
-                                                  _buildAttendanceLegendItem(
-                                                    Colors.red, 
-                                                    'Пропуски', 
-                                                    attendance['missed']?.toInt() ?? 0
-                                                  ),
-                                                ],
-                                              )
-                                            ],
-                                          )
-                                        ],
-                                      ),
-                                    ],
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${attendance['total']?.toInt() ?? 0}',
+                                          style: const TextStyle(
+                                            fontSize: 26,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const Text(
+                                          'занятий всего',
+                                          style: TextStyle(fontSize: 11, color: Colors.black54),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        // Wrap вместо Row: если не влезает по ширине — переносится
+                                        // на следующую строку, а не вылезает за карточку.
+                                        Wrap(
+                                          alignment: WrapAlignment.center,
+                                          spacing: 10,
+                                          runSpacing: 6,
+                                          children: [
+                                            _buildAttendanceLegendItem(
+                                              Colors.green,
+                                              'Посещено',
+                                              attendance['attended']?.toInt() ?? 0,
+                                            ),
+                                            _buildAttendanceLegendItem(
+                                              Colors.orange,
+                                              'Опоздания',
+                                              attendance['late']?.toInt() ?? 0,
+                                            ),
+                                            _buildAttendanceLegendItem(
+                                              Colors.red,
+                                              'Пропуски',
+                                              attendance['missed']?.toInt() ?? 0,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                              Card(
-                                elevation: 4,
-                                margin: const EdgeInsets.all(8),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    children: [
-                                      const Text(
-                                        'Ср. Оценка',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
+                              Expanded(
+                                child: Card(
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  margin: const EdgeInsets.all(6),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.school_outlined, size: 16, color: Colors.grey.shade700),
+                                            const SizedBox(width: 6),
+                                            const Text(
+                                              'Ср. оценка',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                      const SizedBox(height: 35),
-                                      Row(
-                                        children: [
-                                          _buildLegendItemWithValue(Colors.blue, 'Общая', averages['overall'] ?? 0.0),
-                                        ],
-                                      ),
-                                    ],
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          (averages['overall'] ?? 0.0) > 0
+                                              ? (averages['overall'] ?? 0.0).toStringAsFixed(1)
+                                              : 'Н/Д',
+                                          style: TextStyle(
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.blue.shade700,
+                                          ),
+                                        ),
+                                        const Text(
+                                          'общий балл',
+                                          style: TextStyle(fontSize: 11, color: Colors.black54),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-
                               ),
                             ]
                           ),
