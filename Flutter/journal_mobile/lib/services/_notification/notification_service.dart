@@ -228,18 +228,13 @@ class NotificationService {
 
   Future<void> openAppNotificationSettings() async {
     try {
-      print('Opening notification settings...');
+      const platform = MethodChannel('notification_settings_channel');
+      final opened = await platform.invokeMethod<bool>('openNotificationSettings');
+      if (opened == true) return;
       await AppSettings.openAppSettings();
-      print('Notification settings opened successfully');
     } catch (e) {
       print('Error opening notification settings: $e');
-      try {
-        await AppSettings.openAppSettings();
-        print('Fallback: App settings opened successfully');
-      } catch (fallbackError) {
-        print('Error opening app settings: $fallbackError');
-        throw fallbackError;
-      }
+      await AppSettings.openAppSettings();
     }
   }
 

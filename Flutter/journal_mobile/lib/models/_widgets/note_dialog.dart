@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:glassmorphic_ui/glassmorphic_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:journal_mobile/services/schedule_note_service.dart';
 
 import '../_system/schedule_note.dart';
+import '../_system/futuristic_theme.dart';
 
 class NoteDialog extends StatefulWidget {
   final DateTime date;
@@ -181,24 +183,46 @@ class _NoteDialogState extends State<NoteDialog> {
   
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(
-        widget.existingNote != null ? 'Редактировать заметку' : 'Новая заметка',
-      ),
-      content: SingleChildScrollView(
-        child: Column(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      child: GlassContainer(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+        borderRadius: const BorderRadius.all(Radius.circular(24)),
+        tintColor: isDark ? FuturisticColors.cyan : const Color(0xFF087F9B),
+        tintOpacity: isDark ? 0.12 : 0.08,
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              DateFormat('dd.MM.yyyy (EEEE)', 'ru_RU').format(widget.date),
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            Row(
+              children: [
+                Icon(Icons.edit_note, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    widget.existingNote != null ? 'Редактировать заметку' : 'Новая заметка',
+                    style: futTitle.copyWith(fontSize: 19),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                DateFormat('dd.MM.yyyy (EEEE)', 'ru_RU').format(widget.date),
+                style: futMuted,
+              ),
             ),
             const SizedBox(height: 16),
             
             // Выбор цвета
             Row(
               children: [
-                const Text('Цвет заметки:'),
+                Text('Цвет заметки:', style: futHeading.copyWith(fontSize: 14)),
                 const SizedBox(width: 10),
                 GestureDetector(
                   onTap: () {
@@ -240,14 +264,11 @@ class _NoteDialogState extends State<NoteDialog> {
             const SizedBox(height: 16),
             
             // Текст заметки
-            TextField(
+            GlassTextField(
               controller: _textController,
               maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Текст заметки',
-                border: OutlineInputBorder(),
-                hintText: 'Введите вашу заметку...',
-              ),
+              hintText: 'Текст заметки...',
+              prefixIcon: Icons.notes,
             ),
             const SizedBox(height: 16),
             
@@ -260,7 +281,7 @@ class _NoteDialogState extends State<NoteDialog> {
                     setState(() => _reminderEnabled = value ?? false);
                   },
                 ),
-                const Text('Напоминание'),
+                Text('Напоминание', style: futHeading.copyWith(fontSize: 14)),
               ],
             ),
             
@@ -285,26 +306,31 @@ class _NoteDialogState extends State<NoteDialog> {
                 ],
               ),
             ],
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (widget.existingNote != null) ...[
+                  TextButton(
+                    onPressed: _deleteNote,
+                    child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Отмена'),
+                ),
+                const SizedBox(width: 8),
+                GlassButton(
+                  onPressed: _saveNote,
+                  child: const Text('Сохранить'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
-      actions: [
-        if (widget.existingNote != null) ...[
-          TextButton(
-            onPressed: _deleteNote,
-            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
-          ),
-          const SizedBox(width: 8),
-        ],
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Отмена'),
-        ),
-        ElevatedButton(
-          onPressed: _saveNote,
-          child: const Text('Сохранить'),
-        ),
-      ],
-    );
+    ));
   }
 }
