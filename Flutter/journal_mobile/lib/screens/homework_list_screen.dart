@@ -43,11 +43,36 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
   int _currentTabIndex = 0;
 
   final List<Map<String, dynamic>> _tabs = [
-    {'label': 'Активные', 'status': 'opened', 'icon': Icons.assignment, 'counterType': HomeworkCounter.HOMEWORK_STATUS_OPENED},
-    {'label': 'На проверке', 'status': 'inspection', 'icon': Icons.hourglass_top, 'counterType': HomeworkCounter.HOMEWORK_STATUS_INSPECTION},
-    {'label': 'Проверенные', 'status': 'done', 'icon': Icons.check_circle, 'counterType': HomeworkCounter.HOMEWORK_STATUS_DONE},
-    {'label': 'Просроченные', 'status': 'expired', 'icon': Icons.warning, 'counterType': HomeworkCounter.HOMEWORK_STATUS_EXPIRED},
-    {'label': 'Удаленные', 'status': 'deleted', 'icon': Icons.delete, 'counterType': HomeworkCounter.HOMEWORK_STATUS_DELETED},
+    {
+      'label': 'Активные',
+      'status': 'opened',
+      'icon': Icons.assignment,
+      'counterType': HomeworkCounter.HOMEWORK_STATUS_OPENED,
+    },
+    {
+      'label': 'На проверке',
+      'status': 'inspection',
+      'icon': Icons.hourglass_top,
+      'counterType': HomeworkCounter.HOMEWORK_STATUS_INSPECTION,
+    },
+    {
+      'label': 'Проверенные',
+      'status': 'done',
+      'icon': Icons.check_circle,
+      'counterType': HomeworkCounter.HOMEWORK_STATUS_DONE,
+    },
+    {
+      'label': 'Просроченные',
+      'status': 'expired',
+      'icon': Icons.warning,
+      'counterType': HomeworkCounter.HOMEWORK_STATUS_EXPIRED,
+    },
+    {
+      'label': 'Удаленные',
+      'status': 'deleted',
+      'icon': Icons.delete,
+      'counterType': HomeworkCounter.HOMEWORK_STATUS_DELETED,
+    },
   ];
 
   @override
@@ -58,12 +83,6 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     _tabController.addListener(_handleTabSelection);
     _loadCounters();
 
-    if (widget.isLabWork) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _offlineStorageService.syncLabWorks(widget.token);
-      });
-    }
-    
     String initialStatus = _tabs[_currentTabIndex]['status'];
     _loadHomeworksForTab(initialStatus);
   }
@@ -91,7 +110,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
       setState(() {
         _currentTabIndex = _tabController.index;
       });
-      
+
       String newTabStatus = _tabs[_currentTabIndex]['status'];
       _loadCounters();
 
@@ -99,9 +118,9 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
         _loadCounters();
       }
       _loadCounters();
-      
-      if (_tabHomeworks[newTabStatus]!.isEmpty && 
-          !_tabIsLoading[newTabStatus]! && 
+
+      if (_tabHomeworks[newTabStatus]!.isEmpty &&
+          !_tabIsLoading[newTabStatus]! &&
           _tabErrorMessages[newTabStatus]!.isEmpty) {
         _loadHomeworksForTab(newTabStatus);
       }
@@ -110,21 +129,31 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
 
   String get _currentFilterStatus => _tabs[_currentTabIndex]['status'];
 
-  Future<void> _loadHomeworksForTab(String tabStatus, {bool loadMore = false}) async {
+  Future<void> _loadHomeworksForTab(
+    String tabStatus, {
+    bool loadMore = false,
+  }) async {
     try {
       _setLoadingState(tabStatus, loadMore);
-      
+
       final type = widget.isLabWork ? 1 : 0;
       final statusParam = _getStatusParam(tabStatus);
 
       await Future.delayed(const Duration(milliseconds: 300));
 
-      final homeworks = await _apiService.getHomeworks(
-        widget.token, 
-        type: type,
-        page: _tabCurrentPages[tabStatus]!,
-        status: statusParam,
-      );
+      final homeworks = !_networkService.isConnected
+          ? await _offlineStorageService.getHomeworks(
+              type: type,
+              status: statusParam,
+              page: _tabCurrentPages[tabStatus]!,
+              limit: 6,
+            )
+          : await _apiService.getHomeworks(
+              widget.token,
+              type: type,
+              page: _tabCurrentPages[tabStatus]!,
+              status: statusParam,
+            );
 
       _updateHomeworksState(tabStatus, homeworks, loadMore);
     } catch (e) {
@@ -135,23 +164,29 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
   Future<void> _loadCounters() async {
     try {
       final type = widget.isLabWork ? 1 : 0;
-      final counters = await _apiService.getHomeworkCounters(widget.token, type: type);
-      
+      final counters = !_networkService.isConnected
+          ? await _loadOfflineCounters(type)
+          : await _apiService.getHomeworkCounters(widget.token, type: type);
+
       print('📊 Загружены счетчики для типа $type:');
       for (var counter in counters) {
-        print('   - counterType: ${counter.counterType}, counter: ${counter.counter}');
+        print(
+          '   - counterType: ${counter.counterType}, counter: ${counter.counter}',
+        );
       }
-      
+
       setState(() {
         _counters = counters;
-        
+
         final currentTabStatus = _tabs[_currentTabIndex]['status'];
         final currentLoaded = _tabHomeworks[currentTabStatus]?.length ?? 0;
         final totalCount = _getTotalCountByStatus(currentTabStatus);
-        
+
         _tabHasMoreData[currentTabStatus] = currentLoaded < totalCount;
-        
-        print('📊 Счетчики обновлены: $currentTabStatus - загружено $currentLoaded из $totalCount, hasMore: ${_tabHasMoreData[currentTabStatus]}');
+
+        print(
+          '📊 Счетчики обновлены: $currentTabStatus - загружено $currentLoaded из $totalCount, hasMore: ${_tabHasMoreData[currentTabStatus]}',
+        );
       });
     } catch (e) {
       print("Error loading counters: $e");
@@ -159,6 +194,24 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
         _counters = [];
       });
     }
+  }
+
+  Future<List<HomeworkCounter>> _loadOfflineCounters(int type) async {
+    final homeworks = await _offlineStorageService.getHomeworks(
+      type: type,
+      limit: 10,
+    );
+    final counts = <int, int>{};
+    for (final homework in homeworks) {
+      final status = homework.getDisplayStatus();
+      counts[status] = (counts[status] ?? 0) + 1;
+    }
+    return counts.entries
+        .map(
+          (entry) =>
+              HomeworkCounter(counterType: entry.key, counter: entry.value),
+        )
+        .toList();
   }
 
   Future<void> _refreshData() async {
@@ -172,26 +225,32 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
   }
 
   Future<void> _loadMoreData(String tabStatus) async {
-    print('🔄 loadMoreData для $tabStatus, currentPage: ${_tabCurrentPages[tabStatus]}, hasMore: ${_tabHasMoreData[tabStatus]}, isLoadingMore: ${_tabIsLoadingMore[tabStatus]}');
-    
+    print(
+      '🔄 loadMoreData для $tabStatus, currentPage: ${_tabCurrentPages[tabStatus]}, hasMore: ${_tabHasMoreData[tabStatus]}, isLoadingMore: ${_tabIsLoadingMore[tabStatus]}',
+    );
+
     final currentTotal = _tabHomeworks[tabStatus]?.length ?? 0;
     final totalCountByStatus = _getTotalCountByStatus(tabStatus);
-    
-    if (_tabIsLoadingMore[tabStatus]! || 
+
+    if (_tabIsLoadingMore[tabStatus]! ||
         _tabIsLoading[tabStatus]! ||
         !_tabHasMoreData[tabStatus]! ||
         currentTotal >= totalCountByStatus) {
-      print('❌ Загрузка не требуется: currentTotal=$currentTotal, totalCount=$totalCountByStatus, hasMore=${_tabHasMoreData[tabStatus]}, isLoadingMore=${_tabIsLoadingMore[tabStatus]}');
+      print(
+        '❌ Загрузка не требуется: currentTotal=$currentTotal, totalCount=$totalCountByStatus, hasMore=${_tabHasMoreData[tabStatus]}, isLoadingMore=${_tabIsLoadingMore[tabStatus]}',
+      );
       return;
     }
-    
+
     setState(() {
       _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! + 1;
       _tabIsLoadingMore[tabStatus] = true;
     });
-    
-    print('📊 Увеличен номер страницы перед запросом: ${_tabCurrentPages[tabStatus]}');
-    
+
+    print(
+      '📊 Увеличен номер страницы перед запросом: ${_tabCurrentPages[tabStatus]}',
+    );
+
     try {
       await _loadHomeworksForTab(tabStatus, loadMore: true);
     } catch (e) {
@@ -219,9 +278,11 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
 
   int _getCounterForDeletedTab() {
     try {
-      final counter = _getCounterByStatus(HomeworkCounter.HOMEWORK_STATUS_DELETED);
+      final counter = _getCounterByStatus(
+        HomeworkCounter.HOMEWORK_STATUS_DELETED,
+      );
       if (counter > 0) return counter;
-      
+
       final deletedHomeworks = _tabHomeworks['deleted'] ?? [];
       return deletedHomeworks.isNotEmpty ? deletedHomeworks.length : 0;
     } catch (e) {
@@ -242,54 +303,71 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     });
   }
 
-  void _updateHomeworksState(String tabStatus, List<Homework> homeworks, bool loadMore) {
+  void _updateHomeworksState(
+    String tabStatus,
+    List<Homework> homeworks,
+    bool loadMore,
+  ) {
     setState(() {
       final totalCountByStatus = _getTotalCountByStatus(tabStatus);
-      
+
       if (!loadMore) {
         _tabHomeworks[tabStatus] = homeworks;
         _tabCurrentPages[tabStatus] = 1;
-        
+
         final loadedCount = homeworks.length;
         final totalCount = totalCountByStatus;
-        
+
         _tabHasMoreData[tabStatus] = loadedCount < totalCount;
-        print('📊 Первая загрузка $tabStatus: $loadedCount из $totalCount заданий, hasMore: ${_tabHasMoreData[tabStatus]}');
+        print(
+          '📊 Первая загрузка $tabStatus: $loadedCount из $totalCount заданий, hasMore: ${_tabHasMoreData[tabStatus]}',
+        );
       } else {
         final existingIds = _tabHomeworks[tabStatus]!.map((h) => h.id).toSet();
-        final uniqueNewHomeworks = homeworks.where((h) => !existingIds.contains(h.id)).toList();
-        
+        final uniqueNewHomeworks = homeworks
+            .where((h) => !existingIds.contains(h.id))
+            .toList();
+
         if (uniqueNewHomeworks.isNotEmpty) {
           _tabHomeworks[tabStatus]!.addAll(uniqueNewHomeworks);
-          print('📊 Добавлено ${uniqueNewHomeworks.length} уникальных заданий из ${homeworks.length} полученных');
+          print(
+            '📊 Добавлено ${uniqueNewHomeworks.length} уникальных заданий из ${homeworks.length} полученных',
+          );
         } else {
-          print('📊 Все ${homeworks.length} полученных заданий уже есть в списке');
+          print(
+            '📊 Все ${homeworks.length} полученных заданий уже есть в списке',
+          );
         }
-        
+
         final totalLoaded = _tabHomeworks[tabStatus]!.length;
         final totalCount = totalCountByStatus;
-        
+
         _tabHasMoreData[tabStatus] = totalLoaded < totalCount;
-        
+
         if (uniqueNewHomeworks.isEmpty) {
-          print('📊 Нет новых заданий, страница остаётся: ${_tabCurrentPages[tabStatus]}');
+          print(
+            '📊 Нет новых заданий, страница остаётся: ${_tabCurrentPages[tabStatus]}',
+          );
         }
-        
+
         if (!_tabHasMoreData[tabStatus]!) {
           print('📊 Все задания загружены: $totalLoaded из $totalCount');
         }
       }
-      
+
       _tabIsLoading[tabStatus] = false;
       _tabIsLoadingMore[tabStatus] = false;
-      
-      print('📊 Итог $tabStatus: всего ${_tabHomeworks[tabStatus]!.length} заданий, hasMore: ${_tabHasMoreData[tabStatus]}, page: ${_tabCurrentPages[tabStatus]}');
+
+      print(
+        '📊 Итог $tabStatus: всего ${_tabHomeworks[tabStatus]!.length} заданий, hasMore: ${_tabHasMoreData[tabStatus]}, page: ${_tabCurrentPages[tabStatus]}',
+      );
     });
   }
 
   void _setErrorState(String tabStatus, String error) {
     setState(() {
-      if (_tabIsLoadingMore[tabStatus] == true && _tabCurrentPages[tabStatus]! > 1) {
+      if (_tabIsLoadingMore[tabStatus] == true &&
+          _tabCurrentPages[tabStatus]! > 1) {
         _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! - 1;
       }
       _tabErrorMessages[tabStatus] = 'Ошибка загрузки: $error';
@@ -300,12 +378,18 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
 
   int? _getStatusParam(String tabStatus) {
     switch (tabStatus) {
-      case 'expired': return 0;
-      case 'done': return 1;
-      case 'inspection': return 2;
-      case 'opened': return 3;
-      case 'deleted': return 5;
-      default: return null;
+      case 'expired':
+        return 0;
+      case 'done':
+        return 1;
+      case 'inspection':
+        return 2;
+      case 'opened':
+        return 3;
+      case 'deleted':
+        return 5;
+      default:
+        return null;
     }
   }
 
@@ -326,17 +410,25 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
     }
   }
 
-  Future<void> _downloadHomeworkFile(Homework homework, bool isStudentFile) async {
+  Future<void> _downloadHomeworkFile(
+    Homework homework,
+    bool isStudentFile,
+  ) async {
     try {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Скачивание ${isStudentFile ? 'сданной работы' : 'задания'}...'),
+          content: Text(
+            'Скачивание ${isStudentFile ? 'сданной работы' : 'задания'}...',
+          ),
           duration: const Duration(seconds: 2),
         ),
       );
 
       final file = isStudentFile
-          ? await _apiService.downloadStudentHomeworkFile(widget.token, homework)
+          ? await _apiService.downloadStudentHomeworkFile(
+              widget.token,
+              homework,
+            )
           : await _apiService.downloadHomeworkFile(widget.token, homework);
 
       if (file != null) {
@@ -366,7 +458,9 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isLabWork ? 'Лабораторные работы' : 'Домашние задания'),
+        title: Text(
+          widget.isLabWork ? 'Лабораторные работы' : 'Домашние задания',
+        ),
         bottom: HomeworkTabBar(
           tabController: _tabController,
           tabs: _tabs,
@@ -375,27 +469,25 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
         ),
         actions: [
           StreamBuilder<bool>(
-              stream: _networkService.connectionStream,
-              initialData: _networkService.isConnected,
-              builder: (context, snapshot) {
-                final isConnected = snapshot.data ?? true;
-                
-                if (!isConnected) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: Icon(
-                      Icons.wifi_off,
-                      color: Colors.orange,
-                      size: 20,
-                    ),
-                  );
-                }
-                return SizedBox.shrink();
-              },
-            ),
+            stream: _networkService.connectionStream,
+            initialData: _networkService.isConnected,
+            builder: (context, snapshot) {
+              final isConnected = snapshot.data ?? true;
+
+              if (!isConnected) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Icon(Icons.wifi_off, color: Colors.orange, size: 20),
+                );
+              }
+              return SizedBox.shrink();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _tabIsLoading[_currentFilterStatus]! ? null : _refreshData,
+            onPressed: _tabIsLoading[_currentFilterStatus]!
+                ? null
+                : _refreshData,
             tooltip: 'Обновить',
           ),
         ],
@@ -410,7 +502,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
             children: _tabs.asMap().entries.map((entry) {
               final tabIndex = entry.key;
               final tabStatus = entry.value['status'];
-              
+
               return HomeworkContent(
                 tabStatus: tabStatus,
                 homeworks: _tabHomeworks[tabStatus] ?? [],
@@ -425,9 +517,11 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
                 onLoadMore: () => _loadMoreData(tabStatus),
                 tabData: _tabs[tabIndex],
                 isOffline: isOffline,
-                onDownloadRequested: isOffline ? null : (homework, isStudentFile) {
-                  _downloadHomeworkFile(homework, isStudentFile);
-                },
+                onDownloadRequested: isOffline
+                    ? null
+                    : (homework, isStudentFile) {
+                        _downloadHomeworkFile(homework, isStudentFile);
+                      },
               );
             }).toList(),
           );

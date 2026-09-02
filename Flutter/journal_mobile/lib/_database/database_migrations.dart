@@ -128,7 +128,8 @@ class DatabaseMigrations {
 
     await db.execute('''
       CREATE TABLE IF NOT EXISTS ${DatabaseConfig.tableHomeworks} (
-        id INTEGER PRIMARY KEY,
+        row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER NOT NULL,
         account_id TEXT NOT NULL,
         teacher_work_id INTEGER,
         teacher_name TEXT,
@@ -236,7 +237,11 @@ class DatabaseMigrations {
     ''');
   }
 
-  static Future<void> upgradeDatabase(Database db, int oldVersion, int newVersion) async {
+  static Future<void> upgradeDatabase(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     for (int version = oldVersion + 1; version <= newVersion; version++) {
       switch (version) {
         case 1:
@@ -246,7 +251,15 @@ class DatabaseMigrations {
           // Добавляем поддержку TTL в кэше: раньше параметр `expiry` в
           // CacheRepository.save() принимался, но никуда не сохранялся —
           // кэш по факту никогда не истекал.
-          await _addColumnIfMissing(db, DatabaseConfig.tableCache, 'expires_at', 'INTEGER');
+          await _addColumnIfMissing(
+            db,
+            DatabaseConfig.tableCache,
+            'expires_at',
+            'INTEGER',
+          );
+          break;
+        case 3:
+          await _migrateHomeworksToTypeSafeIds(db);
           break;
       }
     }
@@ -263,5 +276,53 @@ class DatabaseMigrations {
     if (!exists) {
       await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
     }
+  }
+
+  static Future<void> _migrateHomeworksToTypeSafeIds(Database db) async {
+    await db.transaction((txn) async {
+      await txn.execute('''
+        CREATE TABLE ${DatabaseConfig.tableHomeworks}_new (
+          row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          id INTEGER NOT NULL,
+          account_id TEXT NOT NULL,
+          teacher_work_id INTEGER,
+          teacher_name TEXT,
+          subject_name TEXT NOT NULL,
+          theme TEXT NOT NULL,
+          description TEXT,
+          creation_time INTEGER NOT NULL,
+          completion_time INTEGER NOT NULL,
+          overdue_time INTEGER,
+          file_path TEXT,
+          comment TEXT,
+          status INTEGER DEFAULT 0,
+          common_status INTEGER DEFAULT 0,
+          homework_stud TEXT,
+          homework_comment TEXT,
+          cover_image TEXT,
+          material_type INTEGER DEFAULT 0,
+          is_deleted INTEGER DEFAULT 0,
+          UNIQUE(account_id, teacher_work_id, file_path, material_type),
+          FOREIGN KEY (account_id) REFERENCES ${DatabaseConfig.tableAccounts}(id) ON DELETE CASCADE
+        )
+      ''');
+      await txn.execute('''
+        INSERT INTO ${DatabaseConfig.tableHomeworks}_new (
+          id, account_id, teacher_work_id, teacher_name, subject_name, theme,
+          description, creation_time, completion_time, overdue_time, file_path,
+          comment, status, common_status, homework_stud, homework_comment,
+          cover_image, material_type, is_deleted
+        ) SELECT
+          id, account_id, teacher_work_id, teacher_name, subject_name, theme,
+          description, creation_time, completion_time, overdue_time, file_path,
+          comment, status, common_status, homework_stud, homework_comment,
+          cover_image, material_type, is_deleted
+        FROM ${DatabaseConfig.tableHomeworks}
+      ''');
+      await txn.execute('DROP TABLE ${DatabaseConfig.tableHomeworks}');
+      await txn.execute(
+        'ALTER TABLE ${DatabaseConfig.tableHomeworks}_new RENAME TO ${DatabaseConfig.tableHomeworks}',
+      );
+    });
   }
 }

@@ -4,6 +4,7 @@ import 'dart:async';
 import '../services/_notification/notification_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/_network/network_service.dart';
+import 'marks_and_profile_screen.dart';
 
 import '../models/_widgets/notifications/notification_item.dart';
 import '../models/_rabbits/notification_time.dart';
@@ -51,9 +52,9 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
 
   void _scheduleNextRefresh() {
     _autoRefreshTimer?.cancel();
-    
+
     final interval = NotificationTime.getCurrentPollingInterval();
-    
+
     _autoRefreshTimer = Timer(interval, () {
       _refreshNotifications();
       _scheduleNextRefresh();
@@ -79,7 +80,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
 
     final secureStorage = SecureStorageService();
     final token = await secureStorage.getToken();
-    
+
     if (token != null) {
       await _notificationService.manualCheckWithNotification(token);
       await Future.delayed(const Duration(seconds: 2));
@@ -98,7 +99,9 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Очистить историю'),
-        content: const Text('Вы уверены, что хотите очистить всю историю уведомлений?'),
+        content: const Text(
+          'Вы уверены, что хотите очистить всю историю уведомлений?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -115,7 +118,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
     if (shouldClear == true) {
       await _notificationService.clearNotificationsHistory();
       _refreshNotifications();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('История уведомлений очищена')),
       );
@@ -125,7 +128,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
   Future<void> _deleteNotification(NotificationItem notification) async {
     await _notificationService.deleteNotification(notification.id);
     _refreshNotifications();
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Уведомление удалено'),
@@ -145,6 +148,17 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
       await _notificationService.markAsRead(notification.id);
       _refreshNotifications();
     }
+
+    if (notification.type == NotificationType.newMarks && mounted) {
+      final token = await SecureStorageService().getToken();
+      if (token != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MarksAndProfileScreen(token: token),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -154,24 +168,20 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
         title: const Text('Уведомления'),
         actions: [
           StreamBuilder<bool>(
-              stream: _networkService.connectionStream,
-              initialData: _networkService.isConnected,
-              builder: (context, snapshot) {
-                final isConnected = snapshot.data ?? true;
-                
-                if (!isConnected) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: Icon(
-                      Icons.wifi_off,
-                      color: Colors.orange,
-                      size: 20,
-                    ),
-                  );
-                }
-                return SizedBox.shrink();
-              },
-            ),
+            stream: _networkService.connectionStream,
+            initialData: _networkService.isConnected,
+            builder: (context, snapshot) {
+              final isConnected = snapshot.data ?? true;
+
+              if (!isConnected) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Icon(Icons.wifi_off, color: Colors.orange, size: 20),
+                );
+              }
+              return SizedBox.shrink();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _refreshNotifications,
@@ -192,7 +202,8 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
               stream: _notificationsStream,
               initialData: const [],
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
@@ -219,47 +230,41 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
     );
   }
 
-        Widget _buildControlCard() {
-          return Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+  Widget _buildControlCard() {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Проверка обновлений',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _isLoading 
-                            ? 'Выполняется проверка...' 
-                            : 'Автообновление каждые ${NotificationTime.getCurrentPollingInterval().inMinutes} мин.',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
+                  const Text(
+                    'Проверка обновлений',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  const SizedBox(width: 16),
-                  _isLoading
-                      ? const CircularProgressIndicator()
-                      : FloatingActionButton(
-                          mini: true,
-                          onPressed: _manualCheck,
-                          child: const Icon(Icons.search),
-                        ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _isLoading
+                        ? 'Выполняется проверка...'
+                        : 'Автообновление каждые ${NotificationTime.getCurrentPollingInterval().inMinutes} мин.',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
                 ],
               ),
+            ),
+            const SizedBox(width: 16),
+            _isLoading
+                ? const CircularProgressIndicator()
+                : FloatingActionButton(
+                    mini: true,
+                    onPressed: _manualCheck,
+                    child: const Icon(Icons.search),
+                  ),
+          ],
+        ),
       ),
     );
   }

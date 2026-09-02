@@ -8,13 +8,13 @@ import '../database_config.dart';
 class HomeworkRepository extends BaseRepository<Homework> {
   @override
   String get tableName => DatabaseConfig.tableHomeworks;
-  
+
   @override
   String getUniqueKey(Homework homework) {
     // ДЗ уникально по ID, типу материала и teacher_work_id
     return '${homework.id}_${homework.materialType ?? 0}_${homework.teacherWorkId}';
   }
-  
+
   @override
   Map<String, dynamic> toMap(Homework homework, String accountId) {
     return {
@@ -31,15 +31,19 @@ class HomeworkRepository extends BaseRepository<Homework> {
       'comment': homework.comment,
       'status': homework.status,
       'common_status': homework.commonStatus,
-      'homework_stud': homework.homeworkStud != null ? jsonEncode(homework.homeworkStud!.toJson()) : null,
-      'homework_comment': homework.homeworkComment != null ? jsonEncode(homework.homeworkComment!.toJson()) : null,
+      'homework_stud': homework.homeworkStud != null
+          ? jsonEncode(homework.homeworkStud!.toJson())
+          : null,
+      'homework_comment': homework.homeworkComment != null
+          ? jsonEncode(homework.homeworkComment!.toJson())
+          : null,
       'cover_image': homework.coverImage,
       'teacher_name': homework.teacherName,
       'material_type': homework.materialType ?? 0,
       'is_deleted': homework.isDeleted == true ? 1 : 0,
     };
   }
-  
+
   @override
   Homework fromMap(Map<String, dynamic> map) {
     try {
@@ -74,10 +78,14 @@ class HomeworkRepository extends BaseRepository<Homework> {
         'name_spec': map['subject_name'],
         'theme': map['theme'],
         'comment': map['description'],
-        'creation_time': parseTimestamp(map['creation_time'] as int?).toIso8601String(),
-        'completion_time': parseTimestamp(map['completion_time'] as int?).toIso8601String(),
-        'overdue_time': map['overdue_time'] != null 
-            ? parseTimestamp(map['overdue_time'] as int).toIso8601String() 
+        'creation_time': parseTimestamp(
+          map['creation_time'] as int?,
+        ).toIso8601String(),
+        'completion_time': parseTimestamp(
+          map['completion_time'] as int?,
+        ).toIso8601String(),
+        'overdue_time': map['overdue_time'] != null
+            ? parseTimestamp(map['overdue_time'] as int).toIso8601String()
             : null,
         'file_path': map['file_path'],
         'status': map['status'],
@@ -102,7 +110,7 @@ class HomeworkRepository extends BaseRepository<Homework> {
       });
     }
   }
-  
+
   @override
   Map<String, dynamic> getUniqueWhereClause(Homework homework) {
     return {
@@ -111,30 +119,50 @@ class HomeworkRepository extends BaseRepository<Homework> {
       'teacher_work_id': homework.teacherWorkId,
     };
   }
-  
+
   /// Сохранить домашние задания с выбором стратегии
   Future<void> saveHomeworks(
-    List<Homework> homeworks, 
+    List<Homework> homeworks,
     String accountId, {
     int? materialType,
     SyncStrategy strategy = SyncStrategy.merge,
     bool cleanupMissing = false,
   }) async {
     await saveItems(
-      homeworks, 
+      homeworks,
       accountId,
       strategy: strategy,
       extraWhere: materialType != null ? 'material_type = ?' : null,
       extraWhereArgs: materialType != null ? [materialType] : null,
       cleanupMissing: cleanupMissing,
     );
-    
+
+    if (materialType != null) {
+      final db = await dbService.database;
+      await db.rawDelete(
+        '''
+        DELETE FROM $tableName
+        WHERE account_id = ?
+          AND material_type = ?
+          AND row_id NOT IN (
+            SELECT row_id FROM $tableName
+            WHERE account_id = ? AND material_type = ?
+            ORDER BY completion_time DESC, id DESC
+            LIMIT 10
+          )
+      ''',
+        [accountId, materialType, accountId, materialType],
+      );
+    }
+
     final typeName = materialType == 1 ? 'лабораторных' : 'домашних';
-    print('✅ $typeName заданий сохранено (стратегия: $strategy): ${homeworks.length} шт');
+    print(
+      '✅ $typeName заданий сохранено (стратегия: $strategy): ${homeworks.length} шт',
+    );
   }
-  
+
   // ====== Существующие методы (адаптированные) ======
-  
+
   Future<List<Homework>> getHomeworks(
     String accountId, {
     int? materialType,
@@ -144,14 +172,14 @@ class HomeworkRepository extends BaseRepository<Homework> {
   }) async {
     final queryBuilder = StringBuffer();
     final whereArgs = <dynamic>[accountId];
-    
+
     queryBuilder.write('account_id = ?');
-    
+
     if (materialType != null) {
       queryBuilder.write(' AND material_type = ?');
       whereArgs.add(materialType);
     }
-    
+
     if (status != null) {
       queryBuilder.write(' AND status = ?');
       whereArgs.add(status);
@@ -171,7 +199,7 @@ class HomeworkRepository extends BaseRepository<Homework> {
 
     String orderBy = 'completion_time ASC';
     String limitClause = '';
-    
+
     if (page != null && limit != null) {
       final offset = (page - 1) * limit;
       limitClause = 'LIMIT $limit OFFSET $offset';
@@ -189,7 +217,7 @@ class HomeworkRepository extends BaseRepository<Homework> {
 
   /// Сохранить счетчики домашних заданий
   Future<void> saveHomeworkCounters(
-    List<HomeworkCounter> counters, 
+    List<HomeworkCounter> counters,
     String accountId, {
     int? type,
   }) async {
@@ -210,22 +238,28 @@ class HomeworkRepository extends BaseRepository<Homework> {
       }
 
       for (final counter in counters) {
-        await txn.insert(DatabaseConfig.tableHomeworkCounters, {
-          'account_id': accountId,
-          'counter_type': counter.counterType,
-          'counter': counter.counter,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,);
+        await txn.insert(
+          DatabaseConfig.tableHomeworkCounters,
+          {
+            'account_id': accountId,
+            'counter_type': counter.counterType,
+            'counter': counter.counter,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
     });
-    
+
     print('✅ Счетчики сохранены: ${counters.length} шт');
   }
-  
-  Future<List<HomeworkCounter>> getHomeworkCounters(String accountId, {int? type}) async {
+
+  Future<List<HomeworkCounter>> getHomeworkCounters(
+    String accountId, {
+    int? type,
+  }) async {
     final whereArgs = <dynamic>[accountId];
     String whereClause = 'account_id = ?';
-    
+
     if (type != null) {
       whereClause += ' AND counter_type = ?';
       whereArgs.add(type);
@@ -238,25 +272,32 @@ class HomeworkRepository extends BaseRepository<Homework> {
       orderBy: 'counter_type ASC',
     );
 
-    return countersData.map((data) => HomeworkCounter.fromJson({
-      'counter_type': data['counter_type'],
-      'counter': data['counter'],
-    })).toList();
+    return countersData
+        .map(
+          (data) => HomeworkCounter.fromJson({
+            'counter_type': data['counter_type'],
+            'counter': data['counter'],
+          }),
+        )
+        .toList();
   }
-  
+
   //TODO: ВЫНЕСТИ
   // ====== Дополнительные методы (без изменений) ======
 
-  
-  Future<int> getHomeworksCount(String accountId, {int? materialType, int? status}) async {
+  Future<int> getHomeworksCount(
+    String accountId, {
+    int? materialType,
+    int? status,
+  }) async {
     final whereArgs = <dynamic>[accountId];
     String whereClause = 'account_id = ?';
-    
+
     if (materialType != null) {
       whereClause += ' AND material_type = ?';
       whereArgs.add(materialType);
     }
-    
+
     if (status != null) {
       whereClause += ' AND status = ?';
       whereArgs.add(status);
@@ -268,16 +309,20 @@ class HomeworkRepository extends BaseRepository<Homework> {
       'SELECT COUNT(*) as count FROM $tableName WHERE $whereClause',
       whereArgs,
     );
-    
+
     if (result.isEmpty) return 0;
     return result.first['count'] as int;
   }
 
-  Future<List<Homework>> getExpiredHomeworks(String accountId, {int? materialType}) async {
+  Future<List<Homework>> getExpiredHomeworks(
+    String accountId, {
+    int? materialType,
+  }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final whereArgs = <dynamic>[accountId, now];
-    String whereClause = 'account_id = ? AND completion_time < ? AND (is_deleted IS NULL OR is_deleted = 0)';
-    
+    String whereClause =
+        'account_id = ? AND completion_time < ? AND (is_deleted IS NULL OR is_deleted = 0)';
+
     if (materialType != null) {
       whereClause += ' AND material_type = ?';
       whereArgs.add(materialType);
@@ -293,11 +338,15 @@ class HomeworkRepository extends BaseRepository<Homework> {
     return homeworksData.map(fromMap).toList();
   }
 
-  Future<List<Homework>> getPendingHomeworks(String accountId, {int? materialType}) async {
+  Future<List<Homework>> getPendingHomeworks(
+    String accountId, {
+    int? materialType,
+  }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final whereArgs = <dynamic>[accountId, now];
-    String whereClause = 'account_id = ? AND completion_time >= ? AND (is_deleted IS NULL OR is_deleted = 0)';
-    
+    String whereClause =
+        'account_id = ? AND completion_time >= ? AND (is_deleted IS NULL OR is_deleted = 0)';
+
     if (materialType != null) {
       whereClause += ' AND material_type = ?';
       whereArgs.add(materialType);
@@ -313,10 +362,15 @@ class HomeworkRepository extends BaseRepository<Homework> {
     return homeworksData.map(fromMap).toList();
   }
 
-  Future<List<Homework>> getHomeworksBySubject(String accountId, String subjectName, {int? materialType}) async {
+  Future<List<Homework>> getHomeworksBySubject(
+    String accountId,
+    String subjectName, {
+    int? materialType,
+  }) async {
     final whereArgs = <dynamic>[accountId, subjectName];
-    String whereClause = 'account_id = ? AND subject_name = ? AND (is_deleted IS NULL OR is_deleted = 0)';
-    
+    String whereClause =
+        'account_id = ? AND subject_name = ? AND (is_deleted IS NULL OR is_deleted = 0)';
+
     if (materialType != null) {
       whereClause += ' AND material_type = ?';
       whereArgs.add(materialType);
@@ -332,12 +386,14 @@ class HomeworkRepository extends BaseRepository<Homework> {
     return homeworksData.map(fromMap).toList();
   }
 
-  Future<void> updateHomeworkStatus(int homeworkId, String accountId, int status) async {
+  Future<void> updateHomeworkStatus(
+    int homeworkId,
+    String accountId,
+    int status,
+  ) async {
     await dbService.update(
       tableName,
-      {
-        'status': status,
-      },
+      {'status': status},
       where: 'id = ? AND account_id = ?',
       whereArgs: [homeworkId, accountId],
     );
@@ -346,9 +402,7 @@ class HomeworkRepository extends BaseRepository<Homework> {
   Future<void> markHomeworkAsDeleted(int homeworkId, String accountId) async {
     await dbService.update(
       tableName,
-      {
-        'is_deleted': 1,
-      },
+      {'is_deleted': 1},
       where: 'id = ? AND account_id = ?',
       whereArgs: [homeworkId, accountId],
     );
@@ -366,12 +420,16 @@ class HomeworkRepository extends BaseRepository<Homework> {
 
     return homeworksData.map(fromMap).first;
   }
-  
+
   /// Бэквард-совместимость: старый метод с заменой
-  Future<void> saveHomeworksLegacy(List<Homework> homeworks, String accountId, {int? materialType}) async {
+  Future<void> saveHomeworksLegacy(
+    List<Homework> homeworks,
+    String accountId, {
+    int? materialType,
+  }) async {
     await saveHomeworks(
-      homeworks, 
-      accountId, 
+      homeworks,
+      accountId,
       materialType: materialType,
       strategy: SyncStrategy.replace,
     );
