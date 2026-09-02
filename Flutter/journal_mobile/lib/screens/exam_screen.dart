@@ -70,6 +70,7 @@ class _ExamScreenState extends State<ExamScreen> with TickerProviderStateMixin {
       
       if (isConnected) {
         allExams = await _apiService.getExams(token);
+        futureExams = await _apiService.getFutureExams(token);
         pastExams = allExams.where((exam) => exam.isPast).toList();
       } else {
         // Оффлайн режим - загружаем из SQLite с правильной фильтрацией

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../_database/database_config.dart';
 import '_account/account_manager_service.dart';
@@ -187,6 +188,8 @@ class ApiService {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final token = data['access_token'];
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.setString('token', token.toString());
         final accountManager = AccountManagerService();
         
         UserData? userData;
@@ -244,7 +247,10 @@ class ApiService {
         final accountId = await _getCurrentAccountId();
         
         try {
-          final response = await _makeRequest('$_baseUrl/progress/operations/student-visits');
+          final response = await _makeRequest(
+            '$_baseUrl/progress/operations/student-visits',
+            token: token,
+          );
           
           if (response.statusCode == 200) {
             final List<dynamic> marksData = jsonDecode(response.body);
@@ -320,7 +326,10 @@ class ApiService {
         final accountId = await _getCurrentAccountId();
         
         try {
-          final response = await _makeRequest('$_baseUrl/settings/user-info');
+          final response = await _makeRequest(
+            '$_baseUrl/settings/user-info',
+            token: token,
+          );
           
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
@@ -719,7 +728,10 @@ class ApiService {
         final accountId = await _getCurrentAccountId();
         
         try {
-          final response = await _makeRequest('$_baseUrl/progress/operations/student-exams');
+          final response = await _makeRequest(
+            '$_baseUrl/progress/operations/student-exams',
+            token: token,
+          );
           
           if (response.statusCode == 200) {
             final responseData = jsonDecode(response.body);
@@ -800,11 +812,18 @@ class ApiService {
         final accountId = await _getCurrentAccountId();
         
         try {
-          final response = await _makeRequest('$_baseUrl/dashboard/info/future-exams');
+          final response = await _makeRequest(
+            '$_baseUrl/dashboard/info/future-exams',
+            token: token,
+          );
           
           if (response.statusCode == 200) {
-            final List<dynamic> futureExamsData = jsonDecode(response.body);
-            final exams = futureExamsData.map((json) => Exam.fromJson(json)).toList();
+            final responseData = jsonDecode(response.body);
+            final futureExamsData = responseData is List ? responseData : <dynamic>[];
+            final exams = futureExamsData
+              .map((json) => Exam.fromJson(json))
+              .where((exam) => exam.isFuture)
+              .toList();
             
             // Сохраняем в SQLite
             await _databaseFacade.saveExams(exams, accountId);
@@ -824,7 +843,9 @@ class ApiService {
             print("Failed to load future exams: ${response.statusCode}");
             
             // Пробуем из SQLite (все экзамены)
-            final offlineExams = await _databaseFacade.getExams(accountId);
+            final offlineExams = (await _databaseFacade.getExams(accountId))
+              .where((exam) => exam.isFuture)
+              .toList();
             if (offlineExams.isNotEmpty) {
               print('📱 Используем экзамены из SQLite: ${offlineExams.length} шт');
               return offlineExams;
@@ -847,7 +868,9 @@ class ApiService {
           }
           
           // Пробуем из SQLite
-          final offlineExams = await _databaseFacade.getExams(accountId);
+            final offlineExams = (await _databaseFacade.getExams(accountId))
+              .where((exam) => exam.isFuture)
+              .toList();
           if (offlineExams.isNotEmpty) {
             print('🗄️ Используем экзамены из SQLite: ${offlineExams.length} шт');
             return offlineExams;
@@ -952,14 +975,9 @@ class ApiService {
           if (groupId != null) queryParams['group_id'] = groupId.toString();
           if (specId != null) queryParams['spec_id'] = specId.toString();
           
-          queryParams['limit'] = '6';
-          if (page != null) {
-            queryParams['offset'] = ((page - 1) * 6).toString();
-          }
-
           final url = uri.replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
           
-          final response = await _makeRequest(url.toString());
+          final response = await _makeRequest(url.toString(), token: token);
           
           if (response.statusCode == 200) {
             final responseData = jsonDecode(response.body);
@@ -1080,7 +1098,7 @@ class ApiService {
           
           final url = uri.replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
           
-          final response = await _makeRequest(url.toString());
+          final response = await _makeRequest(url.toString(), token: token);
           
           if (response.statusCode == 200) {
             final List<dynamic> counterData = jsonDecode(response.body);
@@ -1230,6 +1248,11 @@ class ApiService {
         getHomeworkCounters(token, type: 0).then((counters) async {
           await _databaseFacade.saveHomeworkCounters(counters, accountId, type: 0);
           print('✅ Счетчики ДЗ синхронизированы: ${counters.length} шт');
+        }),
+
+        getHomeworkCounters(token, type: 1).then((counters) async {
+          await _databaseFacade.saveHomeworkCounters(counters, accountId, type: 1);
+          print('✅ Счетчики лабораторных синхронизированы: ${counters.length} шт');
         }),
         
         getProgressActivity(token).then((activities) async {

@@ -5,6 +5,7 @@ import 'package:journal_mobile/models/mark.dart';
 class NotificationStateService {
   static const String _lastMarksKey = 'last_marks_for_notifications';
   static const String _lastAttendanceKey = 'last_attendance_for_notifications';
+  static const String _lastHomeworkKey = 'last_homework_for_notifications';
   
   final FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   
@@ -46,6 +47,21 @@ class NotificationStateService {
     } catch (e) {
       print('❌ Error loading last attendance state: $e');
       return [];
+    }
+  }
+
+  Future<void> saveHomeworkState(Map<String, String> state) async {
+    await _secureStorage.write(key: _lastHomeworkKey, value: jsonEncode(state));
+  }
+
+  Future<Map<String, String>> getLastHomeworkState() async {
+    try {
+      final data = await _secureStorage.read(key: _lastHomeworkKey);
+      if (data == null) return {};
+      return Map<String, String>.from(jsonDecode(data) as Map);
+    } catch (e) {
+      print('Error loading homework notification state: $e');
+      return {};
     }
   }
   

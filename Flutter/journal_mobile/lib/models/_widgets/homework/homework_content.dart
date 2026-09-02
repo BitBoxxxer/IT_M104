@@ -121,6 +121,7 @@ class HomeworkContent extends StatelessWidget {
                   final homework = homeworks[index];
                   return HomeworkCard(
                     homework: homework,
+                    tabStatus: tabStatus,
                     onDownloadRequested: onDownloadRequested,
                     isOffline: isOffline,
                   );

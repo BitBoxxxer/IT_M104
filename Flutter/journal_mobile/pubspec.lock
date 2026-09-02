@@ -328,6 +328,22 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  futuristic_onboarding:
+    dependency: "direct main"
+    description:
+      name: futuristic_onboarding
+      sha256: "1c74fc84a178af9a676e265173e471f4fc32f640e8b10a29adcf456db878a3b9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
+  glassmorphic_ui:
+    dependency: "direct main"
+    description:
+      name: glassmorphic_ui
+      sha256: "83df0c8264ff12e4163a2246c5e4df58db07ee5d16e3553621568c2a74c71d74"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
   glob:
     dependency: transitive
     description:

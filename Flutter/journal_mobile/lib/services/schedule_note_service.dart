@@ -8,6 +8,7 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
 import '../models/_system/schedule_note.dart';
+import '../models/_widgets/notifications/notification_item.dart';
 
 class ScheduleNoteService {
   final DatabaseFacade _databaseFacade = DatabaseFacade();
@@ -62,6 +63,17 @@ class ScheduleNoteService {
     
     const NotificationDetails details = NotificationDetails(
       android: androidDetails,
+    );
+
+    await _safeNotificationService.saveNotificationToHistory(
+      NotificationItem(
+        id: note.id + 10000,
+        title: 'Напоминание о заметке',
+        message: '${note.noteText}\nДата: $formattedDate',
+        timestamp: DateTime.now(),
+        type: NotificationType.schedule,
+        payload: {'note_id': note.id, 'date': note.date.toIso8601String()},
+      ),
     );
     
     await _safeNotificationService.notifications.show(
@@ -177,7 +189,7 @@ class ScheduleNoteService {
       '${note.noteText}\nДата: $formattedDate',
       _scheduleReminderTime(note.reminderTime!),
       details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       payload: jsonEncode({
         'type': 'schedule_note_reminder',
@@ -220,10 +232,28 @@ class ScheduleNoteService {
     if (reminderEnabled && reminderTime != null) {
       await _cancelScheduledReminder(savedNoteId);
       await _scheduleNoteReminder(note.copyWith(id: savedNoteId));
+      await _safeNotificationService.saveNotificationToHistory(
+        NotificationItem(
+          id: DateTime.now().millisecondsSinceEpoch,
+          title: 'Напоминание запланировано',
+          message: 'Заметка напомнит вам ${_formatReminderTime(reminderTime)}',
+          timestamp: DateTime.now(),
+          type: NotificationType.schedule,
+          payload: {'note_id': savedNoteId, 'date': normalizedDate.toIso8601String()},
+        ),
+      );
     }
     
     print('✅ Заметка ${noteId != null ? 'обновлена' : 'сохранена'} с ID: $savedNoteId');
     return savedNoteId;
+  }
+
+  String _formatReminderTime(DateTime reminderTime) {
+    final day = reminderTime.day.toString().padLeft(2, '0');
+    final month = reminderTime.month.toString().padLeft(2, '0');
+    final hour = reminderTime.hour.toString().padLeft(2, '0');
+    final minute = reminderTime.minute.toString().padLeft(2, '0');
+    return '$day.$month в $hour:$minute';
   }
 
   Future<void> _cancelScheduledReminder(int noteId) async {

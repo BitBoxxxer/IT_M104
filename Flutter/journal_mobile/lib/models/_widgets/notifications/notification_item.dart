@@ -18,12 +18,26 @@ class NotificationItem {
   });
 
   factory NotificationItem.fromJson(Map<String, dynamic> json) {
+    final timestamp = json['timestamp'];
+    final type = json['type'];
     return NotificationItem(
-      id: json['id'],
-      title: json['title'],
-      message: json['message'],
-      timestamp: DateTime.parse(json['timestamp']),
-      type: NotificationType.values[json['type']],
+      id: (json['id'] as num).toInt(),
+      title: json['title']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
+      timestamp: timestamp is DateTime
+          ? timestamp
+          : DateTime.parse(timestamp.toString()),
+      type: type is NotificationType
+          ? type
+          : type is String
+              ? NotificationType.values.firstWhere(
+                  (value) => value.name == type,
+                  orElse: () => NotificationType.system,
+                )
+              : NotificationType.values[(type as num).toInt().clamp(
+                    0,
+                    NotificationType.values.length - 1,
+                  )],
       isRead: json['isRead'] ?? false,
       payload: json['payload'],
     );

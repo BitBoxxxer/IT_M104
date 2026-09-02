@@ -271,10 +271,7 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
         
         _tabHasMoreData[tabStatus] = totalLoaded < totalCount;
         
-        if (uniqueNewHomeworks.isNotEmpty) {
-          _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! + 1;
-          print('📊 Увеличена страница на 1, теперь: ${_tabCurrentPages[tabStatus]}');
-        } else {
+        if (uniqueNewHomeworks.isEmpty) {
           print('📊 Нет новых заданий, страница остаётся: ${_tabCurrentPages[tabStatus]}');
         }
         
@@ -292,6 +289,9 @@ class _HomeworkListScreenState extends State<HomeworkListScreen>
 
   void _setErrorState(String tabStatus, String error) {
     setState(() {
+      if (_tabIsLoadingMore[tabStatus] == true && _tabCurrentPages[tabStatus]! > 1) {
+        _tabCurrentPages[tabStatus] = _tabCurrentPages[tabStatus]! - 1;
+      }
       _tabErrorMessages[tabStatus] = 'Ошибка загрузки: $error';
       _tabIsLoading[tabStatus] = false;
       _tabIsLoadingMore[tabStatus] = false;

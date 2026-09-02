@@ -25,6 +25,7 @@ class NotificationService {
   String? _currentAccountId;
 
   bool _isInitialized = false;
+  Future<void>? _initializationFuture;
 
   final StreamController<List<NotificationItem>> _notificationsController = 
       StreamController<List<NotificationItem>>.broadcast();
@@ -50,6 +51,17 @@ class NotificationService {
 
   Future<void> initialize() async {
     if (_isInitialized) return;
+    if (_initializationFuture != null) return _initializationFuture!;
+
+    _initializationFuture = _initializePlugin();
+    try {
+      await _initializationFuture;
+    } finally {
+      _initializationFuture = null;
+    }
+  }
+
+  Future<void> _initializePlugin() async {
     
     const AndroidInitializationSettings androidSettings = 
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -73,6 +85,10 @@ class NotificationService {
           print('📱 Уведомление нажато: ${response.payload}');
         },
       );
+
+      final androidPlugin = notifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.requestNotificationsPermission();
 
       await _createNotificationChannels();
       _isInitialized = true;
@@ -139,6 +155,8 @@ class NotificationService {
     }
   }
 
+  void refreshNotifications() => _emitNotificationsUpdate();
+
   Future<void> showTestNotification() async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'new_marks_channel',
@@ -175,7 +193,10 @@ class NotificationService {
 
   Future<bool> requestPermissions() async {
     try {
-      return true;
+      await initialize();
+      final androidPlugin = notifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      return await androidPlugin?.requestNotificationsPermission() ?? true;
     } catch (e) {
       print('❌ Ошибка запроса разрешений: $e');
       return false;
@@ -382,6 +403,7 @@ class NotificationService {
       
       await _checkMarks(token, prefs);
       await _checkAttendance(token, prefs);
+      await _checkHomework(token);
       
       await prefs.setInt(_lastSuccessfulCheckKey, 
         DateTime.now().millisecondsSinceEpoch);
@@ -389,6 +411,87 @@ class NotificationService {
     } catch (e) {
       print('Smart polling error: $e');
     }
+  }
+
+  Future<void> _checkHomework(String token) async {
+    try {
+      final current = <String, String>{};
+      for (final type in [0, 1]) {
+        final items = await _apiService.getHomeworks(token, type: type);
+        for (final homework in items) {
+          current['$type:${homework.id}'] = homework.statusString;
+        }
+      }
+
+      final previous = await _stateService.getLastHomeworkState();
+      if (previous.isEmpty) {
+        await _stateService.saveHomeworkState(current);
+        return;
+      }
+
+      var added = 0;
+      var completed = 0;
+      var deleted = 0;
+      var expired = 0;
+      current.forEach((key, status) {
+        final oldStatus = previous[key];
+        if (oldStatus == null) added++;
+        if (status == 'done' && oldStatus != 'done') completed++;
+        if (status == 'deleted' && oldStatus != 'deleted') deleted++;
+        if (status == 'expired' && oldStatus != 'expired') expired++;
+      });
+
+      await _stateService.saveHomeworkState(current);
+      final changes = <String>[];
+      if (added > 0) changes.add('новых: $added');
+      if (completed > 0) changes.add('проверено: $completed');
+      if (deleted > 0) changes.add('удалено: $deleted');
+      if (expired > 0) changes.add('просрочено: $expired');
+      if (changes.isEmpty) return;
+
+      final notification = NotificationItem(
+        id: DateTime.now().millisecondsSinceEpoch,
+        title: 'Изменения в заданиях',
+        message: changes.join(', '),
+        timestamp: DateTime.now(),
+        type: NotificationType.system,
+        payload: {'added': added, 'completed': completed, 'deleted': deleted, 'expired': expired},
+      );
+      await saveNotificationToHistory(notification);
+      await _showLocalNotification(
+        notification,
+        channelId: 'new_marks_channel',
+        channelName: 'Изменения в заданиях',
+      );
+    } catch (e) {
+      print('Error checking homework updates: $e');
+    }
+  }
+
+  Future<void> _showLocalNotification(
+    NotificationItem notification, {
+    required String channelId,
+    required String channelName,
+  }) async {
+    await initialize();
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        channelId,
+        channelName,
+        importance: Importance.high,
+        priority: Priority.high,
+        enableVibration: true,
+        playSound: true,
+      ),
+      iOS: const DarwinNotificationDetails(),
+    );
+    await notifications.show(
+      notification.id,
+      notification.title,
+      notification.message,
+      details,
+      payload: jsonEncode(notification.payload),
+    );
   }
 
   Future<void> _ensureInitialState(String token, SharedPreferences prefs) async {
@@ -700,6 +803,7 @@ class NotificationService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_lastMarksHashKey);
     await prefs.remove(_lastAttendanceHashKey);
+    await _stateService.saveHomeworkState({});
     await prefs.remove(_lastSuccessfulCheckKey);
     await clearNotificationsHistory();
   }

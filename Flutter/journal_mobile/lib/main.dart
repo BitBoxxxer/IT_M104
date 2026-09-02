@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:futuristic_onboarding/futuristic_onboarding.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_initializer.dart';
 
@@ -20,7 +22,7 @@ import 'services/main_service_coordinator.dart';
 import 'services/_notification/notification_service.dart';
 import 'services/_network/network_service.dart';
 
-import 'models/_system/blue_theme.dart';
+import 'models/_system/futuristic_theme.dart';
 
 import 'screens/menu_screen.dart';
 
@@ -92,13 +94,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _initializeServices();
     
-    BackgroundWorker.initialize();
   }
 
   Future<void> _initializeServices() async {
     try {
       await DatabaseHealthCheck.repairDatabaseIfNeeded();
       await _networkService.initialize();
+      await BackgroundWorker.initialize();
+      await BackgroundWorker.scheduleBackgroundSync();
       await _loadTheme();
     } catch (e) {
       print('Ошибка инициализации сервисов: $e');
@@ -257,17 +260,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
   ThemeData _getDarkTheme() {
-    return _currentTheme == ThemeService.blue 
-        ? blueTheme
-        : ThemeData.dark();
+    return futuristicTheme;
   }
+
+  ThemeData _getLightTheme() => futuristicLightTheme;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'It top M',
-      theme: ThemeData.light(),
+      theme: _getLightTheme(),
       darkTheme: _getDarkTheme(),
       themeMode: _themeService.getThemeMode(_currentTheme),
       home: FutureBuilder<Map<String, dynamic>>(
@@ -324,16 +327,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           final isOffline = data['isOffline'] == true;
           final accountId = data['accountId'];
 
+          final Widget startScreen;
           if (screenType == 'menu' && token != null) {
             if (!isOffline) {
               WidgetsBinding.instance.addPostFrameCallback((_) async {
-                try {
-                  await _apiService.syncCriticalDataOnly(token);
-                  print('✅ Критические данные синхронизированы');
-                } catch (e) {
-                  print('⚠️ Синхронизация критических данных не удалась: $e');
-                }
-                
                 _serviceCoordinator.startBackgroundServices(token);
                 
                 Future.delayed(Duration(seconds: 2), () {
@@ -358,19 +355,99 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               });
             }
             
-            return MainMenuScreen(
+            startScreen = MainMenuScreen(
               token: token,
               currentTheme: _currentTheme,
               onThemeChanged: _changeTheme,
               isOfflineMode: isOffline,
             );
           } else {
-          return LoginScreen(
+          startScreen = LoginScreen(
             currentTheme: _currentTheme,
             onThemeChanged: _changeTheme,
           );
         }
+          return _OnboardingShell(child: startScreen);
         },
+      ),
+    );
+  }
+}
+
+class _OnboardingShell extends StatefulWidget {
+  const _OnboardingShell({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_OnboardingShell> createState() => _OnboardingShellState();
+}
+
+class _OnboardingShellState extends State<_OnboardingShell> {
+  static const _completedKey = 'futuristic_onboarding_completed';
+  final _titleKey = GlobalKey();
+  final _contentKey = GlobalKey();
+  bool? _isCompleted;
+
+  List<OnboardingStep> get _steps => [
+        OnboardingStep(
+          targetKey: _titleKey,
+          title: 'Добро пожаловать',
+          description: 'Обновленный интерфейс приложения в стиле HUD и Liquid Glass.',
+          highlightShape: HighlightShape.roundedRect,
+          tooltipPosition: TooltipPosition.bottom,
+          illustration: const Icon(Icons.auto_awesome, size: 42, color: Colors.cyan),
+        ),
+        OnboardingStep(
+          targetKey: _contentKey,
+          title: 'Все важное под рукой',
+          description: 'Здесь находятся расписание, оценки, задания и настройки приложения.',
+          highlightShape: HighlightShape.roundedRect,
+          tooltipPosition: TooltipPosition.top,
+          illustration: const Icon(Icons.dashboard_customize, size: 42, color: Colors.amber),
+          skippable: false,
+        ),
+      ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCompletionState();
+  }
+
+  Future<void> _loadCompletionState() async {
+    final preferences = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() => _isCompleted = preferences.getBool(_completedKey) ?? false);
+    }
+  }
+
+  Future<void> _markCompleted() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_completedKey, true);
+    if (mounted) setState(() => _isCompleted = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isCompleted == null) return widget.child;
+
+    return FuturisticOnboarding(
+      key: const ValueKey('journal_futuristic_onboarding'),
+      steps: _steps,
+      theme: OnboardingTheme.cyberpunk,
+      showParticles: true,
+      enableGestures: true,
+      autoStart: !_isCompleted!,
+      onCompleted: _markCompleted,
+      onSkipped: _markCompleted,
+      child: Column(
+        children: [
+          SizedBox(key: _titleKey, height: 1),
+          Expanded(
+            child: Container(key: _contentKey, child: widget.child),
+          ),
+        ],
       ),
     );
   }

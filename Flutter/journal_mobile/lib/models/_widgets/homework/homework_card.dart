@@ -5,12 +5,14 @@ import 'homework.dart';
 
 class HomeworkCard extends StatelessWidget {
   final Homework homework;
+  final String tabStatus;
   final Function(Homework, bool)? onDownloadRequested;
   final bool isOffline;
 
   const HomeworkCard({
     super.key,
     required this.homework,
+    required this.tabStatus,
     this.onDownloadRequested,
     this.isOffline = false,
   });
@@ -371,30 +373,53 @@ class HomeworkCard extends StatelessWidget {
   }
 
   Color _getStatusColor() {
-    if (homework.isDeletedStatus) return Colors.grey.shade700;
-    if (homework.isExpired) return Colors.red.shade700;
-    if (homework.isDone) return Colors.green.shade700;
-    if (homework.isInspection) return Colors.blue.shade700;
-    if (homework.isOpened) return Colors.orange.shade700;
-    return Colors.grey.shade700;
+    switch (tabStatus) {
+      case 'expired':
+        return Colors.red.shade700;
+      case 'done':
+        return Colors.green.shade700;
+      case 'inspection':
+        return Colors.orange.shade700;
+      case 'opened':
+        return Colors.blue.shade700;
+      case 'deleted':
+      default:
+        return Colors.grey.shade700;
+    }
   }
 
   String _getStatusText() {
-    if (homework.isDeletedStatus) return 'Удалено';
-    if (homework.isExpired) return 'Просрочено';
-    if (homework.isDone) return 'Проверено';
-    if (homework.isInspection) return 'На проверке';
-    if (homework.isOpened) return 'Активно';
-    return 'Неизвестно';
+    switch (tabStatus) {
+      case 'expired':
+        return 'Просрочено';
+      case 'done':
+        return 'Проверено';
+      case 'inspection':
+        return 'На проверке';
+      case 'opened':
+        return 'Активно';
+      case 'deleted':
+        return 'Удалено';
+      default:
+        return 'Неизвестно';
+    }
   }
 
   IconData _getStatusIcon() {
-    if (homework.isDeletedStatus) return Icons.delete_rounded;
-    if (homework.isExpired) return Icons.warning_rounded;
-    if (homework.isDone) return Icons.check_circle_rounded;
-    if (homework.isInspection) return Icons.hourglass_top_rounded;
-    if (homework.isOpened) return Icons.assignment_rounded;
-    return Icons.help_rounded;
+    switch (tabStatus) {
+      case 'expired':
+        return Icons.warning_rounded;
+      case 'done':
+        return Icons.check_circle_rounded;
+      case 'inspection':
+        return Icons.hourglass_top_rounded;
+      case 'opened':
+        return Icons.assignment_rounded;
+      case 'deleted':
+        return Icons.delete_rounded;
+      default:
+        return Icons.help_rounded;
+    }
   }
 
   bool _isDownloadAvailable() {

@@ -78,6 +78,10 @@ class NotificationRepository {
         return NotificationType.newMarks;
       case 'attendance':
         return NotificationType.attendance;
+      case 'schedule':
+        return NotificationType.schedule;
+      case 'achievement':
+        return NotificationType.achievement;
       case 'system':
         return NotificationType.system;
       default:

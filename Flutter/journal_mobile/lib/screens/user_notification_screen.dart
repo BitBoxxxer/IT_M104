@@ -69,8 +69,7 @@ class _UserNotificationScreenState extends State<UserNotificationScreen> {
   }
 
   void _refreshNotifications() {
-    _notificationService.getNotificationsHistory().then((_) {
-    });
+    _notificationService.refreshNotifications();
   }
 
   Future<void> _manualCheck() async {

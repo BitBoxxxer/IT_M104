@@ -117,7 +117,7 @@ String? get studentFilename => homeworkStud?.filename;
         (description?.toLowerCase().contains('удален') == true)) {
       return 5;
     }
-    
+
     if (homeworkStud?.mark != null) {
       return 1;
     }
@@ -125,9 +125,8 @@ String? get studentFilename => homeworkStud?.filename;
     if (homeworkStud != null) {
       return 2;
     }
-    
-    final now = DateTime.now();
-    if (now.isAfter(completionTime)) {
+
+    if (DateTime.now().isAfter(completionTime)) {
       return 0;
     }
     
